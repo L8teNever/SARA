@@ -2,6 +2,7 @@
 # Python 3.11 + FFmpeg auf Debian Slim
 
 FROM python:3.11-slim
+LABEL org.opencontainers.image.source=https://github.com/L8teNever/SARA
 
 # System-Pakete: ffmpeg, Schriften für drawtext-Filter
 RUN apt-get update && apt-get install -y --no-install-recommends \
