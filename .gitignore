@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+pip-wheel-metadata/
+.mypy_cache/
+.pytest_cache/
+
+# Virtuelle Umgebungen
+.venv/
+venv/
+env/
+ENV/
+
+# SARA — Laufzeitdaten (werden als Docker-Volume gemountet, nicht ins Repo)
+data/
+
+# Umgebungsvariablen & Secrets
+.env
+.env.local
+.env.production
+*.secret
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/

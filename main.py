@@ -1,0 +1,1321 @@
+"""
+SARA — Story And Reel Automator
+Flask-Backend: Story-Generierung, Video-Erstellung, Warteschlange
+
+Neu (v2):
+ - 9:16 Hochformat (1080×1920)
+ - Cover-Bild für jede Story (einheitliches Design)
+ - Edge-TTS für natürliche Stimme (Fallback: gTTS)
+ - Wort-Highlighting via ASS-Untertitel (aktives Wort = gelb)
+ - Nahtloser Hintergrundvideo-Loop (zufälliger Wechsel bei Videoende)
+ - SSE-basierter Job-Progress (Live-Status auf der Website)
+"""
+
+import os
+import re
+import json
+import uuid
+import random
+import string
+import sqlite3
+import asyncio
+import threading
+import subprocess
+import traceback
+from datetime import datetime
+from pathlib import Path
+
+from flask import (
+    Flask, request, jsonify, render_template,
+    send_from_directory, abort, Response, stream_with_context
+)
+import anthropic
+
+# ---------------------------------------------------------------------------
+# Konfiguration
+# ---------------------------------------------------------------------------
+BASE_DIR        = Path(__file__).parent
+DATA_DIR        = BASE_DIR / "data"
+BACKGROUNDS_DIR = DATA_DIR / "backgrounds"
+OUTPUTS_DIR     = DATA_DIR / "outputs"
+TTS_DIR         = DATA_DIR / "tts"
+COVERS_DIR      = DATA_DIR / "covers"
+DB_PATH         = DATA_DIR / "sara.db"
+
+# Video-Format: 9:16 Hochformat (TikTok/Reels)
+VIDEO_WIDTH     = 1080
+VIDEO_HEIGHT    = 1920
+
+ALLOWED_VIDEO_EXTENSIONS = {"mp4", "mov", "avi"}
+MAX_WORDS_PER_PART = 200
+QUEUE_POLL_INTERVAL = 2  # Sekunden zwischen Queue-Durchläufen
+
+# Globaler Job-Progress (story_part_id → {step, total_steps, label})
+_job_progress: dict = {}
+_progress_lock = threading.Lock()
+
+# ---------------------------------------------------------------------------
+# FFmpeg / FFprobe — automatische Pfaderkennung (Windows + Docker)
+# ---------------------------------------------------------------------------
+def _find_ffmpeg() -> str:
+    import shutil
+    ff = shutil.which("ffmpeg")
+    if ff:
+        return ff
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return "ffmpeg"
+
+FFMPEG_EXE = _find_ffmpeg()
+
+# ---------------------------------------------------------------------------
+# Schrift für drawtext — plattformübergreifend
+# ---------------------------------------------------------------------------
+def _find_font() -> str:
+    """Sucht eine passende TTF-Schrift auf dem aktuellen Betriebssystem."""
+    candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/calibrib.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/Library/Fonts/Arial Bold.ttf",
+    ]
+    for c in candidates:
+        if Path(c).exists():
+            return c
+    return ""
+
+DRAWTEXT_FONT = _find_font()
+
+app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB Upload-Limit
+
+# ---------------------------------------------------------------------------
+# Datenbank — Initialisierung & Hilfsfunktionen
+# ---------------------------------------------------------------------------
+
+def get_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+
+def init_db():
+    with get_db() as conn:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS stories (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                code         TEXT    NOT NULL UNIQUE,
+                title        TEXT    NOT NULL,
+                keywords_json TEXT   NOT NULL,
+                total_parts  INTEGER NOT NULL,
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS story_parts (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                story_id     INTEGER NOT NULL REFERENCES stories(id),
+                part_number  INTEGER NOT NULL,
+                text         TEXT    NOT NULL,
+                cliffhanger  TEXT,
+                video_path   TEXT,
+                cover_path   TEXT,
+                status       TEXT    NOT NULL DEFAULT 'pending',
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS queue (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                story_part_id   INTEGER NOT NULL REFERENCES story_parts(id),
+                status          TEXT    NOT NULL DEFAULT 'pending',
+                error_msg       TEXT,
+                progress_label  TEXT    DEFAULT '',
+                progress_pct    INTEGER DEFAULT 0,
+                created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+                finished_at     TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS backgrounds (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename      TEXT    NOT NULL UNIQUE,
+                original_name TEXT    NOT NULL,
+                uploaded_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS video_uploads (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                story_part_id   INTEGER NOT NULL REFERENCES story_parts(id),
+                platform        TEXT    NOT NULL DEFAULT 'tiktok',
+                uploaded_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+                notes           TEXT    DEFAULT ''
+            );
+        """)
+        # Migration: cover_path Spalte falls noch nicht vorhanden
+        try:
+            conn.execute("ALTER TABLE story_parts ADD COLUMN cover_path TEXT")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE queue ADD COLUMN progress_label TEXT DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE queue ADD COLUMN progress_pct INTEGER DEFAULT 0")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE story_parts ADD COLUMN social_json TEXT")
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Hilfsfunktionen
+# ---------------------------------------------------------------------------
+
+def generate_story_code() -> str:
+    chars = string.ascii_uppercase + string.digits
+    while True:
+        code = "".join(random.choices(chars, k=6))
+        with get_db() as conn:
+            row = conn.execute("SELECT id FROM stories WHERE code = ?", (code,)).fetchone()
+        if row is None:
+            return code
+
+
+def check_duplicate(keywords: list) -> dict:
+    new_set = set(k.lower() for k in keywords)
+    with get_db() as conn:
+        rows = conn.execute("SELECT id, code, title, keywords_json FROM stories").fetchall()
+    for row in rows:
+        existing = set(k.lower() for k in json.loads(row["keywords_json"]))
+        overlap = len(new_set & existing)
+        if overlap >= 6:
+            return {
+                "is_duplicate": True,
+                "similar_story": {"id": row["id"], "code": row["code"], "title": row["title"]},
+                "overlap": overlap,
+            }
+    return {"is_duplicate": False, "similar_story": None, "overlap": 0}
+
+
+def allowed_video(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_VIDEO_EXTENSIONS
+
+
+def _set_progress(job_id: int, pct: int, label: str):
+    """Aktualisiert den Fortschritt eines Jobs in der DB."""
+    try:
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE queue SET progress_pct = ?, progress_label = ? WHERE id = ?",
+                (pct, label, job_id)
+            )
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# AI — Story-Generierung via Claude
+# ---------------------------------------------------------------------------
+
+SYSTEM_PROMPT = """You are a creative storyteller specializing in Reddit-style personal stories for TikTok/Reels.
+Generate compelling, emotional, and suspenseful stories that feel authentic and real.
+Stories must be written in English and follow this EXACT JSON format — no text before or after:
+{
+  "title": "Story Title",
+  "total_parts": <number>,
+  "keywords": ["word1","word2","word3","word4","word5","word6","word7","word8","word9","word10"],
+  "parts": [
+    {
+      "part_number": 1,
+      "text": "Text of part 1 — MUST be 160 to 200 words...",
+      "cliffhanger_hint": "brief hint of what comes next",
+      "social": {
+        "video_title": "Catchy TikTok/Reels title with Part 1/2 — max 80 chars",
+        "description": "2-3 sentence caption that teases the story emotionally without spoiling it. End with a question or call-to-action.",
+        "hashtags": "#storytime #reddit #viral #relationship #foryou #fyp #drama"
+      }
+    },
+    {
+      "part_number": 2,
+      "text": "Text of part 2 — MUST be 160 to 200 words...",
+      "cliffhanger_hint": "",
+      "social": {
+        "video_title": "Catchy TikTok/Reels title with Part 2/2 — max 80 chars",
+        "description": "2-3 sentence caption that teases the conclusion. End with a question or call-to-action.",
+        "hashtags": "#storytime #reddit #viral #relationship #foryou #fyp #drama"
+      }
+    }
+  ]
+}
+
+Rules:
+- Each part MUST contain exactly 160–200 words (this guarantees at least 75 seconds of audio per part)
+- Split the story so each part has 160–200 words; never fewer than 160 words per part
+- Each part (except the last) MUST end at the most dramatic, suspenseful cliffhanger possible
+- For 2-part stories: Part 1 MUST end at the single most gripping moment — the listener MUST feel compelled to watch Part 2 immediately
+- Last part always has empty string for cliffhanger_hint
+- keywords: exactly 10 English keywords describing the core story content
+- Write in first person, past tense, raw and emotional style (like r/TIFU or r/relationships)
+- Hook the audience within the very first sentence — no slow build-ups
+- social.video_title: punchy and attention-grabbing, include "Part X/Y" for multi-part, max 80 chars
+- social.description: emotionally tease the story, never spoil the ending, end with a question or CTA
+- social.hashtags: 6–8 relevant hashtags as a single space-separated string"""
+
+
+def generate_story(prompt: str) -> dict:
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY ist nicht gesetzt.")
+    client = anthropic.Anthropic(api_key=api_key)
+    message = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=4096,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": f"Create a story about: {prompt}"}],
+    )
+    raw = message.content[0].text.strip()
+    json_match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not json_match:
+        raise ValueError(f"Claude hat kein gültiges JSON zurückgegeben: {raw[:200]}")
+    return json.loads(json_match.group())
+
+
+# ---------------------------------------------------------------------------
+# TTS — Edge-TTS (natürlich) mit gTTS-Fallback
+# ---------------------------------------------------------------------------
+
+def tts_to_file(text: str, output_path: Path) -> Path:
+    """
+    Versucht Edge-TTS (natürliche Stimme), fällt auf gTTS zurück.
+    Gibt immer eine MP3-Datei zurück.
+    """
+    # Edge-TTS — asynchron, daher in eigenem Event-Loop
+    try:
+        import edge_tts
+
+        async def _edge_speak():
+            communicate = edge_tts.Communicate(
+                text=text,
+                voice="en-US-AriaNeural",
+                rate="-3%",   # Leicht langsamer für flüssigere, natürlichere Erzählung
+                pitch="-2Hz",
+            )
+            await communicate.save(str(output_path))
+
+        # Windows-kompatibles Event-Loop-Handling
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        loop.run_until_complete(_edge_speak())
+        return output_path
+
+    except Exception as edge_err:
+        # Fallback: gTTS
+        try:
+            from gtts import gTTS
+            tts = gTTS(text=text, lang="en", slow=False)
+            tts.save(str(output_path))
+            return output_path
+        except Exception as gtts_err:
+            raise RuntimeError(
+                f"TTS fehlgeschlagen. Edge-TTS: {edge_err} | gTTS: {gtts_err}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Timing & Dauer-Hilfsfunktionen
+# ---------------------------------------------------------------------------
+
+def _get_duration(file_path: Path) -> float:
+    result = subprocess.run(
+        [FFMPEG_EXE, "-i", str(file_path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stderr_text = result.stderr.decode("utf-8", errors="replace")
+    match = re.search(r"Duration:\s*(\d+):(\d+):([\d.]+)", stderr_text)
+    if not match:
+        raise ValueError(f"Konnte Dauer nicht ermitteln für: {file_path}")
+    h, m, s = int(match.group(1)), int(match.group(2)), float(match.group(3))
+    return h * 3600 + m * 60 + s
+
+
+def get_audio_duration(audio_path: Path) -> float:
+    return _get_duration(audio_path)
+
+
+def get_video_duration(video_path: Path) -> float:
+    return _get_duration(video_path)
+
+
+# ---------------------------------------------------------------------------
+# Word-Timing: Wort-Highlighting via Edge-TTS WordBoundary + ASS-Untertitel
+# ---------------------------------------------------------------------------
+
+def build_word_timed_ass(text: str, output_path: Path, audio_path: Path) -> Path:
+    """
+    Erstellt eine ASS-Untertiteldatei mit Wort-Highlighting.
+    Aktiv gesprochenes Wort = gelb, Rest = weiß.
+    Nutzt Edge-TTS WordBoundary-Events für exaktes Timing.
+    Fallback: gleichmäßige Aufteilung.
+    """
+    word_events = _get_word_boundaries(text, audio_path)
+    ass_content = _build_ass_from_events(word_events, text)
+    output_path.write_text(ass_content, encoding="utf-8")
+    return output_path
+
+
+def _get_word_boundaries(text: str, audio_path: Path) -> list:
+    """
+    Versucht Edge-TTS WordBoundary-Events zu holen.
+    Gibt Liste von (word, start_sec, end_sec) zurück.
+    """
+    try:
+        import edge_tts
+        events = []
+
+        async def _collect():
+            communicate = edge_tts.Communicate(
+                text=text,
+                voice="en-US-AriaNeural",
+                rate="-3%",
+                pitch="-2Hz",
+            )
+            async for chunk in communicate.stream():
+                if chunk["type"] == "WordBoundary":
+                    offset_sec  = chunk["offset"]  / 1e7   # 100ns → sec
+                    duration_sec = chunk["duration"] / 1e7
+                    events.append((
+                        chunk["text"],
+                        offset_sec,
+                        offset_sec + duration_sec,
+                    ))
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        loop.run_until_complete(_collect())
+        return events if events else _uniform_word_timing(text, audio_path)
+
+    except Exception:
+        return _uniform_word_timing(text, audio_path)
+
+
+def _uniform_word_timing(text: str, audio_path: Path) -> list:
+    """Gleichmäßiges Timing als Fallback."""
+    words = text.split()
+    try:
+        total = get_audio_duration(audio_path)
+    except Exception:
+        total = len(words) * 0.4
+    dur = total / max(len(words), 1)
+    return [(w, i * dur, (i + 1) * dur) for i, w in enumerate(words)]
+
+
+def _build_ass_from_events(word_events: list, full_text: str) -> str:
+    """
+    3-Zeilen-Layout: gelbes Wort IMMER an fixer Y-Position (Mitte des Screens),
+    vorherige Wörter darüber, nächste Wörter darunter.
+    Für 1080×1920 (9:16) optimiert.
+    """
+    header = """\
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Active,Arial,84,&H0000FFFF,&H000000FF,&H00000000,&HAA000000,-1,0,0,0,100,100,1.5,0,1,6,3,5,60,60,0,1
+Style: Context,Arial,58,&H00E8E8E8,&H000000FF,&H00000000,&H66000000,0,0,0,0,100,100,1,0,1,4,2,5,60,60,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+
+    def fmt(sec: float) -> str:
+        h = int(sec // 3600)
+        m = int((sec % 3600) // 60)
+        s = sec % 60
+        cs = int((s - int(s)) * 100)
+        return f"{h}:{m:02d}:{int(s):02d}.{cs:02d}"
+
+    # Feste Bildschirm-Positionen (Bildschirm 1080×1920)
+    X       = 540   # horizontal zentriert
+    Y_PREV  = 910   # Zeile über dem aktiven Wort
+    Y_ACT   = 1050  # Aktives Wort — IMMER hier
+    Y_NEXT  = 1195  # Zeile unter dem aktiven Wort
+    CTX     = 3     # Kontext-Wörter oben/unten
+
+    events_out = []
+
+    for i, (word, start, end) in enumerate(word_events):
+        # Aktives Wort — fixe Position, gelb, fett
+        events_out.append(
+            f"Dialogue: 0,{fmt(start)},{fmt(end)},Active,,0,0,0,,"
+            f"{{\\an5\\pos({X},{Y_ACT})}}{word}"
+        )
+
+        # Vorherige Wörter (oben) — grau/weiß
+        prev = [word_events[j][0] for j in range(max(0, i - CTX), i)]
+        if prev:
+            events_out.append(
+                f"Dialogue: 0,{fmt(start)},{fmt(end)},Context,,0,0,0,,"
+                f"{{\\an5\\pos({X},{Y_PREV})}}{' '.join(prev)}"
+            )
+
+        # Nächste Wörter (unten) — grau/weiß
+        nxt = [word_events[j][0] for j in range(i + 1, min(len(word_events), i + CTX + 1))]
+        if nxt:
+            events_out.append(
+                f"Dialogue: 0,{fmt(start)},{fmt(end)},Context,,0,0,0,,"
+                f"{{\\an5\\pos({X},{Y_NEXT})}}{' '.join(nxt)}"
+            )
+
+    return header + "\n".join(events_out) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# Cover-Bild erstellen (einheitliches Design)
+# ---------------------------------------------------------------------------
+
+def create_cover_image(story_title: str, story_code: str, part_number: int,
+                       output_path: Path) -> Path:
+    """
+    Erstellt ein einheitliches Cover-Bild (1080×1920) für die Story.
+    Dunkler Hintergrund, Gradient, Titel + Part-Badge.
+    """
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import textwrap
+
+        W, H = VIDEO_WIDTH, VIDEO_HEIGHT
+        img = Image.new("RGB", (W, H), (0, 0, 0))
+        draw = ImageDraw.Draw(img)
+
+        # Gradient-Hintergrund (dunkelviolett → schwarz)
+        for y in range(H):
+            t = y / H
+            r = int(30  * (1 - t) + 0  * t)
+            g = int(10  * (1 - t) + 0  * t)
+            b = int(60  * (1 - t) + 0  * t)
+            draw.line([(0, y), (W, y)], fill=(r, g, b))
+
+        # Vignette-Overlay (Ellipse, transparent → schwarz an Rändern)
+        for radius in range(0, min(W, H) // 2, 8):
+            alpha = int(80 * (radius / (min(W, H) // 2)))
+            overlay_color = (0, 0, 0, alpha)
+            try:
+                draw.ellipse(
+                    [(W//2 - radius*2, H//2 - radius*3),
+                     (W//2 + radius*2, H//2 + radius*3)],
+                    outline=None
+                )
+            except Exception:
+                pass
+
+        # Schrift laden
+        font_path = DRAWTEXT_FONT or ""
+        try:
+            font_big   = ImageFont.truetype(font_path, 90) if font_path else ImageFont.load_default()
+            font_med   = ImageFont.truetype(font_path, 55) if font_path else ImageFont.load_default()
+            font_small = ImageFont.truetype(font_path, 40) if font_path else ImageFont.load_default()
+        except Exception:
+            font_big   = ImageFont.load_default()
+            font_med   = ImageFont.load_default()
+            font_small = ImageFont.load_default()
+
+        # "SARA" Logo oben
+        draw.text((W // 2, 160), "SARA", font=font_big, fill=(180, 140, 255),
+                  anchor="mm", stroke_width=3, stroke_fill=(80, 40, 120))
+
+        # Trennlinie
+        lw = 3
+        draw.rectangle([(120, 260), (W - 120, 260 + lw)], fill=(140, 100, 220))
+
+        # Part Badge
+        badge_text = f"Part {part_number}"
+        badge_x, badge_y = W // 2, 360
+        bw = draw.textlength(badge_text, font=font_med) + 60
+        bh = 70
+        draw.rounded_rectangle(
+            [(badge_x - bw // 2, badge_y - bh // 2),
+             (badge_x + bw // 2, badge_y + bh // 2)],
+            radius=35,
+            fill=(80, 40, 140)
+        )
+        draw.text((badge_x, badge_y), badge_text, font=font_med,
+                  fill=(220, 180, 255), anchor="mm")
+
+        # Story-Titel (umgebrochen)
+        wrapped = textwrap.wrap(story_title, width=22)
+        y_start = H // 2 - (len(wrapped) * 110) // 2
+        for i, line in enumerate(wrapped):
+            draw.text(
+                (W // 2, y_start + i * 110),
+                line,
+                font=font_big,
+                fill=(255, 255, 255),
+                anchor="mm",
+                stroke_width=4,
+                stroke_fill=(0, 0, 0),
+            )
+
+        # Story-Code unten
+        draw.text(
+            (W // 2, H - 140),
+            story_code,
+            font=font_small,
+            fill=(150, 150, 180),
+            anchor="mm",
+        )
+
+        # Dekorative Linie unten
+        draw.rectangle([(120, H - 200), (W - 120, H - 200 + lw)], fill=(80, 50, 120))
+
+        img.save(str(output_path), "JPEG", quality=92)
+        return output_path
+
+    except Exception as e:
+        # Minimal-Fallback: schwarzes Bild
+        try:
+            from PIL import Image
+            img = Image.new("RGB", (VIDEO_WIDTH, VIDEO_HEIGHT), (20, 10, 40))
+            img.save(str(output_path), "JPEG", quality=85)
+        except Exception:
+            pass
+        return output_path
+
+
+# ---------------------------------------------------------------------------
+# Video-Erstellung (Hauptfunktion)
+# ---------------------------------------------------------------------------
+
+def create_video_for_part(story_part_id: int, job_id: int) -> Path:
+    """
+    Erstellt ein 9:16 Hochformat-Video (1080×1920) für einen Story-Teil.
+    Features:
+    - Edge-TTS natürliche Stimme
+    - Wort-Highlighting (gelb) via ASS-Untertitel
+    - Nahtloser Hintergrundvideo-Loop (bei Videoende zufällig neues)
+    - Cover-Bild
+    """
+    def progress(pct: int, label: str):
+        _set_progress(job_id, pct, label)
+
+    with get_db() as conn:
+        part = conn.execute(
+            """SELECT sp.*, s.code, s.title
+               FROM story_parts sp
+               JOIN stories s ON s.id = sp.story_id
+               WHERE sp.id = ?""",
+            (story_part_id,)
+        ).fetchone()
+
+    if not part:
+        raise ValueError(f"Story-Teil {story_part_id} nicht gefunden.")
+
+    story_code  = part["code"]
+    story_title = part["title"]
+    part_number = part["part_number"]
+    text        = part["text"]
+
+    # Ausgabe-Verzeichnis anlegen
+    output_dir = OUTPUTS_DIR / story_code
+    output_dir.mkdir(parents=True, exist_ok=True)
+    COVERS_DIR.mkdir(parents=True, exist_ok=True)
+
+    output_path = output_dir / f"part_{part_number}.mp4"
+    cover_path  = COVERS_DIR / f"{story_code}_part{part_number}.jpg"
+
+    # Temporäre Dateien
+    audio_path  = TTS_DIR / f"{story_code}_part{part_number}.mp3"
+    ass_path    = TTS_DIR / f"{story_code}_part{part_number}.ass"
+    bg_concat   = TTS_DIR / f"{story_code}_part{part_number}_bg.mp4"
+    tmp_files   = [audio_path, ass_path, bg_concat]
+
+    try:
+        # ---- Schritt 1: Cover-Bild erstellen ----
+        progress(5, "Cover wird erstellt…")
+        create_cover_image(story_title, story_code, part_number, cover_path)
+
+        # ---- Schritt 2: TTS (Edge-TTS natürliche Stimme) ----
+        progress(15, "Stimme wird generiert (Edge-TTS)…")
+        tts_to_file(text, audio_path)
+        audio_duration = get_audio_duration(audio_path)
+
+        # ---- Schritt 3: ASS-Untertitel mit Wort-Highlighting ----
+        progress(30, "Wort-Timing wird berechnet…")
+        build_word_timed_ass(text, ass_path, audio_path)
+
+        # ---- Schritt 4: Hintergrundvideos für Loop vorbereiten ----
+        progress(45, "Hintergrundvideos werden zusammengestellt…")
+
+        bg_videos = list(BACKGROUNDS_DIR.glob("*"))
+        bg_videos = [v for v in bg_videos if v.suffix.lower().lstrip(".") in ALLOWED_VIDEO_EXTENSIONS]
+
+        if not bg_videos:
+            raise FileNotFoundError("Keine Hintergrundvideos gefunden. Bitte zuerst hochladen.")
+
+        # Nahtloser Loop: Zufällige Videos aneinanderreihen bis Audio-Dauer erreicht
+        _assemble_background_loop(bg_videos, audio_duration, bg_concat)
+
+        # ---- Schritt 5: FFmpeg — 9:16 Crop + ASS-Overlay + Audio ----
+        progress(65, "Video wird gerendert (9:16 Hochformat)…")
+
+        ass_escaped = str(ass_path).replace("\\", "/").replace(":", "\\:")
+
+        # Filter:
+        # 1. scale+crop auf 1080×1920 (9:16)
+        # 2. ASS-Untertitel (Wort-Highlighting)
+        vf_filter = (
+            f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,"
+            f"crop={VIDEO_WIDTH}:{VIDEO_HEIGHT},"
+            f"ass='{ass_escaped}'"
+        )
+
+        subprocess.run(
+            [
+                FFMPEG_EXE, "-y",
+                "-i", str(bg_concat),
+                "-i", str(audio_path),
+                "-vf", vf_filter,
+                "-c:v", "libx264",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-shortest",
+                "-preset", "fast",
+                "-crf", "23",
+                "-movflags", "+faststart",
+                str(output_path),
+            ],
+            check=True, capture_output=True
+        )
+
+        # ---- Schritt 6: DB aktualisieren ----
+        progress(95, "Datenbank aktualisiert…")
+        rel_video = str(output_path.relative_to(BASE_DIR)).replace("\\", "/")
+        rel_cover = str(cover_path.relative_to(BASE_DIR)).replace("\\", "/")
+
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE story_parts SET cover_path = ? WHERE id = ?",
+                (rel_cover, story_part_id)
+            )
+
+        progress(100, "Fertig! ✅")
+        return output_path
+
+    finally:
+        for tmp in tmp_files:
+            try:
+                if tmp.exists():
+                    tmp.unlink()
+            except Exception:
+                pass
+
+
+def _assemble_background_loop(bg_videos: list, target_duration: float, output: Path):
+    """
+    Reiht zufällige Hintergrundvideos aneinander (ohne Loop eines einzelnen),
+    bis die Zieldauer erreicht ist. Nutzt FFmpeg concat-Filter.
+    Skaliert auf 9:16 vor der Konkatenation.
+    """
+    random.shuffle(bg_videos)
+    accumulated = 0.0
+    clip_list = []
+
+    while accumulated < target_duration:
+        for vid in bg_videos:
+            try:
+                dur = get_video_duration(vid)
+                clip_list.append((vid, dur))
+                accumulated += dur
+                if accumulated >= target_duration:
+                    break
+            except Exception:
+                continue
+        if not clip_list:
+            raise RuntimeError("Konnte keine Hintergrundvideo-Dauer ermitteln.")
+        if accumulated < target_duration:
+            # Nochmal durchmischen und weitermachen
+            random.shuffle(bg_videos)
+
+    # Jedes Clip auf 1080×1920 skalieren
+    tmp_clips = []
+    concat_list = None
+    try:
+        for i, (vid, dur) in enumerate(clip_list):
+            tmp_clip = output.parent / f"_tmp_clip_{i}_{uuid.uuid4().hex[:6]}.mp4"
+            result = subprocess.run(
+                [
+                    FFMPEG_EXE, "-y",
+                    "-i", str(vid),
+                    "-vf", (
+                        f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,"
+                        f"crop={VIDEO_WIDTH}:{VIDEO_HEIGHT}"
+                    ),
+                    "-c:v", "libx264",
+                    "-an",
+                    "-preset", "ultrafast",
+                    "-crf", "28",
+                    str(tmp_clip),
+                ],
+                capture_output=True
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"FFmpeg Clip-Skalierung fehlgeschlagen (exit {result.returncode}): "
+                    f"{result.stderr.decode('utf-8', errors='replace')[-800:]}"
+                )
+            tmp_clips.append(tmp_clip)
+
+        # Concat-List: absolute Pfade mit Forward-Slashes für FFmpeg auf Windows
+        concat_list = output.parent / f"_concat_{uuid.uuid4().hex[:6]}.txt"
+        with open(concat_list, "w", encoding="utf-8") as f:
+            for clip in tmp_clips:
+                safe_path = str(clip.resolve()).replace("\\", "/")
+                f.write(f"file '{safe_path}'\n")
+
+        result = subprocess.run(
+            [
+                FFMPEG_EXE, "-y",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", str(concat_list),
+                "-t", str(target_duration),
+                "-c:v", "libx264",
+                "-an",
+                "-preset", "fast",
+                "-crf", "23",
+                str(output),
+            ],
+            capture_output=True
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"FFmpeg Concat fehlgeschlagen (exit {result.returncode}): "
+                f"{result.stderr.decode('utf-8', errors='replace')[-800:]}"
+            )
+
+    finally:
+        for c in tmp_clips:
+            try:
+                if c.exists():
+                    c.unlink()
+            except Exception:
+                pass
+        if concat_list is not None:
+            try:
+                if concat_list.exists():
+                    concat_list.unlink()
+            except Exception:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# Warteschlangen-Worker (Background-Thread)
+# ---------------------------------------------------------------------------
+
+def queue_worker():
+    import time
+
+    while True:
+        try:
+            with get_db() as conn:
+                job = conn.execute(
+                    """SELECT q.id, q.story_part_id
+                       FROM queue q
+                       WHERE q.status = 'pending'
+                       ORDER BY q.id ASC
+                       LIMIT 1"""
+                ).fetchone()
+
+            if job is None:
+                time.sleep(QUEUE_POLL_INTERVAL)
+                continue
+
+            job_id        = job["id"]
+            story_part_id = job["story_part_id"]
+
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE queue SET status = 'processing', progress_pct = 0, progress_label = 'Starte…' WHERE id = ?",
+                    (job_id,)
+                )
+                conn.execute(
+                    "UPDATE story_parts SET status = 'processing' WHERE id = ?",
+                    (story_part_id,)
+                )
+
+            try:
+                output_path = create_video_for_part(story_part_id, job_id)
+                rel_path = str(output_path.relative_to(BASE_DIR)).replace("\\", "/")
+
+                with get_db() as conn:
+                    conn.execute(
+                        "UPDATE queue SET status = 'done', progress_pct = 100, progress_label = 'Fertig! ✅', finished_at = datetime('now') WHERE id = ?",
+                        (job_id,)
+                    )
+                    conn.execute(
+                        "UPDATE story_parts SET status = 'done', video_path = ? WHERE id = ?",
+                        (rel_path, story_part_id)
+                    )
+
+            except Exception as e:
+                err_msg = str(e)
+                with get_db() as conn:
+                    conn.execute(
+                        "UPDATE queue SET status = 'error', error_msg = ?, progress_label = 'Fehler ❌', finished_at = datetime('now') WHERE id = ?",
+                        (err_msg, job_id)
+                    )
+                    conn.execute(
+                        "UPDATE story_parts SET status = 'error' WHERE id = ?",
+                        (story_part_id,)
+                    )
+
+        except Exception:
+            import time as t
+            t.sleep(QUEUE_POLL_INTERVAL)
+
+
+def start_queue_worker():
+    t = threading.Thread(target=queue_worker, daemon=True, name="QueueWorker")
+    t.start()
+
+
+# ---------------------------------------------------------------------------
+# Flask-Routen — Story
+# ---------------------------------------------------------------------------
+
+@app.route("/")
+@app.route("/story")
+@app.route("/video")
+@app.route("/library")
+@app.route("/upload")
+@app.route("/prompt")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/api/generate-story", methods=["POST"])
+def api_generate_story():
+    data   = request.get_json(silent=True) or {}
+    prompt = (data.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"error": "Bitte einen Prompt eingeben."}), 400
+    try:
+        story_data = generate_story(prompt)
+    except Exception as e:
+        return jsonify({"error": f"AI-Fehler: {str(e)}"}), 500
+    dup_check = check_duplicate(story_data.get("keywords", []))
+    return jsonify({"story": story_data, "duplicate_check": dup_check})
+
+
+@app.route("/api/save-story", methods=["POST"])
+def api_save_story():
+    data  = request.get_json(silent=True) or {}
+    story = data.get("story")
+    if not story:
+        return jsonify({"error": "Keine Story-Daten."}), 400
+    code = generate_story_code()
+    try:
+        with get_db() as conn:
+            cursor = conn.execute(
+                "INSERT INTO stories (code, title, keywords_json, total_parts) VALUES (?, ?, ?, ?)",
+                (code, story["title"], json.dumps(story["keywords"]), story["total_parts"])
+            )
+            story_id = cursor.lastrowid
+            for part in story["parts"]:
+                social_json = json.dumps(part["social"]) if part.get("social") else None
+                conn.execute(
+                    "INSERT INTO story_parts (story_id, part_number, text, cliffhanger, social_json) VALUES (?, ?, ?, ?, ?)",
+                    (story_id, part["part_number"], part["text"], part.get("cliffhanger_hint", ""), social_json)
+                )
+    except Exception as e:
+        return jsonify({"error": f"Datenbank-Fehler: {str(e)}"}), 500
+    return jsonify({"success": True, "code": code, "story_id": story_id})
+
+
+@app.route("/api/stories", methods=["GET"])
+def api_get_stories():
+    with get_db() as conn:
+        stories = conn.execute(
+            "SELECT id, code, title, total_parts, created_at FROM stories ORDER BY created_at DESC"
+        ).fetchall()
+    return jsonify([dict(s) for s in stories])
+
+
+@app.route("/api/stories/<int:story_id>", methods=["GET"])
+def api_get_story(story_id: int):
+    with get_db() as conn:
+        story = conn.execute("SELECT * FROM stories WHERE id = ?", (story_id,)).fetchone()
+        if not story:
+            abort(404)
+        parts = conn.execute(
+            "SELECT * FROM story_parts WHERE story_id = ? ORDER BY part_number",
+            (story_id,)
+        ).fetchall()
+    return jsonify({"story": dict(story), "parts": [dict(p) for p in parts]})
+
+
+# ---------------------------------------------------------------------------
+# Flask-Routen — Video-Erstellung / Queue
+# ---------------------------------------------------------------------------
+
+@app.route("/api/create-video", methods=["POST"])
+def api_create_video():
+    data        = request.get_json(silent=True) or {}
+    story_id    = data.get("story_id")
+    part_number = data.get("part_number")
+
+    if not story_id:
+        return jsonify({"error": "story_id fehlt."}), 400
+
+    with get_db() as conn:
+        if part_number:
+            parts = conn.execute(
+                "SELECT id FROM story_parts WHERE story_id = ? AND part_number = ?",
+                (story_id, part_number)
+            ).fetchall()
+        else:
+            parts = conn.execute(
+                "SELECT id FROM story_parts WHERE story_id = ?", (story_id,)
+            ).fetchall()
+
+    if not parts:
+        return jsonify({"error": "Keine Story-Teile gefunden."}), 404
+
+    job_ids = []
+    with get_db() as conn:
+        for part in parts:
+            existing = conn.execute(
+                "SELECT id FROM queue WHERE story_part_id = ? AND status IN ('pending','processing')",
+                (part["id"],)
+            ).fetchone()
+            if existing:
+                job_ids.append(existing["id"])
+                continue
+            cursor = conn.execute(
+                "INSERT INTO queue (story_part_id) VALUES (?)", (part["id"],)
+            )
+            job_ids.append(cursor.lastrowid)
+            conn.execute(
+                "UPDATE story_parts SET status = 'pending' WHERE id = ?", (part["id"],)
+            )
+
+    return jsonify({"success": True, "job_ids": job_ids})
+
+
+@app.route("/api/queue", methods=["GET"])
+def api_get_queue():
+    with get_db() as conn:
+        jobs = conn.execute(
+            """SELECT q.id, q.status, q.error_msg, q.created_at, q.finished_at,
+                      q.progress_pct, q.progress_label,
+                      sp.part_number, sp.story_id,
+                      s.title, s.code
+               FROM queue q
+               JOIN story_parts sp ON sp.id = q.story_part_id
+               JOIN stories s ON s.id = sp.story_id
+               ORDER BY q.id DESC
+               LIMIT 50"""
+        ).fetchall()
+    return jsonify([dict(j) for j in jobs])
+
+
+@app.route("/api/queue/stats", methods=["GET"])
+def api_queue_stats():
+    with get_db() as conn:
+        stats = conn.execute(
+            "SELECT status, COUNT(*) as count FROM queue GROUP BY status"
+        ).fetchall()
+    return jsonify({row["status"]: row["count"] for row in stats})
+
+
+@app.route("/api/queue/live")
+def api_queue_live():
+    """SSE-Stream: sendet alle 1.5s den aktuellen Queue-Status."""
+    def generate():
+        import time
+        while True:
+            try:
+                with get_db() as conn:
+                    jobs = conn.execute(
+                        """SELECT q.id, q.status, q.progress_pct, q.progress_label,
+                                  q.error_msg, q.created_at, q.finished_at,
+                                  sp.part_number, sp.story_id,
+                                  s.title, s.code
+                           FROM queue q
+                           JOIN story_parts sp ON sp.id = q.story_part_id
+                           JOIN stories s ON s.id = sp.story_id
+                           ORDER BY q.id DESC LIMIT 30"""
+                    ).fetchall()
+                payload = json.dumps([dict(j) for j in jobs])
+                yield f"data: {payload}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            time.sleep(1.5)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# Flask-Routen — Hintergrundvideos
+# ---------------------------------------------------------------------------
+
+@app.route("/api/backgrounds", methods=["GET"])
+def api_get_backgrounds():
+    with get_db() as conn:
+        bgs = conn.execute("SELECT * FROM backgrounds ORDER BY uploaded_at DESC").fetchall()
+    return jsonify([dict(b) for b in bgs])
+
+
+@app.route("/api/backgrounds/upload", methods=["POST"])
+def api_upload_background():
+    if "video" not in request.files:
+        return jsonify({"error": "Keine Datei hochgeladen."}), 400
+    file = request.files["video"]
+    if not file.filename:
+        return jsonify({"error": "Kein Dateiname."}), 400
+    if not allowed_video(file.filename):
+        return jsonify({"error": "Nur mp4, mov, avi erlaubt."}), 400
+    original_name = file.filename
+    ext           = original_name.rsplit(".", 1)[1].lower()
+    unique_name   = f"{uuid.uuid4().hex}.{ext}"
+    save_path     = BACKGROUNDS_DIR / unique_name
+    file.save(str(save_path))
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO backgrounds (filename, original_name) VALUES (?, ?)",
+            (unique_name, original_name)
+        )
+    return jsonify({"success": True, "filename": unique_name, "original_name": original_name})
+
+
+@app.route("/api/backgrounds/<filename>", methods=["DELETE"])
+def api_delete_background(filename: str):
+    safe_name = Path(filename).name
+    file_path = BACKGROUNDS_DIR / safe_name
+    if file_path.exists():
+        file_path.unlink()
+    with get_db() as conn:
+        conn.execute("DELETE FROM backgrounds WHERE filename = ?", (safe_name,))
+    return jsonify({"success": True})
+
+
+@app.route("/backgrounds/<filename>")
+def serve_background(filename: str):
+    safe_name = Path(filename).name
+    return send_from_directory(str(BACKGROUNDS_DIR), safe_name)
+
+
+@app.route("/covers/<filename>")
+def serve_cover(filename: str):
+    safe_name = Path(filename).name
+    return send_from_directory(str(COVERS_DIR), safe_name)
+
+
+# ---------------------------------------------------------------------------
+# Flask-Routen — Video-Bibliothek & Download
+# ---------------------------------------------------------------------------
+
+@app.route("/api/videos", methods=["GET"])
+def api_get_videos():
+    with get_db() as conn:
+        videos = conn.execute(
+            """SELECT sp.id, sp.part_number, sp.video_path, sp.cover_path, sp.status,
+                      sp.social_json,
+                      s.id as story_id, s.code, s.title, s.created_at
+               FROM story_parts sp
+               JOIN stories s ON s.id = sp.story_id
+               WHERE sp.status = 'done' AND sp.video_path IS NOT NULL
+               ORDER BY s.created_at DESC, sp.part_number ASC"""
+        ).fetchall()
+        uploads = conn.execute("SELECT * FROM video_uploads").fetchall()
+
+    uploads_by_part: dict = {}
+    for u in uploads:
+        pid = u["story_part_id"]
+        if pid not in uploads_by_part:
+            uploads_by_part[pid] = []
+        uploads_by_part[pid].append(dict(u))
+
+    grouped = {}
+    for v in videos:
+        sid = v["story_id"]
+        if sid not in grouped:
+            grouped[sid] = {
+                "story_id": sid, "code": v["code"], "title": v["title"],
+                "created_at": v["created_at"], "parts": [],
+            }
+        social = {}
+        try:
+            if v["social_json"]:
+                social = json.loads(v["social_json"])
+        except Exception:
+            pass
+        grouped[sid]["parts"].append({
+            "id": v["id"], "part_number": v["part_number"],
+            "video_path": v["video_path"], "cover_path": v["cover_path"],
+            "social": social,
+            "uploads": uploads_by_part.get(v["id"], []),
+        })
+
+    return jsonify(list(grouped.values()))
+
+
+@app.route("/video/<path:video_path>")
+def serve_video(video_path: str):
+    full_path = BASE_DIR / video_path
+    if not str(full_path.resolve()).startswith(str(DATA_DIR.resolve())):
+        abort(403)
+    if not full_path.exists():
+        abort(404)
+    return send_from_directory(str(full_path.parent), full_path.name, mimetype="video/mp4")
+
+
+@app.route("/download/<path:video_path>")
+def download_video(video_path: str):
+    full_path = BASE_DIR / video_path
+    if not str(full_path.resolve()).startswith(str(DATA_DIR.resolve())):
+        abort(403)
+    if not full_path.exists():
+        abort(404)
+    return send_from_directory(
+        str(full_path.parent), full_path.name,
+        as_attachment=True, mimetype="application/octet-stream",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Flask-Routen — Upload-Tracking
+# ---------------------------------------------------------------------------
+
+@app.route("/api/uploads", methods=["POST"])
+def api_add_upload():
+    data = request.get_json(silent=True) or {}
+    story_part_id = data.get("story_part_id")
+    platform      = data.get("platform", "tiktok")
+    notes         = data.get("notes", "")
+    if not story_part_id:
+        return jsonify({"error": "story_part_id fehlt."}), 400
+    with get_db() as conn:
+        cursor = conn.execute(
+            "INSERT INTO video_uploads (story_part_id, platform, notes) VALUES (?, ?, ?)",
+            (story_part_id, platform, notes)
+        )
+    return jsonify({"success": True, "id": cursor.lastrowid,
+                    "uploaded_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")})
+
+
+@app.route("/api/uploads/<int:upload_id>", methods=["DELETE"])
+def api_delete_upload(upload_id: int):
+    with get_db() as conn:
+        conn.execute("DELETE FROM video_uploads WHERE id = ?", (upload_id,))
+    return jsonify({"success": True})
+
+
+# ---------------------------------------------------------------------------
+# Flask-Routen — Prompt-Builder
+# ---------------------------------------------------------------------------
+
+PROMPT_TEMPLATE_SYSTEM = SYSTEM_PROMPT
+
+
+@app.route("/api/get-prompt-template", methods=["POST"])
+def api_get_prompt_template():
+    data = request.get_json(silent=True) or {}
+    idea = (data.get("idea") or "").strip()
+    if not idea:
+        return jsonify({"error": "Bitte eine Idee eingeben."}), 400
+    user_msg = f"Create a story about: {idea}"
+    return jsonify({
+        "system_prompt": PROMPT_TEMPLATE_SYSTEM,
+        "user_message":  user_msg,
+        "combined":      f"[SYSTEM]\n{PROMPT_TEMPLATE_SYSTEM}\n\n[USER]\n{user_msg}",
+    })
+
+
+@app.route("/api/import-story", methods=["POST"])
+def api_import_story():
+    data     = request.get_json(silent=True) or {}
+    raw_json = (data.get("json_text") or "").strip()
+    if not raw_json:
+        return jsonify({"error": "Kein JSON eingegeben."}), 400
+    json_match = re.search(r"\{.*\}", raw_json, re.DOTALL)
+    if not json_match:
+        return jsonify({"error": "Kein gültiges JSON gefunden."}), 400
+    try:
+        story = json.loads(json_match.group())
+    except json.JSONDecodeError as e:
+        return jsonify({"error": f"JSON-Parsing-Fehler: {str(e)}"}), 400
+    for field in ["title", "total_parts", "keywords", "parts"]:
+        if field not in story:
+            return jsonify({"error": f"Feld '{field}' fehlt im JSON."}), 400
+    if len(story.get("keywords", [])) != 10:
+        return jsonify({"error": "Keywords-Liste muss genau 10 Einträge haben."}), 400
+    if not story.get("parts"):
+        return jsonify({"error": "Keine 'parts' im JSON gefunden."}), 400
+    dup_check = check_duplicate(story["keywords"])
+    code = generate_story_code()
+    try:
+        with get_db() as conn:
+            cursor = conn.execute(
+                "INSERT INTO stories (code, title, keywords_json, total_parts) VALUES (?, ?, ?, ?)",
+                (code, story["title"], json.dumps(story["keywords"]), story["total_parts"])
+            )
+            story_id = cursor.lastrowid
+            for part in story["parts"]:
+                social_json = json.dumps(part["social"]) if part.get("social") else None
+                conn.execute(
+                    "INSERT INTO story_parts (story_id, part_number, text, cliffhanger, social_json) VALUES (?, ?, ?, ?, ?)",
+                    (story_id, part["part_number"], part["text"], part.get("cliffhanger_hint", ""), social_json)
+                )
+    except Exception as e:
+        return jsonify({"error": f"Datenbank-Fehler: {str(e)}"}), 500
+    return jsonify({
+        "success": True, "code": code, "story_id": story_id,
+        "title": story["title"], "duplicate_check": dup_check,
+    })
+
+
+# ---------------------------------------------------------------------------
+# App-Start
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    for d in [DATA_DIR, BACKGROUNDS_DIR, OUTPUTS_DIR, TTS_DIR, COVERS_DIR]:
+        d.mkdir(parents=True, exist_ok=True)
+
+    init_db()
+    start_queue_worker()
+
+    port = int(os.environ.get("PORT", 7842))
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

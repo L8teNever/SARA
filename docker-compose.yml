@@ -1,0 +1,25 @@
+version: "3.9"
+# Produktion — Image wird automatisch von GitHub Container Registry gezogen
+# Starten mit: docker compose pull && docker compose up -d
+
+services:
+  sara:
+    image: ghcr.io/l8tenever/sara:latest
+    container_name: sara-app
+    restart: unless-stopped
+    ports:
+      - "7842:7842"
+    environment:
+      # Anthropic API Key — zwingend erforderlich für KI-Story-Generator
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Optionaler Port-Override
+      - PORT=7842
+    volumes:
+      # Persistente Daten: Videos, Datenbank, TTS-Temp
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7842/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
