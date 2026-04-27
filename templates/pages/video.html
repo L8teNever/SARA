@@ -1,0 +1,127 @@
+<!-- ============================================================ TAB 2: Video erstellen ============================================================ -->
+<section class="tab-content" id="tab-video">
+  <div class="page-header">
+    <div class="page-header__eyebrow"><span class="material-symbols-rounded">movie</span> Produktion</div>
+    <h1 class="page-header__title">Video erstellen</h1>
+    <p class="page-header__sub">Wähle eine gespeicherte Story und erstelle automatisch alle Videos.</p>
+  </div>
+
+  <div class="d-grid-2">
+    <div>
+      <div class="md-card md-card--elevated">
+        <div class="card-hdr">
+          <div class="card-hdr__icon"><span class="material-symbols-rounded">auto_stories</span></div>
+          <div class="card-hdr__text">
+            <div class="card-title">Story auswählen</div>
+            <div class="card-subtitle">Gespeicherte Stories aus der Datenbank</div>
+          </div>
+        </div>
+
+        <div id="story-list" class="story-select-list">
+          <div class="empty-state" style="padding:24px 0">
+            <div class="empty-state__icon"><span class="material-symbols-rounded">book</span></div>
+            <div class="empty-state__text">Keine Stories vorhanden</div>
+          </div>
+        </div>
+
+        <div class="md-divider"></div>
+        <div class="btn-row">
+          <button class="md-btn md-btn--filled" id="btn-create-video" onclick="createVideo()" disabled>
+            <span class="material-symbols-rounded">video_settings</span> Videos erstellen
+          </button>
+          <span class="text-muted" id="selected-story-info"></span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="md-card md-card--elevated">
+        <div class="card-hdr">
+          <div class="card-hdr__icon" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)">
+            <span class="material-symbols-rounded">queue</span>
+          </div>
+          <div class="card-hdr__text">
+            <div class="card-title">Warteschlange</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="card-subtitle" style="margin:0">Echtzeit-Fortschritt</div>
+              <span id="sse-status"></span>
+            </div>
+          </div>
+        </div>
+        <div id="queue-stats" class="flex-row" style="margin-bottom:12px;gap:6px;"></div>
+        <div id="queue-list" class="queue-list">
+          <div class="empty-state" style="padding:24px 0">
+            <div class="empty-state__icon"><span class="material-symbols-rounded">hourglass_empty</span></div>
+            <div class="empty-state__text">Warteschlange ist leer</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ============================================================
+  //  Story-Liste & Video-Erstellung
+  // ============================================================
+  async function loadStoryList() {
+    const container = document.getElementById('story-list');
+    container.innerHTML = '<div class="spinner" style="margin:16px auto"></div>';
+    try {
+      const stories = await fetch('/api/stories').then(r => r.json());
+      if (!stories.length) {
+        container.innerHTML = `<div class="empty-state" style="padding:24px 0">
+          <div class="empty-state__icon"><span class="material-symbols-rounded">book</span></div>
+          <div class="empty-state__text">Keine Stories vorhanden</div>
+          <div class="empty-state__hint">Erstelle oder importiere zuerst eine Story</div>
+        </div>`;
+        return;
+      }
+      container.innerHTML = '';
+      stories.forEach(s => {
+        const item = document.createElement('div');
+        item.className = 'story-select-item' + (s.id === selectedStoryId ? ' selected' : '');
+        item.dataset.id = s.id;
+        item.innerHTML = `
+          <div class="story-select-item__radio"></div>
+          <div class="story-select-item__info">
+            <div class="story-select-item__title">${escHtml(s.title)}</div>
+            <div class="story-select-item__meta"><strong>${s.code}</strong> · ${s.total_parts} Teil(e) · ${formatDate(s.created_at)}</div>
+          </div>
+          <span class="story-code-badge">${s.code}</span>
+        `;
+        item.addEventListener('click', () => selectStory(s.id, s.title, s.code));
+        container.appendChild(item);
+      });
+      if (pendingSelectStoryId) { selectStory(pendingSelectStoryId); pendingSelectStoryId = null; }
+    } catch (e) {
+      container.innerHTML = `<div class="text-muted">Fehler: ${e.message}</div>`;
+    }
+  }
+
+  function selectStory(id, title, code) {
+    selectedStoryId = id;
+    document.querySelectorAll('.story-select-item').forEach(el =>
+      el.classList.toggle('selected', parseInt(el.dataset.id) === id)
+    );
+    document.getElementById('btn-create-video').disabled = false;
+    document.getElementById('selected-story-info').textContent = title ? `"${title}" [${code}]` : '';
+  }
+
+  async function createVideo() {
+    if (!selectedStoryId) return;
+    try {
+      const res = await fetch('/api/create-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ story_id: selectedStoryId })
+      });
+      const data = await res.json();
+      if (data.error) { showSnack(data.error, 'error'); return; }
+      showSnack(`${data.job_ids.length} Job(s) hinzugefügt!`, 'success');
+      loadQueue();
+    } catch (e) {
+      showSnack('Fehler: ' + e.message, 'error');
+    }
+  }
+</script>

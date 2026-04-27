@@ -1,0 +1,254 @@
+<!-- ============================================================ TAB 1: Story erstellen ============================================================ -->
+<section class="tab-content active" id="tab-story">
+  <div class="page-header">
+    <div class="page-header__eyebrow">
+      <span class="material-symbols-rounded">auto_awesome</span> KI-gesteuert
+    </div>
+    <h1 class="page-header__title">Story generieren</h1>
+    <p class="page-header__sub">Beschreibe ein Thema — SARA erfindet eine Reddit-Story mit Claude AI.</p>
+  </div>
+
+  <!-- API-Key Einstellungen (nur sichtbar wenn kein Server-Key gesetzt) -->
+  <div class="md-card md-card--elevated" id="api-key-card" style="display:none">
+    <div class="card-hdr">
+      <div class="card-hdr__icon" style="background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)">
+        <span class="material-symbols-rounded">key</span>
+      </div>
+      <div class="card-hdr__text">
+        <div class="card-title">Anthropic API-Key</div>
+        <div class="card-subtitle">Wird nur lokal im Browser gespeichert — nie zum Server übertragen (außer für KI-Anfragen).</div>
+      </div>
+    </div>
+    <div class="md-field">
+      <label for="api-key-input">API-Key</label>
+      <div class="input-row">
+        <input type="password" id="api-key-input" class="md-input"
+          placeholder="sk-ant-api03-..." autocomplete="off" />
+        <button class="md-btn md-btn--tonal" onclick="saveApiKey()">
+          <span class="material-symbols-rounded">save</span> Speichern
+        </button>
+      </div>
+    </div>
+    <div id="api-key-status" class="text-muted" style="font-size:12px;margin-top:-8px"></div>
+  </div>
+
+  <div class="md-card md-card--elevated">
+    <div class="card-hdr">
+      <div class="card-hdr__icon"><span class="material-symbols-rounded">edit_note</span></div>
+      <div class="card-hdr__text">
+        <div class="card-title">Neues Thema eingeben</div>
+        <div class="card-subtitle">Claude AI · min. 75 Sek. pro Teil · Social-Daten inklusive</div>
+      </div>
+    </div>
+
+    <div class="md-field">
+      <label for="story-prompt">AI-Prompt</label>
+      <div class="input-row">
+        <input type="text" id="story-prompt" class="md-input"
+          placeholder="z.B. 'betrayal at a family reunion' oder 'revenge on a cheating partner'" />
+        <button class="md-btn md-btn--filled" id="btn-generate" onclick="generateStory()">
+          <span class="material-symbols-rounded">auto_awesome</span> Generieren
+        </button>
+        <div id="generate-spinner" class="spinner hidden"></div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="md-btn md-btn--outlined" onclick="switchTab('prompt')">
+        <span class="material-symbols-rounded">lightbulb</span> Ohne API-Key →
+      </button>
+    </div>
+  </div>
+
+  <div id="duplicate-banner" class="duplicate-banner hidden">
+    <span class="duplicate-banner__icon material-symbols-rounded">warning</span>
+    <div class="duplicate-banner__text">
+      <div class="duplicate-banner__title">Ähnliche Story gefunden</div>
+      <div id="duplicate-msg"></div>
+    </div>
+  </div>
+
+  <div class="md-card" id="story-preview-card">
+    <div class="story-meta" id="story-meta-row"></div>
+    <div id="story-parts-container"></div>
+    <div class="md-divider"></div>
+    <div class="section-title"><span class="material-symbols-rounded">label</span>Keywords</div>
+    <div class="chip-row" id="keywords-chips"></div>
+    <div class="md-divider"></div>
+    <div class="btn-row" id="save-actions">
+      <button class="md-btn md-btn--filled" id="btn-save" onclick="saveStory()">
+        <span class="material-symbols-rounded">save</span> Story speichern
+      </button>
+      <button class="md-btn md-btn--outlined" onclick="generateStory()">
+        <span class="material-symbols-rounded">refresh</span> Neu generieren
+      </button>
+      <div id="save-spinner" class="spinner hidden"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ============================================================
+  //  API-Key Verwaltung
+  // ============================================================
+  function getStoredApiKey() {
+    return localStorage.getItem('sara_api_key') || '';
+  }
+
+  function saveApiKey() {
+    const key = document.getElementById('api-key-input').value.trim();
+    if (key) {
+      localStorage.setItem('sara_api_key', key);
+      document.getElementById('api-key-status').textContent = 'Key gespeichert.';
+      showSnack('API-Key gespeichert!', 'success');
+    } else {
+      localStorage.removeItem('sara_api_key');
+      document.getElementById('api-key-status').textContent = 'Key entfernt.';
+    }
+    setTimeout(() => {
+      const el = document.getElementById('api-key-status');
+      if (el) el.textContent = '';
+    }, 3000);
+  }
+
+  async function initApiKeyCard() {
+    try {
+      const cfg = await fetch('/api/config').then(r => r.json());
+      if (!cfg.api_key_configured) {
+        document.getElementById('api-key-card').style.display = 'block';
+        const stored = getStoredApiKey();
+        if (stored) {
+          document.getElementById('api-key-input').value = stored;
+          document.getElementById('api-key-status').textContent = 'Key aus Browser-Speicher geladen.';
+        }
+      }
+    } catch (_) { }
+  }
+
+  // ============================================================
+  //  Story generieren & Vorschau
+  // ============================================================
+  async function generateStory() {
+    const prompt = document.getElementById('story-prompt').value.trim();
+    if (!prompt) { showSnack('Bitte einen Prompt eingeben.', 'error'); return; }
+
+    setLoading('generate', true);
+    document.getElementById('story-preview-card').style.display = 'none';
+    document.getElementById('duplicate-banner').classList.add('hidden');
+    currentStory = null; savedStoryId = null;
+
+    try {
+      const body = { prompt };
+      const storedKey = getStoredApiKey();
+      if (storedKey) body.api_key = storedKey;
+
+      const res = await fetch('/api/generate-story', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.error) { showSnack(data.error, 'error'); return; }
+      currentStory = data.story;
+
+      if (data.duplicate_check.is_duplicate) {
+        const dup = data.duplicate_check;
+        document.getElementById('duplicate-msg').innerHTML =
+          `Story "<strong>${dup.similar_story.title}</strong>" [${dup.similar_story.code}] hat
+           <strong>${dup.overlap}/10</strong> übereinstimmende Keywords.`;
+        document.getElementById('duplicate-banner').classList.remove('hidden');
+      }
+      renderStoryPreview(currentStory);
+    } catch (e) {
+      showSnack('Netzwerkfehler: ' + e.message, 'error');
+    } finally {
+      setLoading('generate', false);
+    }
+  }
+
+  function renderStoryPreview(story) {
+    const card = document.getElementById('story-preview-card');
+    card.style.display = 'block';
+
+    document.getElementById('story-meta-row').innerHTML = `
+      <span style="font-size:18px;font-weight:600;flex:1">${escHtml(story.title)}</span>
+      <span class="md-chip md-chip--primary">
+        <span class="material-symbols-rounded" style="font-size:14px">splitscreen</span>
+        ${story.total_parts} Teil${story.total_parts > 1 ? 'e' : ''}
+      </span>
+    `;
+
+    const container = document.getElementById('story-parts-container');
+    container.innerHTML = '';
+    story.parts.forEach(part => {
+      const wordCount = part.text.split(/\s+/).length;
+      const div = document.createElement('div');
+      div.className = 'part-card';
+      const socialHtml = part.social ? `
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--md-sys-color-outline-variant)">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-primary);margin-bottom:5px">Social</div>
+          <div style="font-size:13px;font-weight:500;margin-bottom:2px">${escHtml(part.social.video_title || '')}</div>
+          <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-bottom:2px">${escHtml(part.social.description || '')}</div>
+          <div style="font-size:12px;color:var(--md-sys-color-primary)">${escHtml(part.social.hashtags || '')}</div>
+        </div>` : '';
+      div.innerHTML = `
+        <div class="part-header">
+          <span class="part-number-badge">Teil ${part.part_number}</span>
+          <span class="text-muted">${wordCount} Wörter (~${Math.round(wordCount / 2.2)}s)</span>
+        </div>
+        <div class="part-text">${escHtml(part.text)}</div>
+        ${part.cliffhanger_hint ? `<div class="cliffhanger-hint"><span class="material-symbols-rounded" style="font-size:14px">bolt</span><span>${escHtml(part.cliffhanger_hint)}</span></div>` : ''}
+        ${socialHtml}
+      `;
+      container.appendChild(div);
+    });
+
+    document.getElementById('keywords-chips').innerHTML =
+      story.keywords.map(k => `<span class="md-chip">${escHtml(k)}</span>`).join('');
+
+    document.getElementById('save-actions').innerHTML = `
+      <button class="md-btn md-btn--filled" id="btn-save" onclick="saveStory()">
+        <span class="material-symbols-rounded">save</span> Story speichern
+      </button>
+      <button class="md-btn md-btn--outlined" onclick="generateStory()">
+        <span class="material-symbols-rounded">refresh</span> Neu generieren
+      </button>
+      <div id="save-spinner" class="spinner hidden"></div>
+    `;
+  }
+
+  async function saveStory() {
+    if (!currentStory) return;
+    setLoading('save', true);
+    try {
+      const res = await fetch('/api/save-story', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ story: currentStory })
+      });
+      const data = await res.json();
+      if (data.error) { showSnack(data.error, 'error'); return; }
+      savedStoryId = data.story_id;
+      showSnack(`Story gespeichert! Code: ${data.code}`, 'success');
+      const badge = document.createElement('span');
+      badge.className = 'story-code-badge'; badge.textContent = data.code;
+      document.getElementById('story-meta-row').insertBefore(badge, document.getElementById('story-meta-row').firstChild);
+      document.getElementById('save-actions').innerHTML = `
+        <button class="md-btn md-btn--tonal" onclick="goToVideoTab(${data.story_id})">
+          <span class="material-symbols-rounded">movie</span> Video erstellen
+        </button>
+        <button class="md-btn md-btn--outlined" onclick="generateStory()">
+          <span class="material-symbols-rounded">auto_awesome</span> Neue Story
+        </button>
+      `;
+    } catch (e) {
+      showSnack('Fehler: ' + e.message, 'error');
+    } finally {
+      setLoading('save', false);
+    }
+  }
+
+  function goToVideoTab(storyId) { switchTab('video'); pendingSelectStoryId = storyId; }
+
+  initApiKeyCard();
+</script>

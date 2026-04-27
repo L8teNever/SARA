@@ -270,11 +270,11 @@ Rules:
 - social.hashtags: 6–8 relevant hashtags as a single space-separated string"""
 
 
-def generate_story(prompt: str) -> dict:
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY ist nicht gesetzt.")
-    client = anthropic.Anthropic(api_key=api_key)
+def generate_story(prompt: str, api_key: str = "") -> dict:
+    key = api_key.strip() or os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not key:
+        raise ValueError("Kein API-Key angegeben. Trage deinen Anthropic-Key in den Einstellungen ein oder setze ANTHROPIC_API_KEY.")
+    client = anthropic.Anthropic(api_key=key)
     message = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=4096,
@@ -917,14 +917,20 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/api/config", methods=["GET"])
+def api_config():
+    return jsonify({"api_key_configured": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())})
+
+
 @app.route("/api/generate-story", methods=["POST"])
 def api_generate_story():
-    data   = request.get_json(silent=True) or {}
-    prompt = (data.get("prompt") or "").strip()
+    data    = request.get_json(silent=True) or {}
+    prompt  = (data.get("prompt") or "").strip()
+    api_key = (data.get("api_key") or "").strip()
     if not prompt:
         return jsonify({"error": "Bitte einen Prompt eingeben."}), 400
     try:
-        story_data = generate_story(prompt)
+        story_data = generate_story(prompt, api_key)
     except Exception as e:
         return jsonify({"error": f"AI-Fehler: {str(e)}"}), 500
     dup_check = check_duplicate(story_data.get("keywords", []))

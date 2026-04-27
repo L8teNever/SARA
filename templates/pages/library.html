@@ -1,0 +1,191 @@
+<!-- ============================================================ TAB 3: Bibliothek ============================================================ -->
+<section class="tab-content" id="tab-library">
+  <div class="page-header">
+    <div class="page-header__eyebrow"><span class="material-symbols-rounded">video_library</span> Ausgabe</div>
+    <h1 class="page-header__title">Meine Videos</h1>
+    <p class="page-header__sub">Alle fertigen Videos. Klicke auf TikTok / Instagram zum Abhaken. Social-Daten kopieren mit einem Klick.</p>
+  </div>
+
+  <div id="library-container">
+    <div class="empty-state">
+      <div class="empty-state__icon"><span class="material-symbols-rounded">videocam_off</span></div>
+      <div class="empty-state__text">Noch keine Videos vorhanden</div>
+      <div class="empty-state__hint">Erstelle Videos über den "Video erstellen"-Tab</div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ============================================================
+  //  Bibliothek
+  // ============================================================
+  async function loadLibrary() {
+    const container = document.getElementById('library-container');
+    container.innerHTML = '<div class="spinner" style="margin:40px auto"></div>';
+    try {
+      const data = await fetch('/api/videos').then(r => r.json());
+      if (!data.length) {
+        container.innerHTML = `<div class="empty-state">
+          <div class="empty-state__icon"><span class="material-symbols-rounded">videocam_off</span></div>
+          <div class="empty-state__text">Noch keine Videos vorhanden</div>
+        </div>`;
+        return;
+      }
+      container.innerHTML = '';
+      data.forEach(story => {
+        const section = document.createElement('div');
+        section.className = 'library-story';
+        section.innerHTML = `
+          <div class="library-story__hdr">
+            <span class="story-code-badge">${story.code}</span>
+            <span style="font-weight:600;font-size:15px">${escHtml(story.title)}</span>
+            <span class="text-muted">${formatDate(story.created_at)}</span>
+          </div>
+          <div class="lib-grid" id="lib-parts-${story.story_id}"></div>
+        `;
+        container.appendChild(section);
+        const grid = document.getElementById('lib-parts-' + story.story_id);
+
+        story.parts.forEach(part => {
+          const card = document.createElement('div');
+          card.className = 'lib-card';
+          card.id = 'lib-card-' + part.id;
+
+          const coverHtml = part.cover_path
+            ? `<img class="lib-cover" src="/${part.cover_path}" alt="Cover" loading="lazy" />`
+            : '';
+
+          const social = part.social || {};
+          const socialHtml = (social.video_title || social.hashtags) ? `
+            <div class="lib-social">
+              ${social.video_title ? `<div class="lib-social__title">${escHtml(social.video_title)}</div>` : ''}
+              ${social.description ? `<div class="lib-social__desc">${escHtml(social.description)}</div>` : ''}
+              ${social.hashtags ? `<div class="lib-social__tags">${escHtml(social.hashtags)}</div>` : ''}
+              <button class="lib-copy-btn" onclick="copySocialData(${part.id})">
+                <span class="material-symbols-rounded">content_copy</span> Caption kopieren
+              </button>
+            </div>
+          ` : '';
+
+          card.innerHTML = `
+            <div class="lib-card__thumb">
+              ${coverHtml}
+              <video src="/video/${part.video_path}" preload="metadata" muted
+                style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s"></video>
+              <div class="lib-card__play">
+                <span class="material-symbols-rounded">play_circle</span>
+              </div>
+            </div>
+            <div class="lib-card__body">
+              <div class="lib-card__part">Teil ${part.part_number}</div>
+              ${socialHtml}
+              <div class="lib-platforms" id="platforms-${part.id}"></div>
+              <div class="lib-card__actions">
+                <button class="md-btn md-btn--tonal md-btn--sm"
+                  onclick="openVideoModal('/video/${part.video_path}','${escHtml(story.title)} — Teil ${part.part_number}')">
+                  <span class="material-symbols-rounded" style="font-size:15px">play_arrow</span> Play
+                </button>
+                <a class="md-btn md-btn--outlined md-btn--sm" href="/download/${part.video_path}" download>
+                  <span class="material-symbols-rounded" style="font-size:15px">download</span>
+                </a>
+              </div>
+            </div>
+          `;
+
+          const vidEl = card.querySelector('video');
+          card.addEventListener('mouseenter', () => { vidEl.style.opacity = '1'; vidEl.play().catch(() => { }); });
+          card.addEventListener('mouseleave', () => { vidEl.style.opacity = '0'; vidEl.pause(); vidEl.currentTime = 0; });
+
+          card.querySelector('.lib-card__play').addEventListener('click', () =>
+            openVideoModal('/video/' + part.video_path, story.title + ' — Teil ' + part.part_number)
+          );
+
+          grid.appendChild(card);
+          renderPlatformChips(part.id, part.uploads || []);
+          card.dataset.social = JSON.stringify(social);
+        });
+      });
+    } catch (e) {
+      container.innerHTML = `<div class="text-muted">Fehler: ${e.message}</div>`;
+    }
+  }
+
+  function renderPlatformChips(partId, uploads) {
+    const container = document.getElementById('platforms-' + partId);
+    if (!container) return;
+
+    const platforms = [
+      { id: 'tiktok',    label: 'TikTok',     icon: 'play_circle' },
+      { id: 'instagram', label: 'Instagram',   icon: 'photo_camera' },
+      { id: 'youtube',   label: 'YouTube',     icon: 'smart_display' },
+    ];
+
+    container.innerHTML = '';
+    platforms.forEach(p => {
+      const existing = uploads.find(u => u.platform === p.id);
+      const btn = document.createElement('button');
+      btn.className = 'platform-chip' + (existing ? ' uploaded' : '');
+      btn.title = existing
+        ? `Hochgeladen am ${formatDate(existing.uploaded_at)} — Klicken zum Entfernen`
+        : `Als ${p.label} hochgeladen markieren`;
+      btn.innerHTML = `
+        <span class="material-symbols-rounded">${existing ? 'check_circle' : p.icon}</span>
+        ${p.label}${existing ? ` · ${formatDateShort(existing.uploaded_at)}` : ''}
+      `;
+      btn.addEventListener('click', () => toggleUpload(partId, p.id, existing ? existing.id : null));
+      container.appendChild(btn);
+    });
+  }
+
+  async function toggleUpload(partId, platform, uploadId) {
+    try {
+      if (uploadId) {
+        await fetch(`/api/uploads/${uploadId}`, { method: 'DELETE' });
+        showSnack(`${platform} Upload entfernt.`, 'success');
+      } else {
+        const res = await fetch('/api/uploads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ story_part_id: partId, platform })
+        });
+        const data = await res.json();
+        if (data.error) { showSnack(data.error, 'error'); return; }
+        showSnack(`Als ${platform} hochgeladen markiert!`, 'success');
+      }
+      const res = await fetch('/api/videos');
+      const videos = await res.json();
+      for (const story of videos) {
+        const part = story.parts.find(p => p.id === partId);
+        if (part) { renderPlatformChips(partId, part.uploads || []); break; }
+      }
+    } catch (e) {
+      showSnack('Fehler: ' + e.message, 'error');
+    }
+  }
+
+  function copySocialData(partId) {
+    const card = document.getElementById('lib-card-' + partId);
+    if (!card) return;
+    let social = {};
+    try { social = JSON.parse(card.dataset.social || '{}'); } catch (_) { }
+    const text = [social.video_title, '', social.description, '', social.hashtags].filter(x => x != null).join('\n').trim();
+    navigator.clipboard.writeText(text).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    });
+    showSnack('Caption kopiert — jetzt in TikTok / Instagram einfügen!', 'success');
+  }
+
+  function openVideoModal(src, title) {
+    document.getElementById('modal-title').textContent = title;
+    const vid = document.getElementById('modal-video');
+    vid.src = src; vid.load();
+    document.getElementById('video-modal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('video-modal').classList.remove('open');
+    const vid = document.getElementById('modal-video');
+    vid.pause(); vid.src = '';
+  }
+</script>

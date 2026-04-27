@@ -1,0 +1,147 @@
+<!-- ============================================================ TAB 4: Hintergründe ============================================================ -->
+<section class="tab-content" id="tab-upload">
+  <div class="page-header">
+    <div class="page-header__eyebrow"><span class="material-symbols-rounded">video_file</span> Medien</div>
+    <h1 class="page-header__title">Hintergrundvideos</h1>
+    <p class="page-header__sub">Subway Surfer, Minecraft Parkour etc. — werden als Hintergrund für deine Videos genutzt.</p>
+  </div>
+
+  <div class="d-grid-2">
+    <div>
+      <div class="md-card md-card--elevated">
+        <div class="card-hdr">
+          <div class="card-hdr__icon"><span class="material-symbols-rounded">upload_file</span></div>
+          <div class="card-hdr__text">
+            <div class="card-title">Video hochladen</div>
+            <div class="card-subtitle">mp4 · mov · avi · max 500 MB</div>
+          </div>
+        </div>
+
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
+          ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+          <div class="upload-zone__icon"><span class="material-symbols-rounded">cloud_upload</span></div>
+          <div class="upload-zone__text">Video hierher ziehen oder klicken</div>
+          <div class="upload-zone__hint">mp4 · mov · avi · max 500 MB</div>
+        </div>
+        <input type="file" id="file-input" accept=".mp4,.mov,.avi" style="display:none" onchange="uploadFile(this.files[0])" />
+
+        <div id="upload-progress-wrap" class="hidden" style="margin-top:14px">
+          <div class="flex-row" style="justify-content:space-between;margin-bottom:5px">
+            <span class="text-muted" id="upload-filename"></span>
+            <span class="text-muted" id="upload-percent">0%</span>
+          </div>
+          <div class="md-progress"><div class="md-progress__bar" id="upload-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">
+        <span class="material-symbols-rounded">photo_library</span>
+        Hochgeladen (<span id="bg-count">0</span>)
+      </div>
+      <div id="bg-grid" class="bg-grid">
+        <div class="empty-state" style="grid-column:1/-1;padding:28px 0">
+          <div class="empty-state__icon"><span class="material-symbols-rounded">video_library</span></div>
+          <div class="empty-state__text">Keine Hintergrundvideos</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ============================================================
+  //  Hintergrundvideos
+  // ============================================================
+  async function loadBackgrounds() {
+    const grid = document.getElementById('bg-grid');
+    try {
+      const bgs = await fetch('/api/backgrounds').then(r => r.json());
+      document.getElementById('bg-count').textContent = bgs.length;
+      if (!bgs.length) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:28px 0">
+          <div class="empty-state__icon"><span class="material-symbols-rounded">video_library</span></div>
+          <div class="empty-state__text">Keine Hintergrundvideos</div>
+        </div>`;
+        return;
+      }
+      grid.innerHTML = '';
+      bgs.forEach(bg => {
+        const thumb = document.createElement('div');
+        thumb.className = 'bg-thumb';
+        thumb.innerHTML = `
+          <video src="/backgrounds/${bg.filename}" preload="metadata" muted loop></video>
+          <div class="bg-thumb__overlay"><span class="bg-thumb__name">${escHtml(bg.original_name)}</span></div>
+          <button class="bg-thumb__delete" onclick="deleteBackground('${bg.filename}',this)" title="Löschen">
+            <span class="material-symbols-rounded" style="font-size:16px">close</span>
+          </button>
+        `;
+        const vid = thumb.querySelector('video');
+        thumb.addEventListener('mouseenter', () => vid.play().catch(() => { }));
+        thumb.addEventListener('mouseleave', () => { vid.pause(); vid.currentTime = 0; });
+        grid.appendChild(thumb);
+      });
+    } catch (e) {
+      grid.innerHTML = `<div class="text-muted">Fehler: ${e.message}</div>`;
+    }
+  }
+
+  function handleDragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('drag-over'); }
+  function handleDragLeave() { document.getElementById('upload-zone').classList.remove('drag-over'); }
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('upload-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) uploadFile(file);
+  }
+
+  async function uploadFile(file) {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['mp4', 'mov', 'avi'].includes(ext)) { showSnack('Nur mp4, mov, avi erlaubt.', 'error'); return; }
+    document.getElementById('upload-filename').textContent = file.name;
+    document.getElementById('upload-progress-wrap').classList.remove('hidden');
+    const formData = new FormData();
+    formData.append('video', file);
+    try {
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/backgrounds/upload');
+        xhr.upload.addEventListener('progress', e => {
+          if (e.lengthComputable) {
+            const pct = Math.round(e.loaded / e.total * 100);
+            document.getElementById('upload-bar').style.width = pct + '%';
+            document.getElementById('upload-percent').textContent = pct + '%';
+          }
+        });
+        xhr.addEventListener('load', () => { const d = JSON.parse(xhr.responseText); d.error ? reject(new Error(d.error)) : resolve(d); });
+        xhr.addEventListener('error', () => reject(new Error('Upload fehlgeschlagen')));
+        xhr.send(formData);
+      });
+      showSnack(`"${file.name}" hochgeladen!`, 'success');
+      loadBackgrounds();
+    } catch (e) {
+      showSnack('Upload-Fehler: ' + e.message, 'error');
+    } finally {
+      setTimeout(() => {
+        document.getElementById('upload-progress-wrap').classList.add('hidden');
+        document.getElementById('upload-bar').style.width = '0%';
+        document.getElementById('upload-percent').textContent = '0%';
+        document.getElementById('file-input').value = '';
+      }, 1500);
+    }
+  }
+
+  async function deleteBackground(filename, btn) {
+    if (!confirm('Hintergrundvideo wirklich löschen?')) return;
+    try {
+      await fetch(`/api/backgrounds/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+      btn.closest('.bg-thumb').remove();
+      document.getElementById('bg-count').textContent = document.getElementById('bg-grid').querySelectorAll('.bg-thumb').length;
+      showSnack('Gelöscht.', 'success');
+    } catch (e) {
+      showSnack('Fehler: ' + e.message, 'error');
+    }
+  }
+</script>

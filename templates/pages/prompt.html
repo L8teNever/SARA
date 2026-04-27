@@ -1,0 +1,199 @@
+<!-- ============================================================ TAB 5: Prompt-Builder ============================================================ -->
+<section class="tab-content" id="tab-prompt">
+  <div class="page-header">
+    <div class="page-header__eyebrow"><span class="material-symbols-rounded">lightbulb</span> Kein API-Key nötig</div>
+    <h1 class="page-header__title">Prompt-Builder</h1>
+    <p class="page-header__sub">Nutze ChatGPT, Gemini oder Claude.ai mit diesem vorgefertigten Prompt — inklusive Hashtags & Social-Daten.</p>
+  </div>
+
+  <div class="prompt-grid">
+    <div>
+      <div class="md-card md-card--elevated">
+        <div class="card-hdr">
+          <div class="card-hdr__icon"><span class="material-symbols-rounded">content_copy</span></div>
+          <div class="card-hdr__text">
+            <div class="card-title">Fertiger Prompt</div>
+            <div class="card-subtitle">Kopieren → in ChatGPT / Gemini / Claude.ai einfügen. Letzten Satz anpassen oder so lassen.</div>
+          </div>
+          <button class="md-btn md-btn--filled" id="btn-copy-full" onclick="copyFullPrompt()">
+            <span class="material-symbols-rounded">content_copy</span> Kopieren
+          </button>
+        </div>
+
+        <textarea id="prompt-template-ta" class="md-textarea"
+          style="font-family:'Courier New',monospace;font-size:12.5px;min-height:480px;line-height:1.6"
+          spellcheck="false"></textarea>
+
+        <div class="btn-row" style="margin-top:12px">
+          <button class="md-btn md-btn--tonal" onclick="copyFullPrompt()">
+            <span class="material-symbols-rounded">content_copy</span> Kopieren
+          </button>
+          <button class="md-btn md-btn--outlined" onclick="resetPromptTemplate()">
+            <span class="material-symbols-rounded">restart_alt</span> Zurücksetzen
+          </button>
+          <span class="text-muted" id="copy-confirm" style="font-size:12px"></span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="md-card md-card--elevated">
+        <div class="card-hdr">
+          <div class="card-hdr__icon" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)">
+            <span class="material-symbols-rounded">download</span>
+          </div>
+          <div class="card-hdr__text">
+            <div class="card-title">Antwort importieren</div>
+            <div class="card-subtitle">JSON-Antwort der KI einfügen — SARA speichert die Story automatisch.</div>
+          </div>
+        </div>
+
+        <div class="md-field">
+          <label for="import-json">JSON-Antwort einfügen</label>
+          <textarea id="import-json" class="md-textarea"
+            style="min-height:300px;font-family:'Courier New',monospace;font-size:12.5px"
+            placeholder='{
+  "title": "The Betrayal",
+  "total_parts": 2,
+  "keywords": ["betrayal","trust",...],
+  "parts": [
+    {
+      "part_number": 1,
+      "text": "...",
+      "cliffhanger_hint": "...",
+      "social": {
+        "video_title": "...",
+        "description": "...",
+        "hashtags": "#storytime ..."
+      }
+    }
+  ]
+}'></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="md-btn md-btn--success" onclick="importStory()">
+            <span class="material-symbols-rounded">check_circle</span> Story importieren
+          </button>
+          <button class="md-btn md-btn--outlined" onclick="clearImport()">
+            <span class="material-symbols-rounded">delete_sweep</span> Leeren
+          </button>
+        </div>
+
+        <div id="import-result" class="import-result" style="margin-top:12px">
+          <div class="import-result__title" id="import-result-title"></div>
+          <div class="import-result__body" id="import-result-body"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // ============================================================
+  //  Prompt-Builder
+  // ============================================================
+  const SARA_DEFAULT_PROMPT =
+`You are a creative storyteller specializing in Reddit-style personal stories for TikTok/Reels.
+Generate compelling, emotional, and suspenseful stories that feel authentic and real.
+Stories must be written in English and follow this EXACT JSON format — no text before or after:
+{
+  "title": "Story Title",
+  "total_parts": <number>,
+  "keywords": ["word1","word2","word3","word4","word5","word6","word7","word8","word9","word10"],
+  "parts": [
+    {
+      "part_number": 1,
+      "text": "Text of part 1 — MUST be 160 to 200 words...",
+      "cliffhanger_hint": "brief hint of what comes next",
+      "social": {
+        "video_title": "Catchy TikTok/Reels title with Part 1/2 — max 80 chars",
+        "description": "2-3 sentence caption that teases the story emotionally without spoiling it. End with a question or call-to-action.",
+        "hashtags": "#storytime #reddit #viral #relationship #foryou #fyp #drama"
+      }
+    },
+    {
+      "part_number": 2,
+      "text": "Text of part 2 — MUST be 160 to 200 words...",
+      "cliffhanger_hint": "",
+      "social": {
+        "video_title": "Catchy TikTok/Reels title with Part 2/2 — max 80 chars",
+        "description": "2-3 sentence caption that teases the conclusion. End with a question or call-to-action.",
+        "hashtags": "#storytime #reddit #viral #relationship #foryou #fyp #drama"
+      }
+    }
+  ]
+}
+
+Rules:
+- Each part MUST contain exactly 160–200 words (this guarantees at least 75 seconds of audio per part)
+- Split the story so each part has 160–200 words; never fewer than 160 words per part
+- Each part (except the last) MUST end at the most dramatic, suspenseful cliffhanger possible
+- For 2-part stories: Part 1 MUST end at the single most gripping moment — the listener MUST feel compelled to watch Part 2 immediately
+- Last part always has empty string for cliffhanger_hint
+- keywords: exactly 10 English keywords describing the core story content
+- Write in first person, past tense, raw and emotional style (like r/TIFU or r/relationships)
+- Hook the audience within the very first sentence — no slow build-ups
+- social.video_title: punchy and attention-grabbing, include "Part X/Y" for multi-part, max 80 chars
+- social.description: emotionally tease the story, never spoil the ending, end with a question or CTA
+- social.hashtags: 6–8 relevant hashtags as a single space-separated string
+
+Create a story about: [THEMA HIER EINTRAGEN — z.B. "a woman who discovers her husband has a secret family" — oder Zeile so lassen für eine zufällige Story]`;
+
+  function initPromptTemplate() {
+    const ta = document.getElementById('prompt-template-ta');
+    if (ta && !ta.value) ta.value = SARA_DEFAULT_PROMPT;
+  }
+
+  function resetPromptTemplate() {
+    document.getElementById('prompt-template-ta').value = SARA_DEFAULT_PROMPT;
+    showSnack('Prompt zurückgesetzt.', 'success');
+  }
+
+  async function copyFullPrompt() {
+    const text = document.getElementById('prompt-template-ta').value.trim();
+    if (!text) return;
+    const btnEl = document.getElementById('btn-copy-full');
+    const confirmEl = document.getElementById('copy-confirm');
+    try { await navigator.clipboard.writeText(text); } catch (_) {
+      document.getElementById('prompt-template-ta').select(); document.execCommand('copy');
+    }
+    if (btnEl) btnEl.innerHTML = '<span class="material-symbols-rounded">check</span> Kopiert!';
+    if (confirmEl) confirmEl.textContent = '✓ In Zwischenablage — jetzt in ChatGPT / Gemini einfügen!';
+    showSnack('Prompt kopiert!', 'success');
+    setTimeout(() => {
+      if (btnEl) btnEl.innerHTML = '<span class="material-symbols-rounded">content_copy</span> Kopieren';
+      if (confirmEl) confirmEl.textContent = '';
+    }, 3000);
+  }
+
+  async function importStory() {
+    const jsonText = document.getElementById('import-json').value.trim();
+    if (!jsonText) { showSnack('Bitte zuerst das JSON einfügen.', 'error'); return; }
+    try {
+      const res = await fetch('/api/import-story', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ json_text: jsonText })
+      });
+      const data = await res.json();
+      if (data.error) { showSnack(data.error, 'error'); return; }
+      document.getElementById('import-result-title').textContent = `Story importiert! Code: ${data.code}`;
+      let body = `"${data.title}" wurde gespeichert.`;
+      if (data.duplicate_check && data.duplicate_check.is_duplicate) {
+        body += ` Ähnliche Story gefunden (${data.duplicate_check.overlap}/10 Keywords).`;
+      }
+      document.getElementById('import-result-body').textContent = body;
+      document.getElementById('import-result').classList.add('visible');
+      showSnack(`Story "${data.title}" importiert! Code: ${data.code}`, 'success');
+      document.getElementById('import-json').value = '';
+    } catch (e) {
+      showSnack('Fehler: ' + e.message, 'error');
+    }
+  }
+
+  function clearImport() {
+    document.getElementById('import-json').value = '';
+    document.getElementById('import-result').classList.remove('visible');
+  }
+</script>
