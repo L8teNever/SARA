@@ -30,7 +30,9 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # GHCR_PAT (write:packages) wird bevorzugt; fällt auf GITHUB_TOKEN zurück wenn nicht gesetzt.
+          # Bei 403-Fehler mit GITHUB_TOKEN: Settings → Actions → General → Workflow permissions → Read and write.
+          password: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels)
         id: meta
