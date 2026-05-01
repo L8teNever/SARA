@@ -12,6 +12,8 @@ services:
     environment:
       # Anthropic API Key — zwingend erforderlich für KI-Story-Generator
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # ElevenLabs API Key — optional, für hochwertige Rachel-Stimme (sonst Edge-TTS)
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
       # Optionaler Port-Override
       - PORT=7842
     volumes:
