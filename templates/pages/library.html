@@ -52,7 +52,7 @@
           card.id = 'lib-card-' + part.id;
 
           const coverHtml = part.cover_path
-            ? `<img class="lib-cover" src="/${part.cover_path}" alt="Cover" loading="lazy" />`
+            ? `<img class="lib-cover" src="/covers/${part.cover_path.split('/').pop()}" alt="Cover" loading="lazy" />`
             : '';
 
           const social = part.social || {};

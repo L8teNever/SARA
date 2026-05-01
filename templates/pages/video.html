@@ -93,7 +93,11 @@
         item.addEventListener('click', () => selectStory(s.id, s.title, s.code));
         container.appendChild(item);
       });
-      if (pendingSelectStoryId) { selectStory(pendingSelectStoryId); pendingSelectStoryId = null; }
+      if (pendingSelectStoryId) {
+        const s = stories.find(st => st.id === pendingSelectStoryId);
+        if (s) selectStory(s.id, s.title, s.code);
+        pendingSelectStoryId = null;
+      }
     } catch (e) {
       container.innerHTML = `<div class="text-muted">Fehler: ${e.message}</div>`;
     }

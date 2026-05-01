@@ -310,16 +310,12 @@ def tts_to_file(text: str, output_path: Path) -> Path:
             )
             await communicate.save(str(output_path))
 
-        # Windows-kompatibles Event-Loop-Handling
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                raise RuntimeError
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        loop.run_until_complete(_edge_speak())
+            loop.run_until_complete(_edge_speak())
+        finally:
+            loop.close()
         return output_path
 
     except Exception as edge_err:
@@ -404,15 +400,12 @@ def _get_word_boundaries(text: str, audio_path: Path) -> list:
                         offset_sec + duration_sec,
                     ))
 
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                raise RuntimeError
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        loop.run_until_complete(_collect())
+            loop.run_until_complete(_collect())
+        finally:
+            loop.close()
         return events if events else _uniform_word_timing(text, audio_path)
 
     except Exception:
@@ -713,7 +706,6 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
 
         # ---- Schritt 6: DB aktualisieren ----
         progress(95, "Datenbank aktualisiert…")
-        rel_video = str(output_path.relative_to(BASE_DIR)).replace("\\", "/")
         rel_cover = str(cover_path.relative_to(BASE_DIR)).replace("\\", "/")
 
         with get_db() as conn:

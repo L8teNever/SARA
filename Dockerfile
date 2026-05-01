@@ -23,7 +23,7 @@ COPY main.py .
 COPY templates/ templates/
 
 # Datenverzeichnisse anlegen (werden als Volume gemountet)
-RUN mkdir -p data/backgrounds data/outputs data/tts
+RUN mkdir -p data/backgrounds data/outputs data/tts data/covers
 
 # Anwendungsport
 EXPOSE 7842
