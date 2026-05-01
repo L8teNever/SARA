@@ -55,26 +55,9 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: false
 
-      # Paket auf "public" setzen damit docker compose pull ohne Login funktioniert.
-      # Voraussetzung: Secret GHCR_PAT mit einem PAT anlegen (Scope: write:packages + read:packages).
-      # GitHub → Settings → Developer settings → Personal access tokens → Fine-grained oder Classic.
-      - name: Make GHCR package public
-        env:
-          GHCR_PAT: ${{ secrets.GHCR_PAT }}
-        run: |
-          if [ -z "$GHCR_PAT" ]; then
-            echo "::warning::Secret GHCR_PAT fehlt — Paket bleibt privat. Anleitung: siehe Workflow-Kommentar."
-            exit 0
-          fi
-          PACKAGE=$(echo "${GITHUB_REPOSITORY##*/}" | tr '[:upper:]' '[:lower:]')
-          HTTP=$(curl -s -o /tmp/gh_response.json -w "%{http_code}" \
-            -X PATCH \
-            -H "Authorization: Bearer $GHCR_PAT" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/user/packages/container/${PACKAGE}" \
-            -d '{"visibility":"public"}')
-          echo "GitHub API → HTTP $HTTP"
-          cat /tmp/gh_response.json
-          [ "$HTTP" = "200" ] || { echo "::error::Sichtbarkeit konnte nicht auf public gesetzt werden (HTTP $HTTP)"; exit 1; }
-          echo "Paket ist jetzt öffentlich erreichbar: ghcr.io/${IMAGE_NAME}:latest"
+      # HINWEIS: GitHub bietet aktuell keine öffentliche REST-API, um die Sichtbarkeit eines Packages
+      # automatisch auf "public" zu setzen (daher der HTTP 404 Fehler). 
+      # Dies muss einmalig manuell im GitHub Web-UI erfolgen:
+      # 1. Gehe zu Deinem Profil -> "Packages" -> Wähle das Container-Package.
+      # 2. Rechts unter "Package settings" -> "Danger Zone" -> "Change visibility" auf "Public" setzen.
+      # Danach funktioniert 'docker compose pull' auf dem Server ohne vorheriges 'docker login'.
