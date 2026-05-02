@@ -892,10 +892,24 @@
 
     window.addEventListener('popstate', e => {
       const tab = (e.state && e.state.tab) || 'story';
+      const code = e.state && e.state.code;
       const prev = currentTab;
       currentTab = '';
       switchTab(tab, false);
       if (currentTab === prev) currentTab = tab;
+      
+      // Falls wir in der Library sind und einen Code haben
+      if (tab === 'library' && code) {
+        // Wir warten kurz bis die Library geladen ist
+        setTimeout(() => {
+          if (typeof _libData !== 'undefined') {
+            const story = _libData.find(s => s.code === code);
+            if (story) openLibDetail(story, false);
+          }
+        }, 300);
+      } else if (tab === 'library') {
+        if (typeof closeLibDetail === 'function') closeLibDetail(false);
+      }
     });
 
     // ============================================================
@@ -1114,27 +1128,44 @@
     });
 
     (function () {
-      const path = window.location.pathname.replace(/^\//, '').split('/')[0];
+      const parts = window.location.pathname.replace(/^\//, '').split('/');
+      const path = parts[0];
+      const code = parts[1];
       const initTab = TAB_TO_NAV[path] ? path : 'story';
 
       if (!window.location.pathname || window.location.pathname === '/') {
         history.replaceState({ tab: 'story' }, '', '/story');
       } else {
-        history.replaceState({ tab: initTab }, '', '/' + initTab);
+        const state = { tab: initTab };
+        if (initTab === 'library' && code) state.code = code;
+        history.replaceState(state, '', window.location.pathname);
       }
 
-      if (initTab !== 'story') {
-        document.getElementById('tab-story').classList.remove('active');
-        document.querySelectorAll('.nav-item, .bnav-item').forEach(el => el.classList.remove('active'));
-        document.getElementById('tab-' + initTab).classList.add('active');
-        (TAB_TO_NAV[initTab] || []).forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.classList.add('active');
+      // Initialen Tab aktivieren
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-item, .bnav-item').forEach(el => el.classList.remove('active'));
+      
+      const tabEl = document.getElementById('tab-' + initTab);
+      if (tabEl) tabEl.classList.add('active');
+      
+      (TAB_TO_NAV[initTab] || []).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('active');
+      });
+      
+      currentTab = initTab;
+      
+      // Daten laden
+      if (initTab === 'video')        { loadStoryList(); loadQueue(); }
+      else if (initTab === 'upload')  { loadBackgrounds(); }
+      else if (initTab === 'demo')    { /* demo init if any */ }
+      else if (initTab === 'library') {
+        loadLibrary().then(() => {
+          if (code) {
+            const story = _libData.find(s => s.code === code);
+            if (story) openLibDetail(story, false);
+          }
         });
-        currentTab = initTab;
-        if (initTab === 'video')        { loadStoryList(); loadQueue(); }
-        else if (initTab === 'library') { loadLibrary(); }
-        else if (initTab === 'upload')  { loadBackgrounds(); }
       }
     })();
   </script>

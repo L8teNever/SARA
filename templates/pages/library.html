@@ -191,9 +191,12 @@
   }
 
   // ─── Detail-Ansicht öffnen ───────────────────────────────────
-  function openLibDetail(story) {
+  function openLibDetail(story, pushHistory = true) {
     document.getElementById('lib-overview').style.display = 'none';
     document.getElementById('lib-detail').style.display = 'block';
+    if (pushHistory) {
+      history.pushState({ tab: 'library', code: story.code }, '', `/library/${story.code}`);
+    }
     document.getElementById('lib-detail-code').textContent = story.code;
     document.getElementById('lib-detail-title').textContent = `[${story.code}] ${story.title}`;
     document.getElementById('lib-detail-date').textContent = formatDate(story.created_at);
@@ -289,9 +292,12 @@
     });
   }
 
-  function closeLibDetail() {
+  function closeLibDetail(pushHistory = true) {
     document.getElementById('lib-detail').style.display = 'none';
     document.getElementById('lib-overview').style.display = 'block';
+    if (pushHistory) {
+      history.pushState({ tab: 'library' }, '', '/library');
+    }
   }
 
   // ─── Platform-Chips ──────────────────────────────────────────
