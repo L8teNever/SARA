@@ -1,11 +1,22 @@
 <!-- ============================================================ TAB 1: Story erstellen ============================================================ -->
 <section class="tab-content active" id="tab-story">
-  <div class="page-header">
-    <div class="page-header__eyebrow">
-      <span class="material-symbols-rounded">lightbulb</span> Story erstellen
+
+  <!-- 3-Schritt Workflow-Leiste -->
+  <div class="workflow-bar">
+    <div class="workflow-bar__step">
+      <div class="workflow-bar__num">1</div>
+      <span class="workflow-bar__label">Prompt kopieren</span>
     </div>
-    <h1 class="page-header__title">Neue Story erstellen</h1>
-    <p class="page-header__sub">Prompt kopieren → in ChatGPT / Gemini / Claude.ai einfügen → Antwort hier importieren.</p>
+    <span class="material-symbols-rounded workflow-bar__arrow">arrow_forward</span>
+    <div class="workflow-bar__step">
+      <div class="workflow-bar__num">2</div>
+      <span class="workflow-bar__label">In KI einfügen</span>
+    </div>
+    <span class="material-symbols-rounded workflow-bar__arrow">arrow_forward</span>
+    <div class="workflow-bar__step">
+      <div class="workflow-bar__num">3</div>
+      <span class="workflow-bar__label">Antwort importieren</span>
+    </div>
   </div>
 
   <div class="prompt-grid">
@@ -13,15 +24,15 @@
     <div>
       <div class="md-card md-card--elevated">
         <div class="card-hdr">
-          <div class="card-hdr__icon"><span class="material-symbols-rounded">content_copy</span></div>
+          <div class="card-hdr__icon" style="background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font-size:15px;font-weight:800">1</div>
           <div class="card-hdr__text">
-            <div class="card-title">Schritt 1 — Prompt für die KI</div>
-            <div class="card-subtitle">Gib dein Thema ein und kopiere den fertigen Prompt — dann in ChatGPT, Gemini oder Claude.ai einfügen.</div>
+            <div class="card-title">Prompt für die KI</div>
+            <div class="card-subtitle">ChatGPT · Gemini · Claude.ai</div>
           </div>
         </div>
 
         <div class="md-field">
-          <label for="story-idea">Dein Thema <span style="font-weight:400;opacity:.7">(optional — leer lassen für zufällige Story)</span></label>
+          <label for="story-idea">Thema <span style="font-weight:400;opacity:.65">(optional)</span></label>
           <input type="text" id="story-idea" class="md-input"
             placeholder='z.B. "a woman who discovers her husband has a secret family"'>
         </div>
@@ -36,7 +47,7 @@
           <button class="md-btn md-btn--text md-btn--sm" onclick="togglePromptPreview(this)"
             style="color:var(--md-sys-color-on-surface-variant)">
             <span class="material-symbols-rounded" style="font-size:16px;transition:transform .2s">expand_more</span>
-            Vollständigen Prompt anzeigen / bearbeiten
+            Prompt anzeigen / bearbeiten
           </button>
           <div id="prompt-preview-wrap" style="display:none;margin-top:10px">
             <textarea id="prompt-template-ta" class="md-textarea"
@@ -54,41 +65,28 @@
     <div>
       <div class="md-card md-card--elevated">
         <div class="card-hdr">
-          <div class="card-hdr__icon" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)">
-            <span class="material-symbols-rounded">download</span>
-          </div>
+          <div class="card-hdr__icon" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);font-size:15px;font-weight:800">3</div>
           <div class="card-hdr__text">
-            <div class="card-title">Schritt 2 — KI-Antwort importieren</div>
-            <div class="card-subtitle">JSON-Antwort der KI hier einfügen — SARA speichert die Story automatisch.</div>
+            <div class="card-title">KI-Antwort importieren</div>
+            <div class="card-subtitle">JSON hier einfügen — SARA speichert automatisch</div>
           </div>
         </div>
 
         <div class="md-field">
-          <label for="import-json">JSON-Antwort einfügen</label>
+          <label for="import-json">JSON-Antwort</label>
           <textarea id="import-json" class="md-textarea"
-            style="min-height:300px;font-family:'Courier New',monospace;font-size:12.5px"
+            style="min-height:260px;font-family:'Courier New',monospace;font-size:12.5px"
             placeholder='{
   "title": "The Betrayal",
   "total_parts": 2,
   "keywords": ["betrayal","trust",...],
-  "parts": [
-    {
-      "part_number": 1,
-      "text": "...",
-      "cliffhanger_hint": "...",
-      "social": {
-        "video_title": "...",
-        "description": "...",
-        "hashtags": "#storytime ..."
-      }
-    }
-  ]
+  "parts": [...]
 }'></textarea>
         </div>
 
         <div class="btn-row">
           <button class="md-btn md-btn--success" onclick="importStory()">
-            <span class="material-symbols-rounded">check_circle</span> Story importieren
+            <span class="material-symbols-rounded">check_circle</span> Importieren
           </button>
           <button class="md-btn md-btn--outlined" onclick="clearImport()">
             <span class="material-symbols-rounded">delete_sweep</span> Leeren
@@ -112,13 +110,13 @@
           <span class="material-symbols-rounded">history</span>
         </div>
         <div class="card-hdr__text">
-          <div class="card-title">Zuletzt gespeicherte Stories</div>
+          <div class="card-title">Zuletzt gespeichert</div>
         </div>
         <button class="md-btn md-btn--icon" onclick="loadRecentStories()">
           <span class="material-symbols-rounded">refresh</span>
         </button>
       </div>
-      <div id="recent-stories-list" class="flex-column" style="gap:8px">
+      <div id="recent-stories-list">
         <div class="spinner" style="margin:20px auto"></div>
       </div>
     </div>
@@ -278,17 +276,17 @@ Create a story about: [DEIN THEMA HIER EINTRAGEN — z.B. "a woman who discovers
       container.innerHTML = '';
       recent.forEach(s => {
         const row = document.createElement('div');
-        row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--md-sys-color-surface-container-high);border-radius:12px;';
+        row.className = 'sitem';
         row.innerHTML = `
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(s.title)}</div>
-            <div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);opacity:.7">${s.total_parts} Teile · ${formatDate(s.created_at)}</div>
+          <div class="sitem__dot sitem__dot--done"></div>
+          <div class="sitem__body">
+            <div class="sitem__title">${escHtml(s.title)}</div>
+            <div class="sitem__meta"><span class="story-code-badge" style="font-size:10px;padding:1px 7px">${s.code}</span> · ${s.total_parts} Teile · ${formatDate(s.created_at)}</div>
           </div>
-          <span class="story-code-badge" style="font-size:11px">${s.code}</span>
           <button class="md-btn md-btn--tonal md-btn--sm" onclick="goToVideoTab(${s.id})" title="Zu Videos">
             <span class="material-symbols-rounded" style="font-size:16px">movie</span>
           </button>
-          <button class="md-btn md-btn--icon" style="color:var(--md-sys-color-error)" onclick="deleteStoryFromCreation(${s.id}, '${escHtml(s.title).replace(/'/g, '&#39;')}')">
+          <button class="sitem__del" onclick="deleteStoryFromCreation(${s.id}, '${escHtml(s.title).replace(/'/g, '&#39;')}')">
             <span class="material-symbols-rounded">delete</span>
           </button>
         `;

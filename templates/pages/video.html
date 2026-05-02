@@ -3,7 +3,7 @@
   <div class="page-header">
     <div class="page-header__eyebrow"><span class="material-symbols-rounded">movie</span> Produktion</div>
     <h1 class="page-header__title">Video erstellen</h1>
-    <p class="page-header__sub">Wähle eine gespeicherte Story und erstelle automatisch alle Videos.</p>
+    <p class="page-header__sub">Story auswählen → Videos erstellen → Warteschlange abarbeiten.</p>
   </div>
 
   <div class="d-grid-2">
@@ -14,65 +14,60 @@
           <div class="card-hdr__icon"><span class="material-symbols-rounded">auto_stories</span></div>
           <div class="card-hdr__text">
             <div class="card-title">Story auswählen</div>
-            <div class="card-subtitle">Gespeicherte Stories aus der Datenbank</div>
+            <div class="card-subtitle">Klicke eine Story an, dann auf "Erstellen"</div>
           </div>
         </div>
 
-        <div id="story-list" class="story-select-list">
+        <div id="story-list">
           <div class="empty-state" style="padding:24px 0">
             <div class="empty-state__icon"><span class="material-symbols-rounded">book</span></div>
             <div class="empty-state__text">Keine Stories vorhanden</div>
           </div>
         </div>
 
-        <div class="md-divider"></div>
-        <div class="btn-row">
+        <div class="md-divider" style="margin:14px 0 12px"></div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <button class="md-btn md-btn--filled" id="btn-create-video" onclick="createVideo()" disabled>
             <span class="material-symbols-rounded">video_settings</span> Videos erstellen
           </button>
-          <span class="text-muted" id="selected-story-info"></span>
+          <span class="text-muted" id="selected-story-info" style="font-size:13px"></span>
         </div>
       </div>
     </div>
 
-    <!-- Rechte Spalte: Einstellungen + Warteschlange -->
-    <div>
+    <!-- Rechte Spalte: Produktionssteuerung + Warteschlange -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+
       <!-- Produktionssteuerung -->
-      <div class="md-card md-card--elevated" style="margin-bottom:20px">
+      <div class="md-card md-card--elevated">
         <div class="card-hdr">
           <div class="card-hdr__icon" style="background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)">
             <span class="material-symbols-rounded">tune</span>
           </div>
           <div class="card-hdr__text">
             <div class="card-title">Produktion</div>
-            <div class="card-subtitle">Status und Zeitplan der Warteschlange</div>
           </div>
         </div>
 
-        <!-- Pause/Play Control -->
-        <div id="prod-status-bar" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--md-sys-color-surface-container-highest);border-radius:var(--md-shape-large);margin-bottom:16px">
+        <div id="prod-status-bar" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--md-sys-color-surface-container-highest);border-radius:var(--md-shape-large);margin-bottom:14px">
           <span class="material-symbols-rounded" id="prod-status-icon" style="color:var(--md-sys-color-success)">check_circle</span>
-          <div style="flex:1">
+          <div style="flex:1;min-width:0">
             <div style="font-size:14px;font-weight:500" id="prod-status-label">Produktion aktiv</div>
-            <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant)" id="prod-status-hint">Videos werden automatisch aus der Warteschlange produziert</div>
+            <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant)" id="prod-status-hint">Videos werden automatisch produziert</div>
           </div>
           <button class="md-btn md-btn--outlined md-btn--sm" id="btn-toggle-prod" onclick="toggleProdStatus()">
             <span class="material-symbols-rounded">pause_circle</span> Pausieren
           </button>
         </div>
 
-        <!-- Intervall -->
-        <div class="md-field" style="margin-bottom:0">
-          <label>Intervall zwischen Videos</label>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input type="number" id="prod-interval" class="md-input" value="0" min="0" style="width:80px">
-            <span style="font-size:13px;color:var(--md-sys-color-on-surface-variant)">Minuten</span>
-            <button class="md-btn md-btn--tonal md-btn--sm" onclick="saveProdSettings()">
-              <span class="material-symbols-rounded">save</span> Speichern
-            </button>
-          </div>
-          <span style="font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:3px;display:block">0 = sofort nacheinander produzieren</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" id="prod-interval" class="md-input" value="0" min="0" style="width:72px">
+          <span style="font-size:13px;color:var(--md-sys-color-on-surface-variant)">Min. Pause</span>
+          <button class="md-btn md-btn--tonal md-btn--sm" onclick="saveProdSettings()">
+            <span class="material-symbols-rounded">save</span> Speichern
+          </button>
         </div>
+        <span style="font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:4px;display:block">0 = sofort nacheinander</span>
       </div>
 
       <!-- Warteschlange -->
@@ -89,8 +84,8 @@
             </div>
           </div>
         </div>
-        <div id="queue-stats" class="flex-row" style="margin-bottom:12px;gap:6px"></div>
-        <div id="queue-list" class="queue-list">
+        <div id="queue-stats" class="flex-row" style="margin-bottom:10px;gap:6px"></div>
+        <div id="queue-list">
           <div class="empty-state" style="padding:24px 0">
             <div class="empty-state__icon"><span class="material-symbols-rounded">hourglass_empty</span></div>
             <div class="empty-state__text">Warteschlange ist leer</div>
@@ -102,13 +97,9 @@
 </section>
 
 <style>
-  .story-select-item--done { opacity: 0.45; filter: saturate(0.5); }
-  .story-select-item--done:hover { opacity: 0.65; filter: saturate(0.7); }
-  .story-select-item--done.selected { opacity: 0.75; filter: none; }
-
   @media (max-width: 599px) {
     #prod-status-hint { display: none; }
-    #prod-status-bar { padding: 10px 12px; gap: 10px; }
+    #prod-status-bar { padding: 10px 12px; gap: 8px; }
   }
 </style>
 
@@ -137,35 +128,33 @@
 
       container.innerHTML = '';
 
-      function renderItem(s, dimmed) {
-        const item = document.createElement('div');
-        item.className = 'story-select-item'
-          + (s.id === selectedStoryId ? ' selected' : '')
-          + (dimmed ? ' story-select-item--done' : '');
-        item.dataset.id = s.id;
+      function renderSitem(s) {
+        const isDone = s.total_parts > 0 && s.video_done_parts >= s.total_parts;
+        const isQueued = s.video_queue_parts > 0;
 
-        let progressBadge = '';
-        if (dimmed) {
-          progressBadge = `<span class="md-chip" style="font-size:11px;padding:2px 8px;gap:4px">
-            <span class="material-symbols-rounded" style="font-size:13px;color:var(--md-sys-color-success)">check_circle</span>Fertig
-          </span>`;
-        } else if (s.video_queue_parts > 0) {
-          progressBadge = `<span class="md-chip" style="font-size:11px;padding:2px 8px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container)">
-            <span class="material-symbols-rounded" style="font-size:13px;animation:spin 3s linear infinite">settings</span>Wartet (${s.video_queue_parts})
-          </span>`;
+        let dotClass = 'sitem__dot';
+        let badgeHtml = '';
+        if (isDone) {
+          dotClass += ' sitem__dot--done';
+          badgeHtml = `<span class="sitem__badge sitem__badge--done">Fertig</span>`;
+        } else if (isQueued) {
+          dotClass += ' sitem__dot--queue';
+          badgeHtml = `<span class="sitem__badge sitem__badge--active">${s.video_queue_parts} in Queue</span>`;
         } else if (s.video_done_parts > 0) {
-          progressBadge = `<span class="md-chip" style="font-size:11px;padding:2px 8px">${s.video_done_parts}/${s.total_parts} Videos</span>`;
+          badgeHtml = `<span class="sitem__badge">${s.video_done_parts}/${s.total_parts}</span>`;
         }
 
+        const item = document.createElement('div');
+        item.className = 'sitem' + (s.id === selectedStoryId ? ' selected' : '') + (isDone ? ' done' : '');
+        item.dataset.id = s.id;
         item.innerHTML = `
-          <div class="story-select-item__radio"></div>
-          <div class="story-select-item__info">
-            <div class="story-select-item__title">${escHtml(s.title)}</div>
-            <div class="story-select-item__meta"><span class="story-code-badge" style="font-size:10px;padding:1px 7px">${s.code}</span> · ${s.total_parts} Teil(e) · ${formatDate(s.created_at)}</div>
+          <div class="${dotClass}"></div>
+          <div class="sitem__body">
+            <div class="sitem__title">${escHtml(s.title)}</div>
+            <div class="sitem__meta"><span class="story-code-badge" style="font-size:10px;padding:1px 7px">${s.code}</span> · ${s.total_parts} Teil(e) · ${formatDate(s.created_at)}</div>
           </div>
-          ${progressBadge}
-          <button class="md-btn md-btn--icon" style="color:var(--md-sys-color-error);opacity:0.7"
-            onclick="event.stopPropagation(); deleteStoryFromList(${s.id}, '${escHtml(s.title).replace(/'/g, '&#39;')}')">
+          ${badgeHtml}
+          <button class="sitem__del" onclick="event.stopPropagation(); deleteStoryFromList(${s.id}, '${escHtml(s.title).replace(/'/g, '&#39;')}')">
             <span class="material-symbols-rounded">delete</span>
           </button>
         `;
@@ -175,7 +164,7 @@
 
       function createSeparator(id, label, count, storageKey) {
         const sep = document.createElement('div');
-        sep.style.cssText = 'display:flex;align-items:center;gap:8px;margin:14px 0 8px;cursor:pointer;user-select:none;';
+        sep.style.cssText = 'display:flex;align-items:center;gap:8px;margin:12px 0 6px;cursor:pointer;user-select:none;';
         const isCollapsed = localStorage.getItem(storageKey) === 'true';
 
         sep.onclick = () => {
@@ -198,25 +187,25 @@
       }
 
       if (pending.length) {
-        pending.forEach(s => container.appendChild(renderItem(s, false)));
+        pending.forEach(s => container.appendChild(renderSitem(s)));
       }
 
       if (inQueue.length) {
         container.appendChild(createSeparator('queue-stories-container', 'In Warteschlange', inQueue.length, 'sara_queue_collapsed'));
-        const qContainer = document.createElement('div');
-        qContainer.id = 'queue-stories-container';
-        qContainer.style.display = (localStorage.getItem('sara_queue_collapsed') === 'true') ? 'none' : 'block';
-        inQueue.forEach(s => qContainer.appendChild(renderItem(s, false)));
-        container.appendChild(qContainer);
+        const qc = document.createElement('div');
+        qc.id = 'queue-stories-container';
+        qc.style.display = (localStorage.getItem('sara_queue_collapsed') === 'true') ? 'none' : 'block';
+        inQueue.forEach(s => qc.appendChild(renderSitem(s)));
+        container.appendChild(qc);
       }
 
       if (finished.length) {
         container.appendChild(createSeparator('finished-stories-container', 'Bereits produziert', finished.length, 'sara_finished_collapsed'));
-        const fContainer = document.createElement('div');
-        fContainer.id = 'finished-stories-container';
-        fContainer.style.display = (localStorage.getItem('sara_finished_collapsed') === 'true') ? 'none' : 'block';
-        finished.forEach(s => fContainer.appendChild(renderItem(s, true)));
-        container.appendChild(fContainer);
+        const fc = document.createElement('div');
+        fc.id = 'finished-stories-container';
+        fc.style.display = (localStorage.getItem('sara_finished_collapsed') === 'true') ? 'none' : 'block';
+        finished.forEach(s => fc.appendChild(renderSitem(s)));
+        container.appendChild(fc);
       }
 
       if (pendingSelectStoryId) {
@@ -231,7 +220,7 @@
 
   function selectStory(id, title, code) {
     selectedStoryId = id;
-    document.querySelectorAll('.story-select-item').forEach(el =>
+    document.querySelectorAll('.sitem').forEach(el =>
       el.classList.toggle('selected', parseInt(el.dataset.id) === id)
     );
     document.getElementById('btn-create-video').disabled = false;
@@ -296,14 +285,14 @@
       btn.style.borderColor = '';
       if (icon) { icon.textContent = 'check_circle'; icon.style.color = 'var(--md-sys-color-success)'; }
       if (label) label.textContent = 'Produktion aktiv';
-      if (hint) hint.textContent = 'Videos werden automatisch aus der Warteschlange produziert';
+      if (hint) hint.textContent = 'Videos werden automatisch produziert';
     } else {
       btn.innerHTML = '<span class="material-symbols-rounded">play_circle</span> Fortsetzen';
       btn.style.color = 'var(--md-sys-color-primary)';
       btn.style.borderColor = 'var(--md-sys-color-primary)';
       if (icon) { icon.textContent = 'pause_circle'; icon.style.color = 'var(--md-sys-color-warning)'; }
       if (label) label.textContent = 'Produktion pausiert';
-      if (hint) hint.textContent = 'Neue Jobs werden erst gestartet wenn du auf Fortsetzen klickst';
+      if (hint) hint.textContent = 'Klicke Fortsetzen um die Queue wieder zu starten';
     }
   }
 

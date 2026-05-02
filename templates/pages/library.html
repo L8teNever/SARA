@@ -6,16 +6,16 @@
     <div class="page-header">
       <div class="page-header__eyebrow"><span class="material-symbols-rounded">video_library</span> Ausgabe</div>
       <h1 class="page-header__title">Meine Stories</h1>
-      <p class="page-header__sub">Klicke auf eine Story um alle Teile und Videos zu sehen.</p>
+      <p class="page-header__sub">Klicke auf eine Story um alle Videos zu sehen.</p>
     </div>
 
     <!-- Suchleiste + Filter -->
-    <div class="md-card md-card--elevated" style="margin-bottom:18px;padding:14px 18px;">
+    <div class="md-card md-card--elevated" style="margin-bottom:16px;padding:12px 16px;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-        <div style="position:relative;flex:1;min-width:200px;">
-          <span class="material-symbols-rounded" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--md-sys-color-on-surface-variant);pointer-events:none">search</span>
+        <div style="position:relative;flex:1;min-width:180px;">
+          <span class="material-symbols-rounded" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--md-sys-color-on-surface-variant);pointer-events:none">search</span>
           <input class="md-input" id="lib-search" type="text" placeholder="Story suchen…" oninput="filterLibrary()"
-            style="padding-left:40px;min-height:38px;font-size:14px;" />
+            style="padding-left:38px;min-height:38px;font-size:14px;" />
         </div>
         <div class="chip-row" id="lib-filter-chips" style="margin:0;gap:6px;">
           <button class="md-chip lib-filter-chip lib-filter-chip--active" data-filter="all" onclick="setLibFilter('all',this)">
@@ -45,15 +45,18 @@
 
   <!-- ─── Story-Detailansicht (Parts) ─── -->
   <div id="lib-detail" style="display:none;">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
-      <button class="md-btn md-btn--tonal md-btn--sm" onclick="closeLibDetail()" id="lib-back-btn">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+      <button class="md-btn md-btn--tonal md-btn--sm" onclick="closeLibDetail()">
         <span class="material-symbols-rounded">arrow_back</span> Zurück
       </button>
       <span class="story-code-badge" id="lib-detail-code"></span>
-      <span style="font-weight:600;font-size:17px;" id="lib-detail-title"></span>
-      <span class="text-muted" id="lib-detail-date" style="margin-left:auto;"></span>
+      <span style="font-weight:600;font-size:17px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="lib-detail-title"></span>
+      <span class="text-muted" id="lib-detail-date"></span>
+      <button class="md-btn md-btn--outlined md-btn--sm mark-all-done-btn" style="display:none" id="lib-mark-all-btn">
+        <span class="material-symbols-rounded">done_all</span> Alle als erledigt
+      </button>
     </div>
-    <div id="lib-parts-grid" class="lib-grid"></div>
+    <div id="lib-parts-grid"></div>
   </div>
 
 </section>
@@ -61,42 +64,14 @@
 <style>
   .lib-filter-chip { cursor: pointer; transition: background .15s, color .15s; }
   .lib-filter-chip--active { background: var(--md-sys-color-primary-container) !important; border-color: transparent !important; color: var(--md-sys-color-on-primary-container) !important; }
-
-  .lib-story-row {
-    display: flex; align-items: center; gap: 14px;
-    background: var(--md-sys-color-surface-container-high);
-    border-radius: var(--md-shape-large);
-    padding: 14px 18px; margin-bottom: 8px;
-    cursor: pointer; border: 1.5px solid transparent;
-    transition: border-color .15s, background .15s;
-  }
-  .lib-story-row:hover { border-color: var(--md-sys-color-primary-container); background: var(--md-sys-color-surface-container-highest); }
-  .lib-story-row__num {
-    width: 34px; height: 34px; border-radius: 50%;
-    background: var(--md-sys-color-primary-container);
-    color: var(--md-sys-color-on-primary-container);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700; flex-shrink: 0;
-  }
-  .lib-story-row__info { flex: 1; min-width: 0; }
-  .lib-story-row__title { font-weight: 500; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .lib-story-row__meta { font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-top: 2px; }
-  .lib-upload-badges { display: flex; gap: 5px; flex-shrink: 0; }
-  .lib-upload-dot {
-    width: 24px; height: 24px; border-radius: 50%;
-    background: var(--md-sys-color-surface-container-highest);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px;
-  }
-  .lib-upload-dot--done { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
 </style>
 
 <script>
   // ============================================================
   //  Bibliothek — Daten & State
   // ============================================================
-  let _libData = [];       // Alle Stories mit Parts
-  let _libFilter = 'all';  // Aktiver Filter
+  let _libData = [];
+  let _libFilter = 'all';
 
   async function loadLibrary() {
     const container = document.getElementById('lib-story-list');
@@ -110,7 +85,6 @@
     }
   }
 
-  // ─── Filter & Suche ─────────────────────────────────────────
   function setLibFilter(filter, el) {
     _libFilter = filter;
     document.querySelectorAll('.lib-filter-chip').forEach(c => c.classList.remove('lib-filter-chip--active'));
@@ -122,7 +96,6 @@
 
   function _storyMatchesFilter(story) {
     if (_libFilter === 'all') return true;
-    // Prüfen ob mindestens ein Part die Bedingung erfüllt
     return story.parts.some(part => {
       const uploads = part.uploads || [];
       if (_libFilter === 'no-tiktok')    return !uploads.find(u => u.platform === 'tiktok');
@@ -151,39 +124,32 @@
     }
 
     container.innerHTML = '';
-    filtered.forEach((story, idx) => {
+    filtered.forEach(story => {
       const allUploads = story.parts.flatMap(p => p.uploads || []);
       const hasTikTok    = allUploads.some(u => u.platform === 'tiktok');
       const hasInstagram = allUploads.some(u => u.platform === 'instagram');
       const hasYouTube   = allUploads.some(u => u.platform === 'youtube');
 
       const row = document.createElement('div');
-      row.className = 'lib-story-row';
+      row.className = 'lib-row';
       row.innerHTML = `
-        <div class="lib-story-row__num">${idx + 1}</div>
-        <div class="lib-story-row__info">
-          <div class="lib-story-row__title">${escHtml(story.title)}</div>
-          <div class="lib-story-row__meta">
+        <div class="lib-row__info">
+          <div class="lib-row__title">${escHtml(story.title)}</div>
+          <div class="lib-row__meta">
             <span class="story-code-badge" style="font-size:10px;padding:1px 7px">${story.code}</span>
             &nbsp;${story.parts.length} Teil(e) · ${formatDate(story.created_at)}
           </div>
         </div>
-        <div class="lib-upload-badges">
-          <div class="lib-upload-dot ${hasTikTok ? 'lib-upload-dot--done' : ''}" title="TikTok">
-            <span class="material-symbols-rounded">${hasTikTok ? 'check' : 'play_circle'}</span>
-          </div>
-          <div class="lib-upload-dot ${hasInstagram ? 'lib-upload-dot--done' : ''}" title="Instagram">
-            <span class="material-symbols-rounded">${hasInstagram ? 'check' : 'photo_camera'}</span>
-          </div>
-          <div class="lib-upload-dot ${hasYouTube ? 'lib-upload-dot--done' : ''}" title="YouTube">
-            <span class="material-symbols-rounded">${hasYouTube ? 'check' : 'smart_display'}</span>
-          </div>
+        <div class="lib-row__plat">
+          <div class="lib-pdot ${hasTikTok ? 'lib-pdot--done' : ''}" title="TikTok">T</div>
+          <div class="lib-pdot ${hasInstagram ? 'lib-pdot--done' : ''}" title="Instagram">I</div>
+          <div class="lib-pdot ${hasYouTube ? 'lib-pdot--done' : ''}" title="YouTube">Y</div>
         </div>
-        <button class="md-btn md-btn--icon" style="color:var(--md-sys-color-error);margin-left:8px;" 
-          onclick="event.stopPropagation(); deleteStory(${story.story_id}, '${escHtml(story.title)}')">
+        <button class="md-btn md-btn--icon" style="color:var(--md-sys-color-error)"
+          onclick="event.stopPropagation(); deleteStory(${story.story_id}, '${escHtml(story.title).replace(/'/g, '&#39;')}')">
           <span class="material-symbols-rounded">delete</span>
         </button>
-        <span class="material-symbols-rounded" style="color:var(--md-sys-color-on-surface-variant);margin-left:4px;">chevron_right</span>
+        <span class="material-symbols-rounded" style="color:var(--md-sys-color-on-surface-variant)">chevron_right</span>
       `;
       row.addEventListener('click', () => openLibDetail(story));
       container.appendChild(row);
@@ -201,76 +167,52 @@
     document.getElementById('lib-detail-title').textContent = story.title;
     document.getElementById('lib-detail-date').textContent = formatDate(story.created_at);
 
-    // Button zum manuellen Abhacken aller Parts
-    const markAllBtn = document.createElement('button');
-    markAllBtn.className = 'md-btn md-btn--outlined md-btn--sm';
-    markAllBtn.style.marginLeft = '12px';
-    markAllBtn.innerHTML = '<span class="material-symbols-rounded">done_all</span> Alle als erledigt markieren';
-    markAllBtn.onclick = () => markAllAsUploaded(story);
-    
-    // Header bereinigen und Buttons einfügen
-    const hdr = document.querySelector('#lib-detail > div:first-child');
-    // Wir löschen nur alte dynamische Buttons falls vorhanden
-    const oldBtn = hdr.querySelector('.mark-all-done-btn');
-    if (oldBtn) oldBtn.remove();
-    markAllBtn.classList.add('mark-all-done-btn');
-    hdr.appendChild(markAllBtn);
+    const markBtn = document.getElementById('lib-mark-all-btn');
+    markBtn.style.display = '';
+    markBtn.onclick = () => markAllAsUploaded(story);
 
     const grid = document.getElementById('lib-parts-grid');
     grid.innerHTML = '';
 
     story.parts.forEach(part => {
       const card = document.createElement('div');
-      card.className = 'lib-card';
+      card.className = 'lib-vcard';
       card.id = 'lib-card-' + part.id;
 
-      const coverHtml = part.cover_path
-        ? `<img class="lib-cover" src="/covers/${part.cover_path.split('/').pop()}" alt="Cover" loading="lazy" />`
-        : '';
-
       const social = part.social || {};
+
+      // Thumbnail
+      const thumbHtml = `
+        <div class="lib-vcard__thumb" onclick="openVideoModal('/video/${part.video_path}','${escHtml(story.title)} — Teil ${part.part_number}')">
+          ${part.cover_path ? `<img class="lib-vcover" src="/covers/${part.cover_path.split('/').pop()}" alt="Cover" loading="lazy">` : ''}
+          <video src="/video/${part.video_path}" preload="metadata" muted style="opacity:0"></video>
+          <div class="vplay-ov"><span class="material-symbols-rounded">play_circle</span></div>
+        </div>`;
+
       const socialHtml = (social.video_title || social.hashtags) ? `
-        <div class="lib-social">
-          ${social.video_title ? `<div class="lib-social__title">${escHtml(social.video_title)}</div>` : ''}
-          ${social.description ? `<div class="lib-social__desc">${escHtml(social.description)}</div>` : ''}
-          ${social.hashtags ? `<div class="lib-social__tags">${escHtml(social.hashtags)}</div>` : ''}
-          <button class="lib-copy-btn" onclick="copySocialData(${part.id})">
-            <span class="material-symbols-rounded">content_copy</span> Caption kopieren
-          </button>
-        </div>
+        <div class="lib-vcard__vtitle">${escHtml(social.video_title || '')}</div>
+        ${social.description ? `<div class="lib-vcard__desc">${escHtml(social.description)}</div>` : ''}
+        ${social.hashtags ? `<div class="lib-vcard__tags">${escHtml(social.hashtags)}</div>` : ''}
       ` : '';
 
-      // Cover-Download Button
-      const coverDownloadHtml = part.cover_path
-        ? `<a class="md-btn md-btn--outlined md-btn--sm" href="/covers/${part.cover_path.split('/').pop()}" download
-              title="Cover herunterladen">
-             <span class="material-symbols-rounded" style="font-size:15px">image</span>
-           </a>`
-        : '';
-
       card.innerHTML = `
-        <div class="lib-card__thumb">
-          ${coverHtml}
-          <video src="/video/${part.video_path}" preload="metadata" muted
-            style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s"></video>
-          <div class="lib-card__play">
-            <span class="material-symbols-rounded">play_circle</span>
-          </div>
-        </div>
-        <div class="lib-card__body">
-          <div class="lib-card__part">Teil ${part.part_number}</div>
+        ${thumbHtml}
+        <div class="lib-vcard__body">
+          <div class="lib-vcard__part">Teil ${part.part_number}</div>
           ${socialHtml}
-          <div class="lib-platforms" id="platforms-${part.id}"></div>
-          <div class="lib-card__actions">
+          <div class="lib-vcard__plat" id="platforms-${part.id}"></div>
+          <div class="lib-vcard__acts">
             <button class="md-btn md-btn--tonal md-btn--sm"
               onclick="openVideoModal('/video/${part.video_path}','${escHtml(story.title)} — Teil ${part.part_number}')">
               <span class="material-symbols-rounded" style="font-size:15px">play_arrow</span> Play
             </button>
-            <a class="md-btn md-btn--outlined md-btn--sm" href="/download/${part.video_path}" download
-               title="Video herunterladen">
+            <a class="md-btn md-btn--outlined md-btn--sm" href="/download/${part.video_path}" download title="Video herunterladen">
               <span class="material-symbols-rounded" style="font-size:15px">download</span>
             </a>
-            ${coverDownloadHtml}
+            ${part.cover_path ? `<a class="md-btn md-btn--outlined md-btn--sm" href="/covers/${part.cover_path.split('/').pop()}" download title="Cover herunterladen"><span class="material-symbols-rounded" style="font-size:15px">image</span></a>` : ''}
+            <button class="md-btn md-btn--outlined md-btn--sm" onclick="copySocialData(${part.id})" title="Caption kopieren">
+              <span class="material-symbols-rounded" style="font-size:15px">content_copy</span>
+            </button>
             <button class="md-btn md-btn--outlined md-btn--sm" style="color:var(--md-sys-color-error);border-color:var(--md-sys-color-error)"
               onclick="deleteVideo(${part.id})">
               <span class="material-symbols-rounded" style="font-size:15px">delete</span>
@@ -280,11 +222,9 @@
       `;
 
       const vidEl = card.querySelector('video');
-      card.addEventListener('mouseenter', () => { vidEl.style.opacity = '1'; vidEl.play().catch(() => {}); });
-      card.addEventListener('mouseleave', () => { vidEl.style.opacity = '0'; vidEl.pause(); vidEl.currentTime = 0; });
-      card.querySelector('.lib-card__play').addEventListener('click', () =>
-        openVideoModal('/video/' + part.video_path, story.title + ' — Teil ' + part.part_number)
-      );
+      const thumb = card.querySelector('.lib-vcard__thumb');
+      thumb.addEventListener('mouseenter', () => { vidEl.style.opacity = '1'; vidEl.play().catch(() => {}); });
+      thumb.addEventListener('mouseleave', () => { vidEl.style.opacity = '0'; vidEl.pause(); vidEl.currentTime = 0; });
 
       grid.appendChild(card);
       renderPlatformChips(part.id, part.uploads || []);
@@ -341,9 +281,7 @@
         if (data.error) { showSnack(data.error, 'error'); return; }
         showSnack(`Als ${platform} hochgeladen markiert!`, 'success');
       }
-      // Reload und Detail wieder öffnen
       await loadLibrary();
-      // Aktualisierte Chips rendern (Detail bleibt offen)
       const story = _libData.find(s => s.parts.some(p => p.id === partId));
       if (story) {
         const part = story.parts.find(p => p.id === partId);
@@ -387,15 +325,11 @@
       const data = await res.json();
       if (data.error) { showSnack(data.error, 'error'); return; }
       showSnack('Video erfolgreich gelöscht.', 'success');
-      
-      // Story-Detail aktualisieren
       await loadLibrary();
       const story = _libData.find(s => s.parts.some(p => p.id === partId));
       if (story && story.parts.length > 1) {
-        // Wenn noch andere Parts da sind, Detail offen lassen
-        openLibDetail(story);
+        openLibDetail(story, false);
       } else {
-        // Sonst zurück zur Übersicht
         closeLibDetail();
       }
     } catch (e) {
@@ -419,11 +353,9 @@
   async function markAllAsUploaded(story) {
     if (!confirm(`Möchtest du alle Teile der Story "${story.title}" als hochgeladen markieren?`)) return;
     try {
-      // Wir markieren einfach jeden Teil für alle 3 Plattformen
       const platforms = ['tiktok', 'instagram', 'youtube'];
       for (const part of story.parts) {
         for (const p of platforms) {
-          // Nur wenn noch nicht vorhanden
           const exists = (part.uploads || []).some(u => u.platform === p);
           if (!exists) {
             await fetch('/api/uploads', {
@@ -436,9 +368,8 @@
       }
       showSnack('Alle Teile wurden als erledigt markiert.', 'success');
       await loadLibrary();
-      // Detail wieder öffnen
       const updatedStory = _libData.find(s => s.story_id === story.story_id);
-      if (updatedStory) openLibDetail(updatedStory);
+      if (updatedStory) openLibDetail(updatedStory, false);
     } catch (e) {
       showSnack('Fehler beim Markieren: ' + e.message, 'error');
     }
