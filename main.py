@@ -451,21 +451,21 @@ def _uniform_word_timing(text: str, audio_path: Path) -> list:
 
 def _build_ass_from_events(word_events: list, full_text: str) -> str:
     """
-    3-Zeilen-Layout: gelbes Wort IMMER an fixer Y-Position (Mitte des Screens),
-    vorherige Wörter darüber, nächste Wörter darunter.
-    Für 1080×1920 (9:16) optimiert.
+    Einzeilige Karaoke-Untertitel: Alle Woerter auf EINER Zeile.
+    Das gerade gesprochene Wort ist gelb + fett, links und rechts
+    davon stehen graue Kontext-Woerter — alles unten zentriert.
+    Fuer 1080x1920 (9:16) optimiert.
     """
     header = """\
 [Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
-WrapStyle: 0
+WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Active,Arial,84,&H0000FFFF,&H000000FF,&H00000000,&HAA000000,-1,0,0,0,100,100,1.5,0,1,6,3,5,60,60,0,1
-Style: Context,Arial,58,&H00E8E8E8,&H000000FF,&H00000000,&H66000000,0,0,0,0,100,100,1,0,1,4,2,5,60,60,0,1
+Style: Karaoke,Arial,78,&H00AAAAAA,&H000000FF,&H00000000,&HAA000000,0,0,0,0,100,100,2,0,1,5,3,2,80,80,120,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -478,37 +478,31 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         cs = int((s - int(s)) * 100)
         return f"{h}:{m:02d}:{int(s):02d}.{cs:02d}"
 
-    # Feste Bildschirm-Positionen (Bildschirm 1080×1920)
-    X       = 540   # horizontal zentriert
-    Y_PREV  = 910   # Zeile über dem aktiven Wort
-    Y_ACT   = 1050  # Aktives Wort — IMMER hier
-    Y_NEXT  = 1195  # Zeile unter dem aktiven Wort
-    CTX     = 3     # Kontext-Wörter oben/unten
+    # ASS-Farben (BGR-Format)
+    YELLOW = "&H0000FFFF"   # leuchtendes Gelb
+    GRAY   = "&H00AAAAAA"   # Grau fuer Kontext
+    CTX    = 4              # Kontext-Woerter links und rechts
 
     events_out = []
 
     for i, (word, start, end) in enumerate(word_events):
-        # Aktives Wort — fixe Position, gelb, fett
-        events_out.append(
-            f"Dialogue: 0,{fmt(start)},{fmt(end)},Active,,0,0,0,,"
-            f"{{\\an5\\pos({X},{Y_ACT})}}{word}"
-        )
+        parts = []
 
-        # Vorherige Wörter (oben) — grau/weiß
-        prev = [word_events[j][0] for j in range(max(0, i - CTX), i)]
-        if prev:
-            events_out.append(
-                f"Dialogue: 0,{fmt(start)},{fmt(end)},Context,,0,0,0,,"
-                f"{{\\an5\\pos({X},{Y_PREV})}}{' '.join(prev)}"
-            )
+        # Graue Woerter links
+        prev_words = [word_events[j][0] for j in range(max(0, i - CTX), i)]
+        if prev_words:
+            parts.append("{\\c" + GRAY + "&}" + " ".join(prev_words) + " ")
 
-        # Nächste Wörter (unten) — grau/weiß
-        nxt = [word_events[j][0] for j in range(i + 1, min(len(word_events), i + CTX + 1))]
-        if nxt:
-            events_out.append(
-                f"Dialogue: 0,{fmt(start)},{fmt(end)},Context,,0,0,0,,"
-                f"{{\\an5\\pos({X},{Y_NEXT})}}{' '.join(nxt)}"
-            )
+        # Aktives Wort — gelb, fett, etwas groesser
+        parts.append("{\\c" + YELLOW + "&\\b1\\fs90}" + word + "{\\b0\\fs78\\c" + GRAY + "&}")
+
+        # Graue Woerter rechts
+        next_words = [word_events[j][0] for j in range(i + 1, min(len(word_events), i + CTX + 1))]
+        if next_words:
+            parts.append(" " + " ".join(next_words))
+
+        line = "".join(parts)
+        events_out.append(f"Dialogue: 0,{fmt(start)},{fmt(end)},Karaoke,,0,0,0,,{line}")
 
     return header + "\n".join(events_out) + "\n"
 
@@ -518,104 +512,127 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 # ---------------------------------------------------------------------------
 
 def create_cover_image(story_title: str, story_code: str, part_number: int,
-                       output_path: Path) -> Path:
+                       output_path: Path, bg_frame_path: Path | None = None) -> Path:
     """
-    Erstellt ein einheitliches Cover-Bild (1080×1920) für die Story.
-    Dunkler Hintergrund, Gradient, Titel + Part-Badge.
+    Erstellt ein Cover-Bild (1080x1920) fuer die Story.
+    Wenn bg_frame_path angegeben, wird dieser Frame als Hintergrund genutzt
+    (mit dunklem Semi-transparent-Overlay). Sonst dunkler Gradient.
+    Titel bricht automatisch um und ist hell/weiss.
     """
     try:
-        from PIL import Image, ImageDraw, ImageFont
+        from PIL import Image, ImageDraw, ImageFont, ImageFilter
         import textwrap
 
         W, H = VIDEO_WIDTH, VIDEO_HEIGHT
-        img = Image.new("RGB", (W, H), (0, 0, 0))
+
+        # ── Hintergrund ──────────────────────────────────────────────────────
+        if bg_frame_path and Path(bg_frame_path).exists():
+            bg = Image.open(str(bg_frame_path)).convert("RGB")
+            # Auf 9:16 skalieren + croppen
+            bg_ratio = bg.width / bg.height
+            target_ratio = W / H
+            if bg_ratio > target_ratio:
+                new_h = H
+                new_w = int(bg.width * H / bg.height)
+            else:
+                new_w = W
+                new_h = int(bg.height * W / bg.width)
+            bg = bg.resize((new_w, new_h), Image.LANCZOS)
+            left = (new_w - W) // 2
+            top  = (new_h - H) // 2
+            bg = bg.crop((left, top, left + W, top + H))
+            # Leichter Blur damit Text besser lesbar
+            bg = bg.filter(ImageFilter.GaussianBlur(radius=3))
+            img = bg
+        else:
+            # Gradient-Fallback (dunkelviolett -> schwarz)
+            img = Image.new("RGB", (W, H), (0, 0, 0))
+            d0 = ImageDraw.Draw(img)
+            for y in range(H):
+                t = y / H
+                r = int(30 * (1 - t))
+                g = int(10 * (1 - t))
+                b = int(60 * (1 - t))
+                d0.line([(0, y), (W, y)], fill=(r, g, b))
+
         draw = ImageDraw.Draw(img)
 
-        # Gradient-Hintergrund (dunkelviolett → schwarz)
-        for y in range(H):
-            t = y / H
-            r = int(30  * (1 - t) + 0  * t)
-            g = int(10  * (1 - t) + 0  * t)
-            b = int(60  * (1 - t) + 0  * t)
-            draw.line([(0, y), (W, y)], fill=(r, g, b))
+        # ── Dunkles Overlay fuer Lesbarkeit ──────────────────────────────────
+        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        od = ImageDraw.Draw(overlay)
+        # Oben und unten staerker abdunkeln
+        od.rectangle([(0, 0), (W, H // 2)], fill=(0, 0, 0, 160))
+        od.rectangle([(0, H // 2), (W, H)], fill=(0, 0, 0, 140))
+        img = img.convert("RGBA")
+        img = Image.alpha_composite(img, overlay).convert("RGB")
+        draw = ImageDraw.Draw(img)
 
-        # Vignette-Overlay (Ellipse, transparent → schwarz an Rändern)
-        for radius in range(0, min(W, H) // 2, 8):
-            alpha = int(80 * (radius / (min(W, H) // 2)))
-            overlay_color = (0, 0, 0, alpha)
-            try:
-                draw.ellipse(
-                    [(W//2 - radius*2, H//2 - radius*3),
-                     (W//2 + radius*2, H//2 + radius*3)],
-                    outline=None
-                )
-            except Exception:
-                pass
-
-        # Schrift laden
+        # ── Schriften ─────────────────────────────────────────────────────────
         font_path = DRAWTEXT_FONT or ""
         try:
-            font_big   = ImageFont.truetype(font_path, 90) if font_path else ImageFont.load_default()
-            font_med   = ImageFont.truetype(font_path, 55) if font_path else ImageFont.load_default()
-            font_small = ImageFont.truetype(font_path, 40) if font_path else ImageFont.load_default()
+            font_title = ImageFont.truetype(font_path, 88)  if font_path else ImageFont.load_default()
+            font_med   = ImageFont.truetype(font_path, 56)  if font_path else ImageFont.load_default()
+            font_small = ImageFont.truetype(font_path, 38)  if font_path else ImageFont.load_default()
         except Exception:
-            font_big   = ImageFont.load_default()
+            font_title = ImageFont.load_default()
             font_med   = ImageFont.load_default()
             font_small = ImageFont.load_default()
 
-        # "SARA" Logo oben
-        draw.text((W // 2, 160), "SARA", font=font_big, fill=(180, 140, 255),
-                  anchor="mm", stroke_width=3, stroke_fill=(80, 40, 120))
+        # ── "SARA" Logo oben ──────────────────────────────────────────────────
+        draw.text((W // 2, 160), "SARA", font=font_med,
+                  fill=(255, 255, 255), anchor="mm",
+                  stroke_width=2, stroke_fill=(100, 60, 180))
 
-        # Trennlinie
-        lw = 3
-        draw.rectangle([(120, 260), (W - 120, 260 + lw)], fill=(140, 100, 220))
+        # ── Trennlinie ────────────────────────────────────────────────────────
+        draw.rectangle([(120, 240), (W - 120, 243)], fill=(200, 160, 255))
 
-        # Part Badge
+        # ── Part-Badge ────────────────────────────────────────────────────────
         badge_text = f"Part {part_number}"
-        badge_x, badge_y = W // 2, 360
-        bw = draw.textlength(badge_text, font=font_med) + 60
-        bh = 70
+        badge_x, badge_y = W // 2, 330
+        bw = int(draw.textlength(badge_text, font=font_small)) + 60
+        bh = 62
         draw.rounded_rectangle(
             [(badge_x - bw // 2, badge_y - bh // 2),
              (badge_x + bw // 2, badge_y + bh // 2)],
-            radius=35,
-            fill=(80, 40, 140)
+            radius=31, fill=(120, 60, 220)
         )
-        draw.text((badge_x, badge_y), badge_text, font=font_med,
-                  fill=(220, 180, 255), anchor="mm")
+        draw.text((badge_x, badge_y), badge_text, font=font_small,
+                  fill=(240, 220, 255), anchor="mm")
 
-        # Story-Titel (umgebrochen)
-        wrapped = textwrap.wrap(story_title, width=22)
-        y_start = H // 2 - (len(wrapped) * 110) // 2
-        for i, line in enumerate(wrapped):
+        # ── Titel (mehrzeilig, hell, zentriert in der Mitte) ─────────────────
+        # Zeichen pro Zeile abhaengig von Titellaenge anpassen
+        char_width = 18  # Annaeherung fuer Arial 88px
+        max_chars  = max(10, int((W - 160) / char_width))
+        wrapped = textwrap.wrap(story_title, width=max_chars)
+        line_h  = 110
+        total_h = len(wrapped) * line_h
+        y_start = H // 2 - total_h // 2 + 60  # leicht nach unten verschoben
+
+        for idx, line in enumerate(wrapped):
             draw.text(
-                (W // 2, y_start + i * 110),
+                (W // 2, y_start + idx * line_h),
                 line,
-                font=font_big,
+                font=font_title,
                 fill=(255, 255, 255),
                 anchor="mm",
-                stroke_width=4,
+                stroke_width=5,
                 stroke_fill=(0, 0, 0),
             )
 
-        # Story-Code unten
+        # ── Story-Code unten ──────────────────────────────────────────────────
         draw.text(
-            (W // 2, H - 140),
+            (W // 2, H - 130),
             story_code,
             font=font_small,
-            fill=(150, 150, 180),
+            fill=(200, 200, 220),
             anchor="mm",
         )
-
-        # Dekorative Linie unten
-        draw.rectangle([(120, H - 200), (W - 120, H - 200 + lw)], fill=(80, 50, 120))
+        draw.rectangle([(120, H - 185), (W - 120, H - 182)], fill=(80, 50, 150))
 
         img.save(str(output_path), "JPEG", quality=92)
         return output_path
 
-    except Exception as e:
-        # Minimal-Fallback: schwarzes Bild
+    except Exception as exc:
         try:
             from PIL import Image
             img = Image.new("RGB", (VIDEO_WIDTH, VIDEO_HEIGHT), (20, 10, 40))
@@ -673,13 +690,8 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
     tmp_files   = [audio_path, ass_path, bg_concat]
 
     try:
-        # ---- Schritt 1: Cover-Bild erstellen ----
-        progress(5, "Cover wird erstellt…")
-        create_cover_image(story_title, story_code, part_number, cover_path)
-
-        # ---- Schritt 2: TTS (ElevenLabs → Edge-TTS → gTTS) ----
-        el_active = bool(os.environ.get("ELEVENLABS_API_KEY", "").strip())
-        progress(15, "Stimme wird generiert (ElevenLabs Rachel)…" if el_active else "Stimme wird generiert (Edge-TTS)…")
+        # ---- Schritt 1: TTS (lokal, Piper) ----
+        progress(10, "Stimme wird generiert (lokal, Piper)...")
         tts_to_file(text, audio_path)
         audio_duration = get_audio_duration(audio_path)
 
@@ -699,8 +711,24 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
         # Nahtloser Loop: Zufällige Videos aneinanderreihen bis Audio-Dauer erreicht
         _assemble_background_loop(bg_videos, audio_duration, bg_concat)
 
-        # ---- Schritt 5: FFmpeg — 9:16 Crop + ASS-Overlay + Audio ----
-        progress(65, "Video wird gerendert (9:16 Hochformat)…")
+        # ---- Schritt 4b: Frame aus Hintergrundvideo fuer Cover extrahieren ----
+        progress(55, "Cover wird erstellt...")
+        bg_frame_path = TTS_DIR / f"{story_code}_part{part_number}_cover_frame.jpg"
+        try:
+            subprocess.run(
+                [FFMPEG_EXE, "-y", "-i", str(bg_concat),
+                 "-vframes", "1", "-q:v", "2", str(bg_frame_path)],
+                check=True, capture_output=True
+            )
+        except Exception:
+            bg_frame_path = None
+        create_cover_image(story_title, story_code, part_number, cover_path,
+                           bg_frame_path=bg_frame_path)
+        if bg_frame_path and Path(bg_frame_path).exists():
+            Path(bg_frame_path).unlink(missing_ok=True)
+
+        # ---- Schritt 5: FFmpeg --- 9:16 Crop + ASS-Overlay + Audio ----
+        progress(65, "Video wird gerendert (9:16 Hochformat)...")
 
         ass_escaped = str(ass_path).replace("\\", "/").replace(":", "\\:")
 
