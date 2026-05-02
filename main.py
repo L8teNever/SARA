@@ -206,6 +206,11 @@ def init_db():
             INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_active_windows', '');
             INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_active', '1');
         """)
+        
+        # NEU: Beim Start alle "processing" Jobs zurücksetzen, falls der Server abgestürzt ist
+        conn.execute("UPDATE queue SET status = 'pending', progress_label = 'Wartend (Restart)...' WHERE status = 'processing'")
+        conn.execute("UPDATE story_parts SET status = 'pending' WHERE status = 'processing'")
+        
         # Migration: cover_path Spalte falls noch nicht vorhanden
         try:
             conn.execute("ALTER TABLE story_parts ADD COLUMN cover_path TEXT")
@@ -939,6 +944,12 @@ def queue_worker():
                 # Prüfen ob Produktion pausiert ist
                 is_active = conn.execute("SELECT value FROM settings WHERE key = 'prod_active'").fetchone()
                 if is_active and is_active["value"] == "0":
+                    time.sleep(QUEUE_POLL_INTERVAL)
+                    continue
+                
+                # SICHERHEIT: Prüfen ob bereits ein Job läuft (um Mehrfach-Produktion zu verhindern)
+                already_running = conn.execute("SELECT id FROM queue WHERE status = 'processing'").fetchone()
+                if already_running:
                     time.sleep(QUEUE_POLL_INTERVAL)
                     continue
 
