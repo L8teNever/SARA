@@ -299,23 +299,24 @@ def ensure_piper_model() -> Path:
     import urllib.request
     model_dir = DATA_DIR / "piper_models"
     model_dir.mkdir(parents=True, exist_ok=True)
-    onnx_path = model_dir / "en_US-amy-medium.onnx"
-    json_path = model_dir / "en_US-amy-medium.onnx.json"
+    # Höhere Qualität: en_US-lessac-high (ca. 100MB) klingt deutlich natürlicher
+    onnx_path = model_dir / "en_US-lessac-high.onnx"
+    json_path = model_dir / "en_US-lessac-high.onnx.json"
     
     if not onnx_path.exists():
-        print("Lade lokales TTS Modell (en_US-amy-medium.onnx) herunter...")
-        urllib.request.urlretrieve("https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx", onnx_path)
+        print("Lade lokales High-Quality TTS Modell (en_US-lessac-high.onnx) herunter...")
+        urllib.request.urlretrieve("https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/high/en_US-lessac-high.onnx", onnx_path)
     if not json_path.exists():
-        print("Lade TTS Modell-Config (en_US-amy-medium.onnx.json) herunter...")
-        urllib.request.urlretrieve("https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx.json", json_path)
+        print("Lade TTS Modell-Config (en_US-lessac-high.onnx.json) herunter...")
+        urllib.request.urlretrieve("https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/high/en_US-lessac-high.onnx.json", json_path)
     
     return onnx_path
 
 
 def tts_to_file(text: str, output_path: Path) -> Path:
     """
-    Komplett lokale Sprachsynthese mit Piper-TTS (en_US-amy-medium).
-    Keine Internetverbindung oder API-Keys notwendig.
+    Komplett lokale Sprachsynthese mit Piper-TTS (High Quality).
+    Optimiert auf emotionaleren Lesefluss durch angepasste Speed- und Pausen-Parameter.
     """
     try:
         from piper.voice import PiperVoice
@@ -325,9 +326,20 @@ def tts_to_file(text: str, output_path: Path) -> Path:
     model_path = ensure_piper_model()
     voice = PiperVoice.load(str(model_path))
     
+    # Synthese-Einstellungen für natürlicheren Klang:
+    # length_scale: 1.05 (etwas langsamer für mehr Betonung)
+    # sentence_silence: 0.3 (längere Pausen zwischen Sätzen wirken natürlicher)
+    # noise_scale: 0.8 (etwas mehr Varianz in der Stimme)
+    
     import wave
     with wave.open(str(output_path), "wb") as wav_file:
-        voice.synthesize_wav(text, wav_file)
+        voice.synthesize_wav(
+            text, 
+            wav_file,
+            length_scale=1.05,
+            sentence_silence=0.3,
+            noise_scale=0.8
+        )
         
     return output_path
 
