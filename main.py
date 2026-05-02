@@ -327,7 +327,7 @@ def tts_to_file(text: str, output_path: Path) -> Path:
     
     import wave
     with wave.open(str(output_path), "wb") as wav_file:
-        voice.synthesize(text, wav_file)
+        voice.synthesize_wav(text, wav_file)
         
     return output_path
 
