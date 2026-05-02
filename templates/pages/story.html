@@ -194,30 +194,50 @@ Create a story about: [THEMA HIER EINTRAGEN — z.B. "a woman who discovers her 
     }, 3000);
   }
 
-  async function importStory() {
+  async function importStory(forceSave = false, forceQueue = false) {
     const jsonText = document.getElementById('import-json').value.trim();
     if (!jsonText) { showSnack('Bitte zuerst das JSON einfügen.', 'error'); return; }
+    
     try {
       const res = await fetch('/api/import-story', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ json_text: jsonText })
+        body: JSON.stringify({ 
+          json_text: jsonText, 
+          dry_run: !forceSave,
+          auto_queue: forceQueue
+        })
       });
       const data = await res.json();
       if (data.error) { showSnack(data.error, 'error'); return; }
-      document.getElementById('import-result-title').textContent = `Story importiert! Code: ${data.code}`;
-      let body = `"${data.title}" wurde gespeichert.`;
-      if (data.duplicate_check && data.duplicate_check.is_duplicate) {
-        body += ` Ähnliche Story gefunden (${data.duplicate_check.overlap}/10 Keywords).`;
+
+      // Falls Duplikat-Check im Dry-Run anschlägt
+      if (!forceSave && data.duplicate_check && data.duplicate_check.is_duplicate) {
+        const msg = `Ähnliche Story gefunden (${data.duplicate_check.overlap}/10 Keywords).\n\n` +
+                    `Gefunden: "${data.duplicate_check.similar_story.title}" [${data.duplicate_check.similar_story.code}]\n\n` +
+                    `Möchtest du die Story trotzdem speichern und direkt in die Warteschlange zum Erstellen schicken?`;
+        if (confirm(msg)) {
+          importStory(true, true);
+        } else {
+          showSnack('Import abgebrochen.', 'info');
+        }
+        return;
       }
+
+      // Falls wir hier sind, wurde gespeichert
+      document.getElementById('import-result-title').textContent = data.auto_queued ? 'Story gespeichert & eingereiht!' : 'Story importiert!';
+      let body = `"${data.title}" wurde gespeichert (Code: ${data.code}).`;
+      if (data.auto_queued) body += " Die Videos werden automatisch erstellt.";
+      
       document.getElementById('import-result-body').textContent = body;
       document.getElementById('import-result-actions').innerHTML = `
         <button class="md-btn md-btn--tonal md-btn--sm" onclick="goToVideoTab(${data.story_id})">
-          <span class="material-symbols-rounded">movie</span> Video erstellen
+          <span class="material-symbols-rounded">movie</span> Video-Status prüfen
         </button>`;
       document.getElementById('import-result').classList.add('visible');
-      showSnack(`Story "${data.title}" importiert! Code: ${data.code}`, 'success');
+      showSnack(`Story "${data.title}" ${data.auto_queued ? 'wird produziert' : 'importiert'}!`, 'success');
       document.getElementById('import-json').value = '';
+      loadRecentStories();
     } catch (e) {
       showSnack('Fehler: ' + e.message, 'error');
     }

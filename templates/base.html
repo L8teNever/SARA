@@ -943,7 +943,10 @@
       };
       _sseSource.onmessage = (e) => {
         try {
-          const jobs = JSON.parse(e.data);
+          const data = JSON.parse(e.data);
+          const jobs = data.jobs || data; 
+          if (data.prod_active !== undefined) _prodActive = data.prod_active;
+          
           if (!Array.isArray(jobs)) return;
           renderQueueList(jobs);
           const stats = {};
@@ -1083,9 +1086,10 @@
       return m[s] || s;
     }
 
+    let _prodActive = true;
     function getDuration(startStr, endStr) {
       if (!startStr) return '';
-      // SQLite format: YYYY-MM-DD HH:MM:SS
+      if (!_prodActive && !endStr) return 'Pausiert';
       const start = new Date(startStr.replace(' ', 'T') + 'Z').getTime();
       const end = endStr ? new Date(endStr.replace(' ', 'T') + 'Z').getTime() : Date.now();
       const diff = Math.floor((end - start) / 1000);

@@ -25,6 +25,33 @@ import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
 
+# Globale Liste für aktive Subprozesse (FFmpeg etc.)
+_ACTIVE_SUBPROCESSES = []
+def _run_sub(args, **kwargs):
+    import subprocess
+    p = subprocess.Popen(args, **kwargs)
+    _ACTIVE_SUBPROCESSES.append(p)
+    try:
+        out, err = p.communicate()
+        if p.returncode != 0:
+            raise subprocess.CalledProcessError(p.returncode, args, out, err)
+    finally:
+        if p in _ACTIVE_SUBPROCESSES:
+            _ACTIVE_SUBPROCESSES.remove(p)
+
+def _kill_active_subs():
+    import signal
+    import os
+    while _ACTIVE_SUBPROCESSES:
+        p = _ACTIVE_SUBPROCESSES.pop()
+        try:
+            if os.name == 'nt':
+                subprocess.run(['taskkill', '/F', '/T', '/PID', str(p.pid)], capture_output=True)
+            else:
+                p.terminate()
+        except: pass
+
+
 from flask import (
     Flask, request, jsonify, render_template,
     send_from_directory, abort, Response, stream_with_context
@@ -727,7 +754,7 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
         progress(55, "Cover wird erstellt...")
         bg_frame_path = TTS_DIR / f"{story_code}_part{part_number}_cover_frame.jpg"
         try:
-            subprocess.run(
+            _run_sub(
                 [FFMPEG_EXE, "-y", "-i", str(bg_concat),
                  "-vframes", "1", "-q:v", "2", str(bg_frame_path)],
                 check=True, capture_output=True
@@ -753,7 +780,7 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
             f"ass='{ass_escaped}'"
         )
 
-        subprocess.run(
+        _run_sub(
             [
                 FFMPEG_EXE, "-y",
                 "-i", str(bg_concat),
@@ -1151,6 +1178,9 @@ def api_settings():
         with get_db() as conn:
             for k, v in data.items():
                 conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, str(v)))
+                if k == 'prod_active' and str(v) == '0':
+                    # Wenn gestoppt wird, alle laufenden Prozesse killen
+                    _kill_active_subs()
         return jsonify({"success": True})
     else:
         with get_db() as conn:
@@ -1192,6 +1222,9 @@ def api_queue_live():
         while True:
             try:
                 with get_db() as conn:
+                    is_active = conn.execute("SELECT value FROM settings WHERE key = 'prod_active'").fetchone()
+                    prod_active = (is_active["value"] != "0") if is_active else True
+                    
                     jobs = conn.execute(
                         """SELECT q.id, q.status, q.progress_pct, q.progress_label,
                                   q.error_msg, q.created_at, q.started_at, q.finished_at,
@@ -1202,7 +1235,10 @@ def api_queue_live():
                            JOIN stories s ON s.id = sp.story_id
                            ORDER BY q.id DESC LIMIT 100"""
                     ).fetchall()
-                payload = json.dumps([dict(j) for j in jobs])
+                payload = json.dumps({
+                    "jobs": [dict(j) for j in jobs],
+                    "prod_active": prod_active
+                })
                 yield f"data: {payload}\n\n"
             except Exception as e:
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
@@ -1569,8 +1605,11 @@ def api_get_prompt_template():
 
 @app.route("/api/import-story", methods=["POST"])
 def api_import_story():
-    data     = request.get_json(silent=True) or {}
-    raw_json = (data.get("json_text") or "").strip()
+    data      = request.get_json(silent=True) or {}
+    raw_json  = (data.get("json_text") or "").strip()
+    dry_run   = data.get("dry_run", False)
+    auto_queue = data.get("auto_queue", False)
+
     if not raw_json:
         return jsonify({"error": "Kein JSON eingegeben."}), 400
     json_match = re.search(r"\{.*\}", raw_json, re.DOTALL)
@@ -1583,11 +1622,16 @@ def api_import_story():
     for field in ["title", "total_parts", "keywords", "parts"]:
         if field not in story:
             return jsonify({"error": f"Feld '{field}' fehlt im JSON."}), 400
-    if len(story.get("keywords", [])) != 10:
-        return jsonify({"error": "Keywords-Liste muss genau 10 Einträge haben."}), 400
-    if not story.get("parts"):
-        return jsonify({"error": "Keine 'parts' im JSON gefunden."}), 400
+    
     dup_check = check_duplicate(story["keywords"])
+    
+    if dry_run:
+        return jsonify({
+            "success": True, 
+            "duplicate_check": dup_check, 
+            "story": story
+        })
+
     code = generate_story_code()
     try:
         with get_db() as conn:
@@ -1596,17 +1640,37 @@ def api_import_story():
                 (code, story["title"], json.dumps(story["keywords"]), story["total_parts"])
             )
             story_id = cursor.lastrowid
+            part_ids = []
             for part in story["parts"]:
                 social_json = json.dumps(part["social"]) if part.get("social") else None
-                conn.execute(
+                pc = conn.execute(
                     "INSERT INTO story_parts (story_id, part_number, text, cliffhanger, social_json) VALUES (?, ?, ?, ?, ?)",
                     (story_id, part["part_number"], part["text"], part.get("cliffhanger_hint", ""), social_json)
                 )
+                part_ids.append(pc.lastrowid)
+            
+            if auto_queue:
+                interval_min = int(conn.execute("SELECT value FROM settings WHERE key = 'prod_interval_min'").fetchone()["value"] or 0)
+                last_row = conn.execute("SELECT MAX(scheduled_at) as m FROM queue").fetchone()
+                last_m = last_row["m"] if last_row and last_row["m"] else None
+                ref_time = datetime.strptime(last_m, "%Y-%m-%d %H:%M:%S") if last_m else datetime.now()
+                if ref_time < datetime.now(): ref_time = datetime.now()
+
+                for p_id in part_ids:
+                    sched_time = None
+                    if interval_min > 0:
+                        ref_time += timedelta(minutes=interval_min)
+                        sched_time = ref_time.strftime("%Y-%m-%d %H:%M:%S")
+                    conn.execute("INSERT INTO queue (story_part_id, scheduled_at) VALUES (?, ?)", (p_id, sched_time))
+                    conn.execute("UPDATE story_parts SET status = 'pending' WHERE id = ?", (p_id,))
+
     except Exception as e:
         return jsonify({"error": f"Datenbank-Fehler: {str(e)}"}), 500
+    
     return jsonify({
-        "success": True, "code": code, "story_id": story_id,
+        "success": True, "code": code, "story_id": story_id, 
         "title": story["title"], "duplicate_check": dup_check,
+        "auto_queued": auto_queue
     })
 
 
