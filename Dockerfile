@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         fonts-dejavu-core \
         fonts-liberation \
+        espeak-ng \
+        libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Arbeitsverzeichnis
