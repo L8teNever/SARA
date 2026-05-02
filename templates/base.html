@@ -1019,7 +1019,7 @@
             <div class="queue-item__ico"><span class="material-symbols-rounded" style="font-size:19px">${icoMap[job.status] || 'help'}</span></div>
             <div class="queue-item__info">
               <div class="queue-item__title">${escHtml(job.title)} — Teil ${job.part_number}</div>
-              <div class="queue-item__meta">[${job.code}] · ${formatDate(job.created_at)}</div>
+              <div class="queue-item__meta">[${job.code}] · ${formatDate(job.created_at)} ${job.started_at ? `&middot; ⏱ ${getDuration(job.started_at, job.finished_at)}` : ''}</div>
             </div>
             <span class="status-chip status-chip--${job.status}">${statusLabel(job.status)}</span>
           </div>
@@ -1078,7 +1078,22 @@
       else                { dot.className = 'queue-dot'; text.textContent = 'Bereit'; }
     }
 
-    function statusLabel(s) { return { pending: 'Wartend', processing: 'Läuft', done: 'Fertig', error: 'Fehler' }[s] || s; }
+    function statusLabel(s) {
+      const m = { pending: 'Wartend', processing: 'Läuft…', done: 'Fertig', error: 'Fehler' };
+      return m[s] || s;
+    }
+
+    function getDuration(startStr, endStr) {
+      if (!startStr) return '';
+      // SQLite format: YYYY-MM-DD HH:MM:SS
+      const start = new Date(startStr.replace(' ', 'T') + 'Z').getTime();
+      const end = endStr ? new Date(endStr.replace(' ', 'T') + 'Z').getTime() : Date.now();
+      const diff = Math.floor((end - start) / 1000);
+      if (diff < 0) return '0s';
+      const m = Math.floor(diff / 60);
+      const s = diff % 60;
+      return m > 0 ? `${m}m ${s}s` : `${s}s`;
+    }
 
     // ============================================================
     //  Utilities

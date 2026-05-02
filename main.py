@@ -141,6 +141,7 @@ def init_db():
                 progress_label  TEXT    DEFAULT '',
                 progress_pct    INTEGER DEFAULT 0,
                 created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
+                started_at      TEXT,
                 finished_at     TEXT
             );
 
@@ -170,6 +171,10 @@ def init_db():
             pass
         try:
             conn.execute("ALTER TABLE queue ADD COLUMN progress_pct INTEGER DEFAULT 0")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE queue ADD COLUMN started_at TEXT")
         except Exception:
             pass
         try:
@@ -921,7 +926,7 @@ def queue_worker():
 
             with get_db() as conn:
                 conn.execute(
-                    "UPDATE queue SET status = 'processing', progress_pct = 0, progress_label = 'Starte…' WHERE id = ?",
+                    "UPDATE queue SET status = 'processing', progress_pct = 0, progress_label = 'Starte…', started_at = datetime('now') WHERE id = ?",
                     (job_id,)
                 )
                 conn.execute(
@@ -1141,7 +1146,7 @@ def api_queue_live():
                 with get_db() as conn:
                     jobs = conn.execute(
                         """SELECT q.id, q.status, q.progress_pct, q.progress_label,
-                                  q.error_msg, q.created_at, q.finished_at,
+                                  q.error_msg, q.created_at, q.started_at, q.finished_at,
                                   sp.part_number, sp.story_id,
                                   s.title, s.code
                            FROM queue q
