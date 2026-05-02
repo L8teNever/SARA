@@ -35,6 +35,26 @@
     </div>
 
     <div>
+      <div class="md-card md-card--elevated" style="margin-bottom:20px;">
+        <div class="card-hdr">
+          <div class="card-hdr__icon" style="background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)">
+            <span class="material-symbols-rounded">schedule</span>
+          </div>
+          <div class="card-hdr__text">
+            <div class="card-title">Produktions-Zeitplan</div>
+            <div class="card-subtitle">Verzögerte Erstellung aktivieren</div>
+          </div>
+        </div>
+        
+        <div class="md-field">
+          <label>Intervall zwischen Videos (Minuten)</label>
+          <div style="display:flex;gap:12px;align-items:center;">
+            <input type="number" id="prod-interval" class="md-input" value="0" min="0" style="width:80px;">
+            <button class="md-btn md-btn--tonal md-btn--sm" onclick="saveProdSettings()">Speichern</button>
+          </div>
+          <div class="md-field__helper">0 = Sofort nacheinander produzieren</div>
+        </div>
+      </div>
       <div class="md-card md-card--elevated">
         <div class="card-hdr">
           <div class="card-hdr__icon" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)">
@@ -80,6 +100,7 @@
   //  Story-Liste & Video-Erstellung
   // ============================================================
   async function loadStoryList() {
+    loadProdSettings();
     const container = document.getElementById('story-list');
     container.innerHTML = '<div class="spinner" style="margin:16px auto"></div>';
     try {
@@ -218,6 +239,29 @@
       loadStoryList();
     } catch (e) {
       showSnack('Fehler beim Löschen: ' + e.message, 'error');
+    }
+  }
+  async function loadProdSettings() {
+    try {
+      const settings = await fetch('/api/settings').then(r => r.json());
+      if (settings.prod_interval_min) {
+        document.getElementById('prod-interval').value = settings.prod_interval_min;
+      }
+    } catch (e) {}
+  }
+
+  async function saveProdSettings() {
+    const val = document.getElementById('prod-interval').value;
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prod_interval_min: val })
+      });
+      const data = await res.json();
+      if (data.success) showSnack('Zeitplan gespeichert!', 'success');
+    } catch (e) {
+      showSnack('Fehler beim Speichern', 'error');
     }
   }
 </script>

@@ -22,7 +22,7 @@ import asyncio
 import threading
 import subprocess
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from flask import (
@@ -142,6 +142,7 @@ def init_db():
                 progress_pct    INTEGER DEFAULT 0,
                 created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
                 started_at      TEXT,
+                scheduled_at    TEXT,
                 finished_at     TEXT
             );
 
@@ -159,6 +160,15 @@ def init_db():
                 uploaded_at     TEXT    NOT NULL DEFAULT (datetime('now')),
                 notes           TEXT    DEFAULT ''
             );
+
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT
+            );
+
+            INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_interval_min', '0');
+            INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_slots', ''); 
+            INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_active_windows', '');
         """)
         # Migration: cover_path Spalte falls noch nicht vorhanden
         try:
@@ -175,6 +185,10 @@ def init_db():
             pass
         try:
             conn.execute("ALTER TABLE queue ADD COLUMN started_at TEXT")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE queue ADD COLUMN scheduled_at TEXT")
         except Exception:
             pass
         try:
@@ -887,9 +901,10 @@ def queue_worker():
         try:
             with get_db() as conn:
                 job = conn.execute(
-                    """SELECT q.id, q.story_part_id
+                    """SELECT q.id, q.story_part_id 
                        FROM queue q
-                       WHERE q.status = 'pending'
+                       WHERE q.status = 'pending' 
+                         AND (q.scheduled_at IS NULL OR q.scheduled_at <= datetime('now'))
                        ORDER BY q.id ASC
                        LIMIT 1"""
                 ).fetchone()
@@ -1066,8 +1081,26 @@ def api_create_video():
     if not parts:
         return jsonify({"error": "Keine Story-Teile gefunden."}), 404
 
-    job_ids = []
+    # Settings laden
     with get_db() as conn:
+        interval_min = int(conn.execute("SELECT value FROM settings WHERE key = 'prod_interval_min'").fetchone()["value"] or 0)
+        
+        # Letzten Planungszeitpunkt finden
+        last_row = conn.execute("SELECT MAX(scheduled_at) as m FROM queue").fetchone()
+        last_m = last_row["m"] if last_row and last_row["m"] else None
+        
+        if last_m:
+            try:
+                ref_time = datetime.strptime(last_m, "%Y-%m-%d %H:%M:%S")
+            except:
+                ref_time = datetime.now()
+        else:
+            ref_time = datetime.now()
+            
+        if ref_time < datetime.now():
+            ref_time = datetime.now()
+
+        job_ids = []
         for part in parts:
             existing = conn.execute(
                 "SELECT id FROM queue WHERE story_part_id = ? AND status IN ('pending','processing')",
@@ -1076,8 +1109,15 @@ def api_create_video():
             if existing:
                 job_ids.append(existing["id"])
                 continue
+            
+            sched_time = None
+            if interval_min > 0:
+                ref_time += timedelta(minutes=interval_min)
+                sched_time = ref_time.strftime("%Y-%m-%d %H:%M:%S")
+
             cursor = conn.execute(
-                "INSERT INTO queue (story_part_id) VALUES (?)", (part["id"],)
+                "INSERT INTO queue (story_part_id, scheduled_at) VALUES (?, ?)", 
+                (part["id"], sched_time)
             )
             job_ids.append(cursor.lastrowid)
             conn.execute(
@@ -1085,6 +1125,20 @@ def api_create_video():
             )
 
     return jsonify({"success": True, "job_ids": job_ids})
+
+
+@app.route("/api/settings", methods=["GET", "POST"])
+def api_settings():
+    if request.method == "POST":
+        data = request.get_json() or {}
+        with get_db() as conn:
+            for k, v in data.items():
+                conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, str(v)))
+        return jsonify({"success": True})
+    else:
+        with get_db() as conn:
+            rows = conn.execute("SELECT key, value FROM settings").fetchall()
+        return jsonify({r["key"]: r["value"] for r in rows})
 
 
 @app.route("/api/queue", methods=["GET"])
