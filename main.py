@@ -612,22 +612,22 @@ def create_cover_image(story_title: str, story_code: str, part_number: int,
                   fill=(240, 220, 255), anchor="mm")
 
         # ── Titel (mehrzeilig, hell, zentriert in der Mitte) ─────────────────
-        # Zeichen pro Zeile abhaengig von Titellaenge anpassen
-        char_width = 18  # Annaeherung fuer Arial 88px
-        max_chars  = max(10, int((W - 160) / char_width))
+        # Zeichen pro Zeile abhängig von Titellänge anpassen
+        # Für 88px Font sind ca. 18-22 Zeichen pro Zeile sicher auf 1080px Breite
+        max_chars  = 20 
         wrapped = textwrap.wrap(story_title, width=max_chars)
-        line_h  = 110
+        line_h  = 120
         total_h = len(wrapped) * line_h
-        y_start = H // 2 - total_h // 2 + 60  # leicht nach unten verschoben
+        y_start = H // 2 - total_h // 2 + 60
 
         for idx, line in enumerate(wrapped):
             draw.text(
                 (W // 2, y_start + idx * line_h),
-                line,
+                line.strip(),
                 font=font_title,
                 fill=(255, 255, 255),
                 anchor="mm",
-                stroke_width=5,
+                stroke_width=6,
                 stroke_fill=(0, 0, 0),
             )
 
