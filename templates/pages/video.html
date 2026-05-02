@@ -139,15 +139,32 @@
       // Separator + abgeschlossene Stories
       if (finished.length) {
         const sep = document.createElement('div');
-        sep.style.cssText = 'display:flex;align-items:center;gap:8px;margin:14px 0 8px;';
+        sep.style.cssText = 'display:flex;align-items:center;gap:8px;margin:14px 0 8px;cursor:pointer;user-select:none;';
+        sep.onclick = () => {
+          const c = document.getElementById('finished-stories-container');
+          const i = document.getElementById('finished-stories-icon');
+          const isHidden = c.style.display === 'none';
+          c.style.display = isHidden ? 'block' : 'none';
+          i.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
+          localStorage.setItem('sara_finished_collapsed', !isHidden);
+        };
+
+        const isCollapsed = localStorage.getItem('sara_finished_collapsed') === 'true';
+
         sep.innerHTML = `
           <div style="flex:1;height:1px;background:var(--md-sys-color-outline-variant)"></div>
-          <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);opacity:.5;white-space:nowrap">
-            <span class="material-symbols-rounded" style="font-size:13px;vertical-align:middle;margin-right:3px">check_circle</span>Bereits produziert
+          <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);opacity:.7;white-space:nowrap;display:flex;align-items:center;gap:4px;">
+            <span class="material-symbols-rounded" id="finished-stories-icon" style="font-size:16px;transition:transform 0.2s;${isCollapsed ? 'transform:rotate(-90deg)' : ''}">expand_more</span>
+            Bereits produziert (${finished.length})
           </span>
           <div style="flex:1;height:1px;background:var(--md-sys-color-outline-variant)"></div>`;
         container.appendChild(sep);
-        finished.forEach(s => container.appendChild(renderItem(s, true)));
+
+        const fContainer = document.createElement('div');
+        fContainer.id = 'finished-stories-container';
+        fContainer.style.display = isCollapsed ? 'none' : 'block';
+        finished.forEach(s => fContainer.appendChild(renderItem(s, true)));
+        container.appendChild(fContainer);
       }
 
       if (pendingSelectStoryId) {
