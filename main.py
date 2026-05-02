@@ -328,19 +328,20 @@ def tts_to_file(text: str, output_path: Path) -> Path:
     
     import wave
     # Piper Standard: 22050 Hz, 16-bit (2 bytes), Mono (1 channel)
-    # Wir setzen die Parameter manuell, um "# channels not specified" zu verhindern.
     with wave.open(str(output_path), "wb") as wav_file:
         wav_file.setnchannels(1)
         wav_file.setsampwidth(2)
         wav_file.setframerate(voice.config.sample_rate)
         
-        voice.synthesize_wav(
-            text, 
-            wav_file,
+        # Wir nutzen die .synthesize() Methode, die ein Generator für Audio-Chunks ist.
+        # Damit funktionieren die Parameter length_scale, noise_scale etc. zuverlässig.
+        for audio_bytes in voice.synthesize(
+            text,
             length_scale=1.05,
-            sentence_silence=0.3,
-            noise_scale=0.8
-        )
+            noise_scale=0.8,
+            sentence_silence=0.3
+        ):
+            wav_file.writeframes(audio_bytes)
         
     return output_path
 
