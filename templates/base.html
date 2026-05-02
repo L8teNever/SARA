@@ -740,6 +740,70 @@
     #sse-status { font-size: 11px; color: var(--md-sys-color-on-surface-variant); }
 
     @media (max-width: 600px) { .top-app-bar__sub { display: none; } }
+
+    /* =====================================================
+       Mobile-Optimierungen (≤599px)
+    ===================================================== */
+    @media (max-width: 599px) {
+      /* Top Bar kompakter */
+      .top-app-bar { height: 56px; padding: 0 14px; gap: 10px; }
+      .layout-body { height: calc(100vh - 56px); }
+      .queue-badge { padding: 5px 11px; font-size: 12px; gap: 6px; }
+
+      /* Tab-Inhalt */
+      .tab-content { padding: 14px 12px; }
+      .page-header { margin-bottom: 16px; }
+      .page-header__title { font-size: 22px; }
+      .page-header__sub { font-size: 13px; }
+
+      /* Cards */
+      .md-card { padding: 16px; border-radius: 20px; margin-bottom: 14px; }
+      .card-hdr { gap: 10px; margin-bottom: 12px; }
+      .card-hdr__icon { width: 40px; height: 40px; }
+      .card-hdr__icon .material-symbols-rounded { font-size: 20px; }
+      .card-title { font-size: 16px; }
+      .card-subtitle { font-size: 12px; }
+
+      /* Buttons: größere Touch-Ziele */
+      .md-btn { min-height: 44px; }
+      .md-btn--sm { min-height: 36px; }
+      .md-btn--icon { min-height: 40px; width: 40px; }
+      .btn-row { gap: 8px; }
+
+      /* Formulare */
+      .md-textarea { min-height: 160px !important; }
+      .md-input, .md-textarea { font-size: 16px; } /* verhindert Auto-Zoom auf iOS */
+
+      /* Queue */
+      .queue-item { padding: 12px 13px; }
+      .queue-item__title { font-size: 13px; }
+
+      /* Story-Liste */
+      .story-select-item { padding: 12px 13px; gap: 10px; }
+      .story-select-item__title { font-size: 14px; }
+
+      /* Library */
+      .lib-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+      .lib-card__body { padding: 12px; }
+
+      /* Hintergrund-Grid */
+      .bg-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+
+      /* Upload-Zone */
+      .upload-zone { padding: 32px 16px; }
+      .upload-zone__icon .material-symbols-rounded { font-size: 40px; }
+
+      /* Duplikat-Banner */
+      .duplicate-banner { padding: 12px 14px; }
+    }
+
+    /* Extra klein (≤400px) */
+    @media (max-width: 400px) {
+      .page-header__title { font-size: 19px; }
+      .top-app-bar__icon { width: 30px; height: 30px; font-size: 15px; letter-spacing: 0; }
+      .top-app-bar__logo { font-size: 15px; }
+      .md-card { padding: 14px; }
+    }
   </style>
 </head>
 
@@ -810,11 +874,6 @@
         <span class="material-symbols-rounded">video_file</span>
         <span class="nav-item__lbl">Hintergründe</span>
       </button>
-      <button class="nav-item" id="snav-demo" onclick="switchTab('demo')">
-        <div class="nav-item__pill"></div>
-        <span class="material-symbols-rounded">science</span>
-        <span class="nav-item__lbl">Stimmen-Demo</span>
-      </button>
     </nav>
 
     <!-- Main Content -->
@@ -839,11 +898,7 @@
     </button>
     <button class="bnav-item" id="bnav-upload" onclick="switchTab('upload')">
       <div class="bnav-item__pill"><span class="material-symbols-rounded">video_file</span></div>
-      <span>Hintergr.</span>
-    </button>
-    <button class="bnav-item" id="bnav-demo" onclick="switchTab('demo')">
-      <div class="bnav-item__pill"><span class="material-symbols-rounded">science</span></div>
-      <span>Demo</span>
+      <span>Hintergrund</span>
     </button>
   </nav>
 
@@ -866,7 +921,6 @@
       video:   ['snav-video',   'bnav-video'],
       library: ['snav-library', 'bnav-library'],
       upload:  ['snav-upload',  'bnav-upload'],
-      demo:    ['snav-demo',    'bnav-demo'],
     };
 
     function switchTab(name, pushHistory = true) {
@@ -1183,7 +1237,6 @@
       // Daten laden
       if (initTab === 'video')        { loadStoryList(); loadQueue(); }
       else if (initTab === 'upload')  { loadBackgrounds(); }
-      else if (initTab === 'demo')    { /* demo init if any */ }
       else if (initTab === 'library') {
         loadLibrary().then(() => {
           if (code) {

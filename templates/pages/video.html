@@ -102,17 +102,13 @@
 </section>
 
 <style>
-  .story-select-item--done {
-    opacity: 0.45;
-    filter: saturate(0.5);
-  }
-  .story-select-item--done:hover {
-    opacity: 0.65;
-    filter: saturate(0.7);
-  }
-  .story-select-item--done.selected {
-    opacity: 0.75;
-    filter: none;
+  .story-select-item--done { opacity: 0.45; filter: saturate(0.5); }
+  .story-select-item--done:hover { opacity: 0.65; filter: saturate(0.7); }
+  .story-select-item--done.selected { opacity: 0.75; filter: none; }
+
+  @media (max-width: 599px) {
+    #prod-status-hint { display: none; }
+    #prod-status-bar { padding: 10px 12px; gap: 10px; }
   }
 </style>
 

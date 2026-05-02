@@ -1026,7 +1026,6 @@ def start_queue_worker():
 @app.route("/library")
 @app.route("/library/<path:rest>")
 @app.route("/upload")
-@app.route("/demo")
 def index(rest=None):
     return render_template("index.html")
 
@@ -1535,43 +1534,6 @@ def download_video(video_path: str):
         str(full_path.parent), full_path.name,
         as_attachment=True, mimetype="application/octet-stream",
     )
-
-
-# ---------------------------------------------------------------------------
-# Flask-Routen — Demo & Test
-# ---------------------------------------------------------------------------
-
-@app.route("/api/demo", methods=["POST"])
-def api_demo():
-    """Generiert eine Demo-Audiodatei und Untertitel für den Test."""
-    data = request.get_json(silent=True) or {}
-    text = data.get("text", "This is a demo of the new Kokoro voice. It sounds much more natural and emotional.")
-    
-    demo_id = "demo_" + datetime.utcnow().strftime("%H%M%S")
-    audio_path = TTS_DIR / f"{demo_id}.wav"
-    ass_path   = TTS_DIR / f"{demo_id}.ass"
-    
-    try:
-        # TTS generieren
-        tts_to_file(text, audio_path)
-        
-        # Wortgrenzen für Untertitel (Whisper)
-        word_events = _get_word_boundaries(text, audio_path)
-        ass_content = _build_ass_from_events(word_events, text)
-        with open(ass_path, "w", encoding="utf-8") as f:
-            f.write(ass_content)
-            
-        return jsonify({
-            "audio_url": f"/tts/{audio_path.name}",
-            "ass_content": ass_content,
-            "text": text
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/tts/<filename>")
-def serve_tts(filename: str):
-    return send_from_directory(str(TTS_DIR), filename)
 
 
 # ---------------------------------------------------------------------------
