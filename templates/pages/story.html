@@ -92,6 +92,28 @@
       </div>
     </div>
   </div>
+
+  <!-- Neue Sektion: Zuletzt gespeicherte Stories -->
+  <div style="margin-top:24px;">
+    <div class="md-card md-card--elevated" style="padding:18px;">
+      <div class="card-hdr" style="margin-bottom:12px;">
+        <div class="card-hdr__icon" style="background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)">
+          <span class="material-symbols-rounded">history</span>
+        </div>
+        <div class="card-hdr__text">
+          <div class="card-title">Zuletzt gespeichert</div>
+          <div class="card-subtitle">Deine neuesten Stories im Überblick</div>
+        </div>
+        <button class="md-btn md-btn--icon" onclick="loadRecentStories()">
+          <span class="material-symbols-rounded">refresh</span>
+        </button>
+      </div>
+
+      <div id="recent-stories-list" class="flex-column" style="gap:8px;">
+        <div class="spinner" style="margin:20px auto"></div>
+      </div>
+    </div>
+  </div>
 </section>
 
 <script>
@@ -207,4 +229,51 @@ Create a story about: [THEMA HIER EINTRAGEN — z.B. "a woman who discovers her 
   }
 
   function goToVideoTab(storyId) { switchTab('video'); pendingSelectStoryId = storyId; }
+
+  async function loadRecentStories() {
+    const container = document.getElementById('recent-stories-list');
+    try {
+      const stories = await fetch('/api/stories').then(r => r.json());
+      if (!stories.length) {
+        container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">Noch keine Stories vorhanden.</div>';
+        return;
+      }
+      // Nur die letzten 5 anzeigen
+      const recent = stories.slice(0, 5);
+      container.innerHTML = '';
+      recent.forEach(s => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--md-sys-color-surface-container-high);border-radius:12px;';
+        row.innerHTML = `
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">[${s.code}] ${escHtml(s.title)}</div>
+            <div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);opacity:0.7;">${s.total_parts} Teile &middot; ${formatDate(s.created_at)}</div>
+          </div>
+          <button class="md-btn md-btn--tonal md-btn--sm" onclick="goToVideoTab(${s.id})">
+            <span class="material-symbols-rounded" style="font-size:16px">movie</span>
+          </button>
+          <button class="md-btn md-btn--icon" style="color:var(--md-sys-color-error)" onclick="deleteStoryFromCreation(${s.id}, '${escHtml(s.title)}')">
+            <span class="material-symbols-rounded">delete</span>
+          </button>
+        `;
+        container.appendChild(row);
+      });
+    } catch (e) {
+      container.innerHTML = '<div class="text-muted">Fehler beim Laden.</div>';
+    }
+  }
+
+  async function deleteStoryFromCreation(id, title) {
+    if (!confirm(`Story "${title}" wirklich löschen?`)) return;
+    try {
+      await fetch(`/api/stories/${id}`, { method: 'DELETE' });
+      showSnack('Story gelöscht.', 'success');
+      loadRecentStories();
+    } catch (e) {
+      showSnack('Fehler.', 'error');
+    }
+  }
+
+  // Initial laden
+  loadRecentStories();
 </script>

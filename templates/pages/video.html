@@ -117,7 +117,7 @@
         item.innerHTML = `
           <div class="story-select-item__radio"></div>
           <div class="story-select-item__info">
-            <div class="story-select-item__title">${escHtml(s.title)}</div>
+            <div class="story-select-item__title">[${s.code}] ${escHtml(s.title)}</div>
             <div class="story-select-item__meta"><strong>${s.code}</strong> &middot; ${s.total_parts} Teil(e) &middot; ${formatDate(s.created_at)}</div>
           </div>
           ${progressBadge}

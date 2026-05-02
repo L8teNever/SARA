@@ -1352,15 +1352,21 @@ def api_delete_video(part_id: int):
 
 @app.route("/api/stories/<int:story_id>", methods=["DELETE"])
 def api_delete_story(story_id: int):
-    """Löscht eine komplette Story inklusive aller Parts und Dateien."""
+    """Löscht eine komplette Story inklusive aller Parts, Dateien und Ordner."""
     with get_db() as conn:
+        story = conn.execute("SELECT code FROM stories WHERE id = ?", (story_id,)).fetchone()
+        if not story:
+            return jsonify({"error": "Story nicht gefunden"}), 404
+        
+        story_code = story["code"]
+        
         # Alle Parts dieser Story finden
         parts = conn.execute(
             "SELECT id, video_path, cover_path FROM story_parts WHERE story_id = ?",
             (story_id,)
         ).fetchall()
         
-        # Dateien löschen
+        # 1. Einzelne Dateien löschen (Video + Cover)
         for p in parts:
             for rel_path in [p["video_path"], p["cover_path"]]:
                 if rel_path:
@@ -1374,6 +1380,22 @@ def api_delete_story(story_id: int):
             # Verknüpfte Daten löschen
             conn.execute("DELETE FROM video_uploads WHERE story_part_id = ?", (p["id"],))
             conn.execute("DELETE FROM queue WHERE story_part_id = ?", (p["id"],))
+
+        # 2. Ganzen Ausgabe-Ordner löschen
+        story_out_dir = OUTPUTS_DIR / story_code
+        if story_out_dir.exists() and story_out_dir.is_dir():
+            try:
+                import shutil
+                shutil.rmtree(story_out_dir)
+            except Exception:
+                pass
+
+        # 3. Temporäre TTS/ASS Dateien löschen
+        try:
+            for f in TTS_DIR.glob(f"{story_code}_part*"):
+                f.unlink()
+        except Exception:
+            pass
 
         # Story und Parts aus DB löschen
         conn.execute("DELETE FROM story_parts WHERE story_id = ?", (story_id,))
