@@ -973,9 +973,10 @@ def start_queue_worker():
 @app.route("/story")
 @app.route("/video")
 @app.route("/library")
+@app.route("/library/<path:rest>")
 @app.route("/upload")
-@app.route("/prompt")
-def index():
+@app.route("/demo")
+def index(rest=None):
     return render_template("index.html")
 
 
