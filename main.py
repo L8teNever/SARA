@@ -939,40 +939,41 @@ def queue_worker():
 
     while True:
         try:
+            job_id = None
+            story_part_id = None
+
             with get_db() as conn:
-                # Prüfen ob Produktion pausiert ist
-                is_active = conn.execute("SELECT value FROM settings WHERE key = 'prod_active'").fetchone()
+                is_active = conn.execute(
+                    "SELECT value FROM settings WHERE key = 'prod_active'"
+                ).fetchone()
                 if is_active and is_active["value"] == "0":
                     time.sleep(QUEUE_POLL_INTERVAL)
                     continue
-                
-                # SICHERHEIT: Prüfen ob bereits ein Job läuft (um Mehrfach-Produktion zu verhindern)
-                already_running = conn.execute("SELECT id FROM queue WHERE status = 'processing'").fetchone()
-                if already_running:
+
+                # Atomares UPDATE + RETURNING: prüft ob kein Job läuft UND startet den nächsten
+                # in einer einzigen SQL-Transaktion — keine Race Condition möglich.
+                row = conn.execute("""
+                    UPDATE queue SET
+                        status         = 'processing',
+                        progress_pct   = 0,
+                        progress_label = 'Starte…',
+                        started_at     = datetime('now')
+                    WHERE id = (
+                        SELECT id FROM queue
+                        WHERE  status = 'pending'
+                          AND  (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
+                          AND  NOT EXISTS (SELECT 1 FROM queue WHERE status = 'processing')
+                        ORDER BY id ASC LIMIT 1
+                    )
+                    RETURNING id, story_part_id
+                """).fetchone()
+
+                if row is None:
                     time.sleep(QUEUE_POLL_INTERVAL)
                     continue
 
-                job = conn.execute(
-                    """SELECT q.id, q.story_part_id 
-                       FROM queue q
-                       WHERE q.status = 'pending' 
-                         AND (q.scheduled_at IS NULL OR q.scheduled_at <= datetime('now'))
-                       ORDER BY q.id ASC
-                       LIMIT 1"""
-                ).fetchone()
-
-            if job is None:
-                time.sleep(QUEUE_POLL_INTERVAL)
-                continue
-
-            job_id        = job["id"]
-            story_part_id = job["story_part_id"]
-
-            with get_db() as conn:
-                conn.execute(
-                    "UPDATE queue SET status = 'processing', progress_pct = 0, progress_label = 'Starte…', started_at = datetime('now') WHERE id = ?",
-                    (job_id,)
-                )
+                job_id        = row["id"]
+                story_part_id = row["story_part_id"]
                 conn.execute(
                     "UPDATE story_parts SET status = 'processing' WHERE id = ?",
                     (story_part_id,)
@@ -984,7 +985,8 @@ def queue_worker():
 
                 with get_db() as conn:
                     conn.execute(
-                        "UPDATE queue SET status = 'done', progress_pct = 100, progress_label = 'Fertig! ✅', finished_at = datetime('now') WHERE id = ?",
+                        "UPDATE queue SET status = 'done', progress_pct = 100, "
+                        "progress_label = 'Fertig! ✅', finished_at = datetime('now') WHERE id = ?",
                         (job_id,)
                     )
                     conn.execute(
@@ -996,7 +998,8 @@ def queue_worker():
                 err_msg = str(e)
                 with get_db() as conn:
                     conn.execute(
-                        "UPDATE queue SET status = 'error', error_msg = ?, progress_label = 'Fehler ❌', finished_at = datetime('now') WHERE id = ?",
+                        "UPDATE queue SET status = 'error', error_msg = ?, "
+                        "progress_label = 'Fehler ❌', finished_at = datetime('now') WHERE id = ?",
                         (err_msg, job_id)
                     )
                     conn.execute(
@@ -1005,8 +1008,7 @@ def queue_worker():
                     )
 
         except Exception:
-            import time as t
-            t.sleep(QUEUE_POLL_INTERVAL)
+            time.sleep(QUEUE_POLL_INTERVAL)
 
 
 def start_queue_worker():
