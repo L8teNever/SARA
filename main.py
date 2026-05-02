@@ -260,9 +260,10 @@ Rules for Content:
 - Every part (except the last) MUST end at the absolute peak of tension.
 - IMPORTANT: Every part that is not the final one MUST end with a verbal call-to-action integrated into the story text (e.g. "... and as I opened the door, my heart stopped. See what happened next in Part 2.").
 - For Part 2 and beyond, start with a quick 1-sentence recap or continuation that keeps the momentum (e.g. "So, there I was, staring at the person I trusted most...").
+- Be extremely creative and original. Avoid generic or repetitive tropes. Every story should have a unique plot twist or a perspective that haven't been heard a thousand times before. Explore a wide variety of themes: hidden family secrets, mysterious disappearances, complex revenge plots, heartwarming but shocking reunions, or psychological workplace drama.
 - Each part MUST contain exactly 160–200 words (this guarantees at least 75 seconds of audio per part).
 - Write in first person, past tense, raw and emotional style (like r/TIFU or r/relationships).
-- keywords: exactly 10 English keywords describing the core story content.
+- keywords: genau 10 englische Stichwörter, die den Kerninhalt der Geschichte beschreiben. Diese werden für den Duplikat-Check genutzt.
 - social.video_title: punchy and attention-grabbing, include "Part X/Y" for multi-part, max 80 chars.
 - social.description: emotionally tease the story, never spoil the ending, end with a question or CTA.
 - social.hashtags: 6–8 relevant hashtags as a single space-separated string."""
