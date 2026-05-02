@@ -471,11 +471,11 @@ def _uniform_word_timing(text: str, audio_path: Path) -> list:
 
 def _build_ass_from_events(word_events: list, full_text: str) -> str:
     """
-    TikTok-Style Untertitel:
-    - Mittig im Bild platziert (Alignment 5)
-    - Aktives Wort GROSS, GELB und EXTRA FETT
-    - Graue Kontext-Woerter links/rechts
-    - Kompakte einzeilige Darstellung
+    Ultimativer TikTok-Style (Focus-Word):
+    - Nur das aktuell gesprochene Wort wird angezeigt
+    - Bleibt EXAKT in der Mitte des Bildes (kein Springen)
+    - Riesige Schrift, knalliges Gelb, extrem dicker Rand
+    - Alles in GROSSBUCHSTABEN für maximale Aufmerksamkeit
     """
     header = """\
 [Script Info]
@@ -486,7 +486,7 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: TikTok,Arial,84,&H00AAAAAA,&H000000FF,&H00000000,&HAA000000,-1,0,0,0,100,100,2,0,1,8,4,5,60,60,0,1
+Style: TikTok,Arial Black,150,&H0000FFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,12,0,5,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -499,29 +499,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         cs = int((s - int(s)) * 100)
         return f"{h}:{m:02d}:{int(s):02d}.{cs:02d}"
 
-    YELLOW = "&H0000FFFF"
-    GRAY   = "&H00CCCCCC"
-    CTX    = 3  # Etwas weniger Kontext fuer Fokus auf die Mitte
-
     events_out = []
-
     for i, (word, start, end) in enumerate(word_events):
-        parts = []
-
-        # Kontext links (kleiner, grau)
-        prev_words = [word_events[j][0] for j in range(max(0, i - CTX), i)]
-        if prev_words:
-            parts.append("{\\c" + GRAY + "&\\fs70}" + " ".join(prev_words).upper() + " ")
-
-        # Aktives Wort (GROSS, GELB, EXTRA FETT)
-        parts.append("{\\c" + YELLOW + "&\\b1\\fs110}" + word.upper() + "{\\b0\\fs84\\c" + GRAY + "&}")
-
-        # Kontext rechts (kleiner, grau)
-        next_words = [word_events[j][0] for j in range(i + 1, min(len(word_events), i + CTX + 1))]
-        if next_words:
-            parts.append(" " + "{\\fs70}" + " ".join(next_words).upper() + "}")
-
-        line = "".join(parts)
+        # Nur das eine Wort, perfekt zentriert durch Alignment 5
+        clean_word = word.strip().upper()
+        if not clean_word: continue
+        
+        # Wir fügen einen winzigen "Pop"-Effekt hinzu durch Font-Scaling (optional)
+        # Hier bleiben wir aber bei der festen Position wie gewünscht.
+        line = clean_word
         events_out.append(f"Dialogue: 0,{fmt(start)},{fmt(end)},TikTok,,0,0,0,,{line}")
 
     return header + "\n".join(events_out) + "\n"

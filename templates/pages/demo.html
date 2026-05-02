@@ -148,24 +148,22 @@
       const cur = audio.currentTime;
       const ev = _demoEvents.find(e => cur >= e.start && cur <= e.end);
       if (ev) {
-        // ASS Tags entfernen für Demo-Display
-        let clean = ev.text.replace(/\{.*?\}/g, (match) => {
-          if (match.includes('\\c&H0000FFFF&')) return '##YELLOW##';
-          if (match.includes('\\fs70')) return '##SMALL##';
-          return '';
-        });
+        // ASS Tags entfernen (in der neuen Version sind keine mehr nötig, da nur 1 Wort)
+        let word = ev.text.replace(/\{.*?\}/g, '').trim().toUpperCase();
         
-        // In HTML umwandeln (TikTok Style)
-        let html = clean.split(' ').map(word => {
-          if (word.includes('##YELLOW##')) {
-            return `<span style="color:#FFFF00; font-weight:900; font-size:2.2em; text-shadow: 4px 4px 0px #000; display:inline-block; transform:scale(1.1); margin: 0 5px;">${word.replace('##YELLOW##','').replace('##SMALL##','')}</span>`;
-          }
-          return `<span style="color:#CCC; font-size:1.4em; text-shadow: 2px 2px 0px #000; opacity:0.8;">${word.replace('##SMALL##','')}</span>`;
-        }).join(' ');
-        
-        display.innerHTML = `<div style="display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:5px; line-height:1.2;">${html}</div>`;
+        display.innerHTML = `
+          <div style="
+            color:#FFFF00; 
+            font-weight:900; 
+            font-size:4em; 
+            text-shadow: 6px 6px 0px #000; 
+            letter-spacing: 2px;
+            font-family: 'Arial Black', sans-serif;
+          ">${word}</div>`;
+      } else {
+        display.innerHTML = '';
       }
-    }, 50);
+    }, 30);
   }
 
   function stopSubtitleSync() {
