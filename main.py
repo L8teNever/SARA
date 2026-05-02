@@ -29,12 +29,20 @@ from pathlib import Path
 _ACTIVE_SUBPROCESSES = []
 def _run_sub(args, **kwargs):
     import subprocess
+    # capture_output auf Popen-Argumente umbiegen
+    if kwargs.pop('capture_output', False):
+        kwargs['stdout'] = subprocess.PIPE
+        kwargs['stderr'] = subprocess.PIPE
+    
+    check = kwargs.pop('check', False)
+    
     p = subprocess.Popen(args, **kwargs)
     _ACTIVE_SUBPROCESSES.append(p)
     try:
         out, err = p.communicate()
-        if p.returncode != 0:
+        if check and p.returncode != 0:
             raise subprocess.CalledProcessError(p.returncode, args, out, err)
+        return subprocess.CompletedProcess(args, p.returncode, out, err)
     finally:
         if p in _ACTIVE_SUBPROCESSES:
             _ACTIVE_SUBPROCESSES.remove(p)
