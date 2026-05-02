@@ -307,13 +307,13 @@ def ensure_kokoro_model() -> tuple[Path, Path]:
     if not onnx_path.exists():
         print("Lade Kokoro-82M ONNX Modell herunter...")
         urllib.request.urlretrieve(
-            "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v1.0.int8.onnx", 
+            "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx", 
             onnx_path
         )
     if not voices_path.exists():
         print("Lade Kokoro Stimmen-Datei herunter...")
         urllib.request.urlretrieve(
-            "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices-v1.0.bin", 
+            "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin", 
             voices_path
         )
     
