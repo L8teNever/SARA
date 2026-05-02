@@ -169,6 +169,7 @@ def init_db():
             INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_interval_min', '0');
             INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_slots', ''); 
             INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_active_windows', '');
+            INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_active', '1');
         """)
         # Migration: cover_path Spalte falls noch nicht vorhanden
         try:
@@ -900,6 +901,12 @@ def queue_worker():
     while True:
         try:
             with get_db() as conn:
+                # Prüfen ob Produktion pausiert ist
+                is_active = conn.execute("SELECT value FROM settings WHERE key = 'prod_active'").fetchone()
+                if is_active and is_active["value"] == "0":
+                    time.sleep(QUEUE_POLL_INTERVAL)
+                    continue
+
                 job = conn.execute(
                     """SELECT q.id, q.story_part_id 
                        FROM queue q
@@ -1153,7 +1160,7 @@ def api_get_queue():
                JOIN story_parts sp ON sp.id = q.story_part_id
                JOIN stories s ON s.id = sp.story_id
                ORDER BY q.id DESC
-               LIMIT 50"""
+               LIMIT 500"""
         ).fetchall()
     return jsonify([dict(j) for j in jobs])
 
@@ -1183,7 +1190,7 @@ def api_queue_live():
                            FROM queue q
                            JOIN story_parts sp ON sp.id = q.story_part_id
                            JOIN stories s ON s.id = sp.story_id
-                           ORDER BY q.id DESC LIMIT 30"""
+                           ORDER BY q.id DESC LIMIT 100"""
                     ).fetchall()
                 payload = json.dumps([dict(j) for j in jobs])
                 yield f"data: {payload}\n\n"

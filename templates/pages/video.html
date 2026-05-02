@@ -42,7 +42,12 @@
           </div>
           <div class="card-hdr__text">
             <div class="card-title">Produktions-Zeitplan</div>
-            <div class="card-subtitle">Verzögerte Erstellung aktivieren</div>
+            <div class="card-subtitle">Steuerung der Warteschlange</div>
+          </div>
+          <div style="margin-left:auto;">
+            <button class="md-btn md-btn--filled md-btn--sm" id="btn-toggle-prod" onclick="toggleProdStatus()" style="background:var(--md-sys-color-error);">
+               <span class="material-symbols-rounded">pause_circle</span> Pause
+            </button>
           </div>
         </div>
         
@@ -241,13 +246,43 @@
       showSnack('Fehler beim Löschen: ' + e.message, 'error');
     }
   }
+  let _prodActive = true;
+
   async function loadProdSettings() {
     try {
       const settings = await fetch('/api/settings').then(r => r.json());
       if (settings.prod_interval_min) {
         document.getElementById('prod-interval').value = settings.prod_interval_min;
       }
+      _prodActive = settings.prod_active !== '0';
+      updateProdButton();
     } catch (e) {}
+  }
+
+  function updateProdButton() {
+    const btn = document.getElementById('btn-toggle-prod');
+    if (_prodActive) {
+      btn.innerHTML = '<span class="material-symbols-rounded">pause_circle</span> Pause';
+      btn.style.background = 'var(--md-sys-color-error)';
+    } else {
+      btn.innerHTML = '<span class="material-symbols-rounded">play_circle</span> Start';
+      btn.style.background = 'var(--md-sys-color-primary)';
+    }
+  }
+
+  async function toggleProdStatus() {
+    _prodActive = !_prodActive;
+    updateProdButton();
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prod_active: _prodActive ? '1' : '0' })
+      });
+      showSnack(_prodActive ? 'Produktion gestartet' : 'Produktion pausiert', 'success');
+    } catch (e) {
+      showSnack('Fehler beim Ändern des Status', 'error');
+    }
   }
 
   async function saveProdSettings() {
