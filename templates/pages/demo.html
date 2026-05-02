@@ -1,0 +1,176 @@
+<!-- ============================================================ TAB: Stimmen-Demo ============================================================ -->
+<section class="tab-content" id="tab-demo">
+  <div class="page-header">
+    <div class="page-header__eyebrow"><span class="material-symbols-rounded">science</span> Labor</div>
+    <h1 class="page-header__title">Stimmen- & Untertitel-Demo</h1>
+    <p class="page-header__sub">Teste die neue Kokoro-82M Stimme und das TikTok-Untertitel-Design in Echtzeit.</p>
+  </div>
+
+  <div class="prompt-grid">
+    <div>
+      <div class="md-card md-card--elevated">
+        <div class="card-hdr">
+          <div class="card-hdr__icon" style="background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container)">
+            <span class="material-symbols-rounded">record_voice_over</span>
+          </div>
+          <div class="card-hdr__text">
+            <div class="card-title">Demo Text</div>
+            <div class="card-subtitle">Gib einen Text ein und höre die neue Kokoro-Stimme.</div>
+          </div>
+        </div>
+
+        <div class="md-field">
+          <label for="demo-text">Text für die Demo</label>
+          <textarea id="demo-text" class="md-textarea" style="min-height:150px;" 
+            placeholder="Schreibe etwas..."></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="md-btn md-btn--filled" id="btn-run-demo" onclick="runDemo()">
+            <span class="material-symbols-rounded">play_circle</span> Demo generieren
+          </button>
+        </div>
+      </div>
+
+      <div id="demo-audio-card" class="md-card md-card--elevated" style="margin-top:20px;display:none;">
+        <div class="card-hdr">
+          <div class="card-hdr__icon"><span class="material-symbols-rounded">audiotrack</span></div>
+          <div class="card-hdr__text">
+            <div class="card-title">Ergebnis</div>
+          </div>
+        </div>
+        <audio id="demo-audio" controls style="width:100%;margin-top:10px;"></audio>
+      </div>
+    </div>
+
+    <div>
+      <div class="md-card md-card--elevated">
+        <div class="card-hdr">
+          <div class="card-hdr__icon" style="background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)">
+            <span class="material-symbols-rounded">visibility</span>
+          </div>
+          <div class="card-hdr__text">
+            <div class="card-title">Vorschau (TikTok Style)</div>
+            <div class="card-subtitle">So sehen die Untertitel im Video aus.</div>
+          </div>
+        </div>
+
+        <div id="demo-preview-box" 
+             style="aspect-ratio:9/16; background:#111; border-radius:16px; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; border:2px solid var(--md-sys-color-outline-variant);">
+          
+          <div id="demo-subtitle-overlay" 
+               style="width:100%; text-align:center; padding:0 20px; font-family:'Arial Black', Arial, sans-serif; pointer-events:none; z-index:10;">
+            <div style="color:var(--md-sys-color-outline-variant); font-size:14px; font-style:italic;">Klicke links auf "Demo generieren"...</div>
+          </div>
+          
+          <!-- Statisches Mockup für TikTok feeling -->
+          <div style="position:absolute; bottom:20px; left:15px; display:flex; flex-direction:column; gap:8px;">
+            <div style="width:40px; height:40px; border-radius:50%; background:#444;"></div>
+            <div style="width:80px; height:12px; border-radius:6px; background:#444;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  let _demoEvents = [];
+  let _demoStartTime = 0;
+  let _demoInterval = null;
+
+  async function runDemo() {
+    const text = document.getElementById('demo-text').value.trim();
+    if (!text) { showSnack('Bitte Text eingeben.', 'error'); return; }
+
+    const btn = document.getElementById('btn-run-demo');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner spinner--sm"></div> Generiere...';
+
+    try {
+      const res = await fetch('/api/demo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json();
+      if (data.error) { showSnack(data.error, 'error'); return; }
+
+      const audio = document.getElementById('demo-audio');
+      audio.src = data.audio_url;
+      document.getElementById('demo-audio-card').style.display = 'block';
+      
+      // Untertitel parsen (sehr einfacher Parser für die Demo)
+      parseAssForDemo(data.ass_content);
+      
+      showSnack('Demo bereit! Klicke auf Play beim Audio.', 'success');
+
+      audio.onplay = () => startSubtitleSync();
+      audio.onpause = () => stopSubtitleSync();
+      audio.onended = () => stopSubtitleSync();
+
+    } catch (e) {
+      showSnack('Fehler: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-rounded">play_circle</span> Demo generieren';
+    }
+  }
+
+  function parseAssForDemo(ass) {
+    _demoEvents = [];
+    const lines = ass.split('\n');
+    lines.forEach(l => {
+      if (l.startsWith('Dialogue:')) {
+        const parts = l.split(',');
+        const startStr = parts[1];
+        const endStr = parts[2];
+        const text = parts.slice(9).join(',');
+        
+        const start = timeToSeconds(startStr);
+        const end = timeToSeconds(endStr);
+        _demoEvents.push({ start, end, text });
+      }
+    });
+  }
+
+  function timeToSeconds(t) {
+    const [h, m, s] = t.split(':').map(parseFloat);
+    return h * 3600 + m * 60 + s;
+  }
+
+  function startSubtitleSync() {
+    if (_demoInterval) clearInterval(_demoInterval);
+    const audio = document.getElementById('demo-audio');
+    const display = document.getElementById('demo-subtitle-overlay');
+    
+    _demoInterval = setInterval(() => {
+      const cur = audio.currentTime;
+      const ev = _demoEvents.find(e => cur >= e.start && cur <= e.end);
+      if (ev) {
+        // ASS Tags entfernen für Demo-Display
+        let clean = ev.text.replace(/\{.*?\}/g, (match) => {
+          if (match.includes('\\c&H0000FFFF&')) return '##YELLOW##';
+          if (match.includes('\\fs70')) return '##SMALL##';
+          return '';
+        });
+        
+        // In HTML umwandeln (TikTok Style)
+        let html = clean.split(' ').map(word => {
+          if (word.includes('##YELLOW##')) {
+            return `<span style="color:#FFFF00; font-weight:900; font-size:2.2em; text-shadow: 4px 4px 0px #000; display:inline-block; transform:scale(1.1); margin: 0 5px;">${word.replace('##YELLOW##','').replace('##SMALL##','')}</span>`;
+          }
+          return `<span style="color:#CCC; font-size:1.4em; text-shadow: 2px 2px 0px #000; opacity:0.8;">${word.replace('##SMALL##','')}</span>`;
+        }).join(' ');
+        
+        display.innerHTML = `<div style="display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:5px; line-height:1.2;">${html}</div>`;
+      }
+    }, 50);
+  }
+
+  function stopSubtitleSync() {
+    if (_demoInterval) clearInterval(_demoInterval);
+  }
+
+  document.getElementById('demo-text').value = "Hello! I am Kokoro-82M, your new high-quality storyteller. I can narrate your scripts with much more emotion and realism than ever before. Let's create something amazing together!";
+</script>

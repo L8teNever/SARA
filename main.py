@@ -295,55 +295,55 @@ def generate_story(prompt: str, api_key: str = "") -> dict:
 # TTS — Piper-TTS (100% lokal, offline, hohe Qualität)
 # ---------------------------------------------------------------------------
 
-def ensure_piper_model() -> Path:
+def ensure_kokoro_model() -> tuple[Path, Path]:
     import urllib.request
-    model_dir = DATA_DIR / "piper_models"
+    model_dir = DATA_DIR / "kokoro_models"
     model_dir.mkdir(parents=True, exist_ok=True)
-    # Höhere Qualität: en_US-lessac-high (ca. 100MB) klingt deutlich natürlicher
-    onnx_path = model_dir / "en_US-lessac-high.onnx"
-    json_path = model_dir / "en_US-lessac-high.onnx.json"
+    
+    # Kokoro-82M v1.0 ONNX (int8 quantized for speed)
+    onnx_path = model_dir / "kokoro-v1.0.int8.onnx"
+    voices_path = model_dir / "voices-v1.0.bin"
     
     if not onnx_path.exists():
-        print("Lade lokales High-Quality TTS Modell (en_US-lessac-high.onnx) herunter...")
-        urllib.request.urlretrieve("https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/high/en_US-lessac-high.onnx", onnx_path)
-    if not json_path.exists():
-        print("Lade TTS Modell-Config (en_US-lessac-high.onnx.json) herunter...")
-        urllib.request.urlretrieve("https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/high/en_US-lessac-high.onnx.json", json_path)
+        print("Lade Kokoro-82M ONNX Modell herunter...")
+        urllib.request.urlretrieve(
+            "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v1.0.int8.onnx", 
+            onnx_path
+        )
+    if not voices_path.exists():
+        print("Lade Kokoro Stimmen-Datei herunter...")
+        urllib.request.urlretrieve(
+            "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices-v1.0.bin", 
+            voices_path
+        )
     
-    return onnx_path
+    return onnx_path, voices_path
 
 
 def tts_to_file(text: str, output_path: Path) -> Path:
     """
-    Komplett lokale Sprachsynthese mit Piper-TTS (High Quality).
-    Schreibt eine saubere WAV-Datei mit expliziten Parametern.
+    Lokale High-End Sprachsynthese mit Kokoro-82M (ONNX).
+    Klingt deutlich menschlicher und emotionaler als Piper.
     """
     try:
-        from piper.voice import PiperVoice
-        from piper.config import SynthesisConfig
+        from kokoro_onnx import Kokoro
+        import soundfile as sf
     except ImportError:
-        raise RuntimeError("Bitte 'pip install piper-tts' ausführen.")
+        raise RuntimeError("Bitte 'pip install kokoro-onnx soundfile' ausführen.")
         
-    model_path = ensure_piper_model()
-    voice = PiperVoice.load(str(model_path))
+    onnx_path, voices_path = ensure_kokoro_model()
+    kokoro = Kokoro(str(onnx_path), str(voices_path))
     
-    import wave
-    # Piper Standard: 22050 Hz, 16-bit (2 bytes), Mono (1 channel)
-    with wave.open(str(output_path), "wb") as wav_file:
-        wav_file.setnchannels(1)
-        wav_file.setsampwidth(2)
-        wav_file.setframerate(voice.config.sample_rate)
-        
-        # Konfiguration für die Synthese erstellen
-        syn_config = SynthesisConfig(
-            length_scale=1.05,
-            noise_scale=0.8
-        )
-        
-        # Wir nutzen die .synthesize() Methode, die AudioChunks liefert.
-        for audio_chunk in voice.synthesize(text, syn_config=syn_config):
-            wav_file.writeframes(audio_chunk.audio_int16_bytes)
-        
+    # Stimmen: 'af_heart' (weiblich, herzlich), 'af_bella' (weiblich, klar), 
+    # 'am_adam' (männlich, tief), 'bm_george' (männlich, britisch)
+    samples, sample_rate = kokoro.create(
+        text,
+        voice="af_heart",
+        speed=1.0,
+        lang="en-us"
+    )
+    
+    sf.write(str(output_path), samples, sample_rate)
     return output_path
 
 
@@ -1425,6 +1425,43 @@ def download_video(video_path: str):
         str(full_path.parent), full_path.name,
         as_attachment=True, mimetype="application/octet-stream",
     )
+
+
+# ---------------------------------------------------------------------------
+# Flask-Routen — Demo & Test
+# ---------------------------------------------------------------------------
+
+@app.route("/api/demo", methods=["POST"])
+def api_demo():
+    """Generiert eine Demo-Audiodatei und Untertitel für den Test."""
+    data = request.get_json(silent=True) or {}
+    text = data.get("text", "This is a demo of the new Kokoro voice. It sounds much more natural and emotional.")
+    
+    demo_id = "demo_" + datetime.utcnow().strftime("%H%M%S")
+    audio_path = TTS_DIR / f"{demo_id}.wav"
+    ass_path   = TTS_DIR / f"{demo_id}.ass"
+    
+    try:
+        # TTS generieren
+        tts_to_file(text, audio_path)
+        
+        # Wortgrenzen für Untertitel (Whisper)
+        word_events = _get_word_boundaries(audio_path, text)
+        ass_content = _build_ass_from_events(word_events, text)
+        with open(ass_path, "w", encoding="utf-8") as f:
+            f.write(ass_content)
+            
+        return jsonify({
+            "audio_url": f"/tts/{audio_path.name}",
+            "ass_content": ass_content,
+            "text": text
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/tts/<filename>")
+def serve_tts(filename: str):
+    return send_from_directory(str(TTS_DIR), filename)
 
 
 # ---------------------------------------------------------------------------
