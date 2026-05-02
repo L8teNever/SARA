@@ -121,6 +121,10 @@
             <div class="story-select-item__meta"><strong>${s.code}</strong> &middot; ${s.total_parts} Teil(e) &middot; ${formatDate(s.created_at)}</div>
           </div>
           ${progressBadge}
+          <button class="md-btn md-btn--icon" style="color:var(--md-sys-color-error);opacity:0.7" 
+            onclick="event.stopPropagation(); deleteStoryFromList(${s.id}, '${escHtml(s.title)}')">
+            <span class="material-symbols-rounded">delete</span>
+          </button>
           <span class="story-code-badge">${s.code}</span>
         `;
         item.addEventListener('click', () => selectStory(s.id, s.title, s.code));
@@ -179,6 +183,24 @@
       loadQueue();
     } catch (e) {
       showSnack('Fehler: ' + e.message, 'error');
+    }
+  }
+
+  async function deleteStoryFromList(storyId, title) {
+    if (!confirm(`Möchtest du die Story "${title}" und alle zugehörigen Daten wirklich löschen?`)) return;
+    try {
+      const res = await fetch(`/api/stories/${storyId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.error) { showSnack(data.error, 'error'); return; }
+      showSnack('Story gelöscht.', 'success');
+      if (selectedStoryId === storyId) {
+        selectedStoryId = null;
+        document.getElementById('btn-create-video').disabled = true;
+        document.getElementById('selected-story-info').textContent = '';
+      }
+      loadStoryList();
+    } catch (e) {
+      showSnack('Fehler beim Löschen: ' + e.message, 'error');
     }
   }
 </script>
