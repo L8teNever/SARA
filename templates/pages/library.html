@@ -179,7 +179,11 @@
             <span class="material-symbols-rounded">${hasYouTube ? 'check' : 'smart_display'}</span>
           </div>
         </div>
-        <span class="material-symbols-rounded" style="color:var(--md-sys-color-on-surface-variant)">chevron_right</span>
+        <button class="md-btn md-btn--icon" style="color:var(--md-sys-color-error);margin-left:8px;" 
+          onclick="event.stopPropagation(); deleteStory(${story.story_id}, '${escHtml(story.title)}')">
+          <span class="material-symbols-rounded">delete</span>
+        </button>
+        <span class="material-symbols-rounded" style="color:var(--md-sys-color-on-surface-variant);margin-left:4px;">chevron_right</span>
       `;
       row.addEventListener('click', () => openLibDetail(story));
       container.appendChild(row);
@@ -193,6 +197,21 @@
     document.getElementById('lib-detail-code').textContent = story.code;
     document.getElementById('lib-detail-title').textContent = story.title;
     document.getElementById('lib-detail-date').textContent = formatDate(story.created_at);
+
+    // Button zum manuellen Abhacken aller Parts
+    const markAllBtn = document.createElement('button');
+    markAllBtn.className = 'md-btn md-btn--outlined md-btn--sm';
+    markAllBtn.style.marginLeft = '12px';
+    markAllBtn.innerHTML = '<span class="material-symbols-rounded">done_all</span> Alle als erledigt markieren';
+    markAllBtn.onclick = () => markAllAsUploaded(story);
+    
+    // Header bereinigen und Buttons einfügen
+    const hdr = document.querySelector('#lib-detail > div:first-child');
+    // Wir löschen nur alte dynamische Buttons falls vorhanden
+    const oldBtn = hdr.querySelector('.mark-all-done-btn');
+    if (oldBtn) oldBtn.remove();
+    markAllBtn.classList.add('mark-all-done-btn');
+    hdr.appendChild(markAllBtn);
 
     const grid = document.getElementById('lib-parts-grid');
     grid.innerHTML = '';
@@ -375,6 +394,47 @@
       }
     } catch (e) {
       showSnack('Fehler beim Löschen: ' + e.message, 'error');
+    }
+  }
+
+  async function deleteStory(storyId, title) {
+    if (!confirm(`Möchtest du die komplette Story "${title}" inklusive ALLER Videos löschen?`)) return;
+    try {
+      const res = await fetch(`/api/stories/${storyId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.error) { showSnack(data.error, 'error'); return; }
+      showSnack('Story wurde komplett gelöscht.', 'success');
+      loadLibrary();
+    } catch (e) {
+      showSnack('Fehler beim Löschen der Story: ' + e.message, 'error');
+    }
+  }
+
+  async function markAllAsUploaded(story) {
+    if (!confirm(`Möchtest du alle Teile der Story "${story.title}" als hochgeladen markieren?`)) return;
+    try {
+      // Wir markieren einfach jeden Teil für alle 3 Plattformen
+      const platforms = ['tiktok', 'instagram', 'youtube'];
+      for (const part of story.parts) {
+        for (const p of platforms) {
+          // Nur wenn noch nicht vorhanden
+          const exists = (part.uploads || []).some(u => u.platform === p);
+          if (!exists) {
+            await fetch('/api/uploads', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ story_part_id: part.id, platform: p })
+            });
+          }
+        }
+      }
+      showSnack('Alle Teile wurden als erledigt markiert.', 'success');
+      await loadLibrary();
+      // Detail wieder öffnen
+      const updatedStory = _libData.find(s => s.story_id === story.story_id);
+      if (updatedStory) openLibDetail(updatedStory);
+    } catch (e) {
+      showSnack('Fehler beim Markieren: ' + e.message, 'error');
     }
   }
 </script>

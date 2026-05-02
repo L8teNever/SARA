@@ -1348,6 +1348,38 @@ def api_delete_video(part_id: int):
     return jsonify({"success": True})
 
 
+@app.route("/api/stories/<int:story_id>", methods=["DELETE"])
+def api_delete_story(story_id: int):
+    """Löscht eine komplette Story inklusive aller Parts und Dateien."""
+    with get_db() as conn:
+        # Alle Parts dieser Story finden
+        parts = conn.execute(
+            "SELECT id, video_path, cover_path FROM story_parts WHERE story_id = ?",
+            (story_id,)
+        ).fetchall()
+        
+        # Dateien löschen
+        for p in parts:
+            for rel_path in [p["video_path"], p["cover_path"]]:
+                if rel_path:
+                    try:
+                        full = BASE_DIR / rel_path
+                        if full.exists():
+                            full.unlink()
+                    except Exception:
+                        pass
+            
+            # Verknüpfte Daten löschen
+            conn.execute("DELETE FROM video_uploads WHERE story_part_id = ?", (p["id"],))
+            conn.execute("DELETE FROM queue WHERE story_part_id = ?", (p["id"],))
+
+        # Story und Parts aus DB löschen
+        conn.execute("DELETE FROM story_parts WHERE story_id = ?", (story_id,))
+        conn.execute("DELETE FROM stories WHERE id = ?", (story_id,))
+        
+    return jsonify({"success": True})
+
+
 @app.route("/video/<path:video_path>")
 def serve_video(video_path: str):
     full_path = BASE_DIR / video_path
