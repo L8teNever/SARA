@@ -1043,7 +1043,17 @@ def api_get_stories():
                 "SELECT COUNT(*) FROM story_parts WHERE story_id = ? AND video_path IS NOT NULL AND video_path != ''",
                 (s['id'],)
             ).fetchone()[0]
+
+            # Zähle Parts in der Warteschlange (pending oder processing)
+            in_queue = conn.execute(
+                """SELECT COUNT(*) FROM story_parts sp 
+                   JOIN queue q ON q.story_part_id = sp.id 
+                   WHERE sp.story_id = ? AND q.status IN ('pending', 'processing')""",
+                (s['id'],)
+            ).fetchone()[0]
+
             row['video_done_parts'] = done
+            row['video_queue_parts'] = in_queue
             result.append(row)
     return jsonify(result)
 

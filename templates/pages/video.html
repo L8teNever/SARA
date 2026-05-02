@@ -119,9 +119,10 @@
         return;
       }
 
-      // Aufteilen: noch nicht vollständig produziert vs. alle Videos fertig
-      const pending  = stories.filter(s => s.video_done_parts < s.total_parts);
+      // Aufteilen der Stories in Kategorien
       const finished = stories.filter(s => s.total_parts > 0 && s.video_done_parts >= s.total_parts);
+      const inQueue  = stories.filter(s => s.video_done_parts < s.total_parts && s.video_queue_parts > 0);
+      const pending  = stories.filter(s => s.video_done_parts < s.total_parts && s.video_queue_parts === 0);
 
       container.innerHTML = '';
 
@@ -132,13 +133,18 @@
           + (dimmed ? ' story-select-item--done' : '');
         item.dataset.id = s.id;
 
-        const progressBadge = dimmed
-          ? `<span class="md-chip" style="font-size:11px;padding:2px 8px;gap:4px">
+        let progressBadge = '';
+        if (dimmed) {
+          progressBadge = `<span class="md-chip" style="font-size:11px;padding:2px 8px;gap:4px">
                <span class="material-symbols-rounded" style="font-size:13px;color:var(--md-sys-color-success)">check_circle</span>Fertig
-             </span>`
-          : (s.video_done_parts > 0
-              ? `<span class="md-chip" style="font-size:11px;padding:2px 8px">${s.video_done_parts}/${s.total_parts} Videos</span>`
-              : '');
+             </span>`;
+        } else if (s.video_queue_parts > 0) {
+          progressBadge = `<span class="md-chip" style="font-size:11px;padding:2px 8px;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container)">
+               <span class="material-symbols-rounded" style="font-size:13px;animation:spin 3s linear infinite;">settings</span>Wartet (${s.video_queue_parts})
+             </span>`;
+        } else if (s.video_done_parts > 0) {
+          progressBadge = `<span class="md-chip" style="font-size:11px;padding:2px 8px">${s.video_done_parts}/${s.total_parts} Videos</span>`;
+        }
 
         item.innerHTML = `
           <div class="story-select-item__radio"></div>
@@ -157,41 +163,55 @@
         return item;
       }
 
-      // Ausstehende Stories
-      if (pending.length) {
-        pending.forEach(s => container.appendChild(renderItem(s, false)));
-      }
-
-      // Separator + abgeschlossene Stories
-      if (finished.length) {
+      function createSeparator(id, label, count, storageKey) {
         const sep = document.createElement('div');
         sep.style.cssText = 'display:flex;align-items:center;gap:8px;margin:14px 0 8px;cursor:pointer;user-select:none;';
+        const isCollapsed = localStorage.getItem(storageKey) === 'true';
+        
         sep.onclick = () => {
-          const c = document.getElementById('finished-stories-container');
-          const i = document.getElementById('finished-stories-icon');
+          const c = document.getElementById(id);
+          const i = sep.querySelector('.md-icon-collapse');
           const isHidden = c.style.display === 'none';
           c.style.display = isHidden ? 'block' : 'none';
           i.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
-          localStorage.setItem('sara_finished_collapsed', !isHidden);
+          localStorage.setItem(storageKey, !isHidden);
         };
-
-        const isCollapsed = localStorage.getItem('sara_finished_collapsed') === 'true';
 
         sep.innerHTML = `
           <div style="flex:1;height:1px;background:var(--md-sys-color-outline-variant)"></div>
           <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);opacity:.7;white-space:nowrap;display:flex;align-items:center;gap:4px;">
-            <span class="material-symbols-rounded" id="finished-stories-icon" style="font-size:16px;transition:transform 0.2s;${isCollapsed ? 'transform:rotate(-90deg)' : ''}">expand_more</span>
-            Bereits produziert (${finished.length})
+            <span class="material-symbols-rounded md-icon-collapse" style="font-size:16px;transition:transform 0.2s;${isCollapsed ? 'transform:rotate(-90deg)' : ''}">expand_more</span>
+            ${label} (${count})
           </span>
           <div style="flex:1;height:1px;background:var(--md-sys-color-outline-variant)"></div>`;
-        container.appendChild(sep);
+        return sep;
+      }
 
+      // 1. Offene Stories
+      if (pending.length) {
+        pending.forEach(s => container.appendChild(renderItem(s, false)));
+      }
+
+      // 2. In Warteschlange
+      if (inQueue.length) {
+        container.appendChild(createSeparator('queue-stories-container', 'In Warteschlange', inQueue.length, 'sara_queue_collapsed'));
+        const qContainer = document.createElement('div');
+        qContainer.id = 'queue-stories-container';
+        qContainer.style.display = (localStorage.getItem('sara_queue_collapsed') === 'true') ? 'none' : 'block';
+        inQueue.forEach(s => qContainer.appendChild(renderItem(s, false)));
+        container.appendChild(qContainer);
+      }
+
+      // 3. Bereits produziert
+      if (finished.length) {
+        container.appendChild(createSeparator('finished-stories-container', 'Bereits produziert', finished.length, 'sara_finished_collapsed'));
         const fContainer = document.createElement('div');
         fContainer.id = 'finished-stories-container';
-        fContainer.style.display = isCollapsed ? 'none' : 'block';
+        fContainer.style.display = (localStorage.getItem('sara_finished_collapsed') === 'true') ? 'none' : 'block';
         finished.forEach(s => fContainer.appendChild(renderItem(s, true)));
         container.appendChild(fContainer);
       }
+
 
       if (pendingSelectStoryId) {
         const s = stories.find(st => st.id === pendingSelectStoryId);
