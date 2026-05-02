@@ -987,7 +987,17 @@ def api_get_stories():
         stories = conn.execute(
             "SELECT id, code, title, total_parts, created_at FROM stories ORDER BY created_at DESC"
         ).fetchall()
-    return jsonify([dict(s) for s in stories])
+        result = []
+        for s in stories:
+            row = dict(s)
+            # Zähle Parts mit abgeschlossenem Video
+            done = conn.execute(
+                "SELECT COUNT(*) FROM story_parts WHERE story_id = ? AND video_path IS NOT NULL AND video_path != ''",
+                (s['id'],)
+            ).fetchone()[0]
+            row['video_done_parts'] = done
+            result.append(row)
+    return jsonify(result)
 
 
 @app.route("/api/stories/<int:story_id>", methods=["GET"])

@@ -60,6 +60,21 @@
   </div>
 </section>
 
+<style>
+  .story-select-item--done {
+    opacity: 0.45;
+    filter: saturate(0.5);
+  }
+  .story-select-item--done:hover {
+    opacity: 0.65;
+    filter: saturate(0.7);
+  }
+  .story-select-item--done.selected {
+    opacity: 0.75;
+    filter: none;
+  }
+</style>
+
 <script>
   // ============================================================
   //  Story-Liste & Video-Erstellung
@@ -77,22 +92,60 @@
         </div>`;
         return;
       }
+
+      // Aufteilen: noch nicht vollständig produziert vs. alle Videos fertig
+      const pending  = stories.filter(s => s.video_done_parts < s.total_parts);
+      const finished = stories.filter(s => s.total_parts > 0 && s.video_done_parts >= s.total_parts);
+
       container.innerHTML = '';
-      stories.forEach(s => {
+
+      function renderItem(s, dimmed) {
         const item = document.createElement('div');
-        item.className = 'story-select-item' + (s.id === selectedStoryId ? ' selected' : '');
+        item.className = 'story-select-item'
+          + (s.id === selectedStoryId ? ' selected' : '')
+          + (dimmed ? ' story-select-item--done' : '');
         item.dataset.id = s.id;
+
+        const progressBadge = dimmed
+          ? `<span class="md-chip" style="font-size:11px;padding:2px 8px;gap:4px">
+               <span class="material-symbols-rounded" style="font-size:13px;color:var(--md-sys-color-success)">check_circle</span>Fertig
+             </span>`
+          : (s.video_done_parts > 0
+              ? `<span class="md-chip" style="font-size:11px;padding:2px 8px">${s.video_done_parts}/${s.total_parts} Videos</span>`
+              : '');
+
         item.innerHTML = `
           <div class="story-select-item__radio"></div>
           <div class="story-select-item__info">
             <div class="story-select-item__title">${escHtml(s.title)}</div>
-            <div class="story-select-item__meta"><strong>${s.code}</strong> · ${s.total_parts} Teil(e) · ${formatDate(s.created_at)}</div>
+            <div class="story-select-item__meta"><strong>${s.code}</strong> &middot; ${s.total_parts} Teil(e) &middot; ${formatDate(s.created_at)}</div>
           </div>
+          ${progressBadge}
           <span class="story-code-badge">${s.code}</span>
         `;
         item.addEventListener('click', () => selectStory(s.id, s.title, s.code));
-        container.appendChild(item);
-      });
+        return item;
+      }
+
+      // Ausstehende Stories
+      if (pending.length) {
+        pending.forEach(s => container.appendChild(renderItem(s, false)));
+      }
+
+      // Separator + abgeschlossene Stories
+      if (finished.length) {
+        const sep = document.createElement('div');
+        sep.style.cssText = 'display:flex;align-items:center;gap:8px;margin:14px 0 8px;';
+        sep.innerHTML = `
+          <div style="flex:1;height:1px;background:var(--md-sys-color-outline-variant)"></div>
+          <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);opacity:.5;white-space:nowrap">
+            <span class="material-symbols-rounded" style="font-size:13px;vertical-align:middle;margin-right:3px">check_circle</span>Bereits produziert
+          </span>
+          <div style="flex:1;height:1px;background:var(--md-sys-color-outline-variant)"></div>`;
+        container.appendChild(sep);
+        finished.forEach(s => container.appendChild(renderItem(s, true)));
+      }
+
       if (pendingSelectStoryId) {
         const s = stories.find(st => st.id === pendingSelectStoryId);
         if (s) selectStory(s.id, s.title, s.code);

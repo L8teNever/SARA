@@ -1,125 +1,285 @@
 <!-- ============================================================ TAB 3: Bibliothek ============================================================ -->
 <section class="tab-content" id="tab-library">
-  <div class="page-header">
-    <div class="page-header__eyebrow"><span class="material-symbols-rounded">video_library</span> Ausgabe</div>
-    <h1 class="page-header__title">Meine Videos</h1>
-    <p class="page-header__sub">Alle fertigen Videos. Klicke auf TikTok / Instagram zum Abhaken. Social-Daten kopieren mit einem Klick.</p>
-  </div>
 
-  <div id="library-container">
-    <div class="empty-state">
-      <div class="empty-state__icon"><span class="material-symbols-rounded">videocam_off</span></div>
-      <div class="empty-state__text">Noch keine Videos vorhanden</div>
-      <div class="empty-state__hint">Erstelle Videos über den "Video erstellen"-Tab</div>
+  <!-- ─── Story-Übersicht (Listenansicht) ─── -->
+  <div id="lib-overview">
+    <div class="page-header">
+      <div class="page-header__eyebrow"><span class="material-symbols-rounded">video_library</span> Ausgabe</div>
+      <h1 class="page-header__title">Meine Stories</h1>
+      <p class="page-header__sub">Klicke auf eine Story um alle Teile und Videos zu sehen.</p>
+    </div>
+
+    <!-- Suchleiste + Filter -->
+    <div class="md-card md-card--elevated" style="margin-bottom:18px;padding:14px 18px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <div style="position:relative;flex:1;min-width:200px;">
+          <span class="material-symbols-rounded" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--md-sys-color-on-surface-variant);pointer-events:none">search</span>
+          <input class="md-input" id="lib-search" type="text" placeholder="Story suchen…" oninput="filterLibrary()"
+            style="padding-left:40px;min-height:38px;font-size:14px;" />
+        </div>
+        <div class="chip-row" id="lib-filter-chips" style="margin:0;gap:6px;">
+          <button class="md-chip lib-filter-chip lib-filter-chip--active" data-filter="all" onclick="setLibFilter('all',this)">
+            <span class="material-symbols-rounded">layers</span> Alle
+          </button>
+          <button class="md-chip lib-filter-chip" data-filter="no-tiktok" onclick="setLibFilter('no-tiktok',this)">
+            <span class="material-symbols-rounded">play_circle</span> Kein TikTok
+          </button>
+          <button class="md-chip lib-filter-chip" data-filter="no-instagram" onclick="setLibFilter('no-instagram',this)">
+            <span class="material-symbols-rounded">photo_camera</span> Kein Instagram
+          </button>
+          <button class="md-chip lib-filter-chip" data-filter="no-youtube" onclick="setLibFilter('no-youtube',this)">
+            <span class="material-symbols-rounded">smart_display</span> Kein YouTube
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="lib-story-list">
+      <div class="empty-state">
+        <div class="empty-state__icon"><span class="material-symbols-rounded">videocam_off</span></div>
+        <div class="empty-state__text">Noch keine Videos vorhanden</div>
+        <div class="empty-state__hint">Erstelle Videos über den "Video erstellen"-Tab</div>
+      </div>
     </div>
   </div>
+
+  <!-- ─── Story-Detailansicht (Parts) ─── -->
+  <div id="lib-detail" style="display:none;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+      <button class="md-btn md-btn--tonal md-btn--sm" onclick="closeLibDetail()" id="lib-back-btn">
+        <span class="material-symbols-rounded">arrow_back</span> Zurück
+      </button>
+      <span class="story-code-badge" id="lib-detail-code"></span>
+      <span style="font-weight:600;font-size:17px;" id="lib-detail-title"></span>
+      <span class="text-muted" id="lib-detail-date" style="margin-left:auto;"></span>
+    </div>
+    <div id="lib-parts-grid" class="lib-grid"></div>
+  </div>
+
 </section>
+
+<style>
+  .lib-filter-chip { cursor: pointer; transition: background .15s, color .15s; }
+  .lib-filter-chip--active { background: var(--md-sys-color-primary-container) !important; border-color: transparent !important; color: var(--md-sys-color-on-primary-container) !important; }
+
+  .lib-story-row {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--md-sys-color-surface-container-high);
+    border-radius: var(--md-shape-large);
+    padding: 14px 18px; margin-bottom: 8px;
+    cursor: pointer; border: 1.5px solid transparent;
+    transition: border-color .15s, background .15s;
+  }
+  .lib-story-row:hover { border-color: var(--md-sys-color-primary-container); background: var(--md-sys-color-surface-container-highest); }
+  .lib-story-row__num {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  .lib-story-row__info { flex: 1; min-width: 0; }
+  .lib-story-row__title { font-weight: 500; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lib-story-row__meta { font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-top: 2px; }
+  .lib-upload-badges { display: flex; gap: 5px; flex-shrink: 0; }
+  .lib-upload-dot {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--md-sys-color-surface-container-highest);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .lib-upload-dot--done { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+</style>
 
 <script>
   // ============================================================
-  //  Bibliothek
+  //  Bibliothek — Daten & State
   // ============================================================
+  let _libData = [];       // Alle Stories mit Parts
+  let _libFilter = 'all';  // Aktiver Filter
+
   async function loadLibrary() {
-    const container = document.getElementById('library-container');
+    const container = document.getElementById('lib-story-list');
     container.innerHTML = '<div class="spinner" style="margin:40px auto"></div>';
     try {
       const data = await fetch('/api/videos').then(r => r.json());
-      if (!data.length) {
-        container.innerHTML = `<div class="empty-state">
-          <div class="empty-state__icon"><span class="material-symbols-rounded">videocam_off</span></div>
-          <div class="empty-state__text">Noch keine Videos vorhanden</div>
-        </div>`;
-        return;
-      }
-      container.innerHTML = '';
-      data.forEach(story => {
-        const section = document.createElement('div');
-        section.className = 'library-story';
-        section.innerHTML = `
-          <div class="library-story__hdr">
-            <span class="story-code-badge">${story.code}</span>
-            <span style="font-weight:600;font-size:15px">${escHtml(story.title)}</span>
-            <span class="text-muted">${formatDate(story.created_at)}</span>
-          </div>
-          <div class="lib-grid" id="lib-parts-${story.story_id}"></div>
-        `;
-        container.appendChild(section);
-        const grid = document.getElementById('lib-parts-' + story.story_id);
-
-        story.parts.forEach(part => {
-          const card = document.createElement('div');
-          card.className = 'lib-card';
-          card.id = 'lib-card-' + part.id;
-
-          const coverHtml = part.cover_path
-            ? `<img class="lib-cover" src="/covers/${part.cover_path.split('/').pop()}" alt="Cover" loading="lazy" />`
-            : '';
-
-          const social = part.social || {};
-          const socialHtml = (social.video_title || social.hashtags) ? `
-            <div class="lib-social">
-              ${social.video_title ? `<div class="lib-social__title">${escHtml(social.video_title)}</div>` : ''}
-              ${social.description ? `<div class="lib-social__desc">${escHtml(social.description)}</div>` : ''}
-              ${social.hashtags ? `<div class="lib-social__tags">${escHtml(social.hashtags)}</div>` : ''}
-              <button class="lib-copy-btn" onclick="copySocialData(${part.id})">
-                <span class="material-symbols-rounded">content_copy</span> Caption kopieren
-              </button>
-            </div>
-          ` : '';
-
-          card.innerHTML = `
-            <div class="lib-card__thumb">
-              ${coverHtml}
-              <video src="/video/${part.video_path}" preload="metadata" muted
-                style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s"></video>
-              <div class="lib-card__play">
-                <span class="material-symbols-rounded">play_circle</span>
-              </div>
-            </div>
-            <div class="lib-card__body">
-              <div class="lib-card__part">Teil ${part.part_number}</div>
-              ${socialHtml}
-              <div class="lib-platforms" id="platforms-${part.id}"></div>
-              <div class="lib-card__actions">
-                <button class="md-btn md-btn--tonal md-btn--sm"
-                  onclick="openVideoModal('/video/${part.video_path}','${escHtml(story.title)} — Teil ${part.part_number}')">
-                  <span class="material-symbols-rounded" style="font-size:15px">play_arrow</span> Play
-                </button>
-                <a class="md-btn md-btn--outlined md-btn--sm" href="/download/${part.video_path}" download>
-                  <span class="material-symbols-rounded" style="font-size:15px">download</span>
-                </a>
-              </div>
-            </div>
-          `;
-
-          const vidEl = card.querySelector('video');
-          card.addEventListener('mouseenter', () => { vidEl.style.opacity = '1'; vidEl.play().catch(() => { }); });
-          card.addEventListener('mouseleave', () => { vidEl.style.opacity = '0'; vidEl.pause(); vidEl.currentTime = 0; });
-
-          card.querySelector('.lib-card__play').addEventListener('click', () =>
-            openVideoModal('/video/' + part.video_path, story.title + ' — Teil ' + part.part_number)
-          );
-
-          grid.appendChild(card);
-          renderPlatformChips(part.id, part.uploads || []);
-          card.dataset.social = JSON.stringify(social);
-        });
-      });
+      _libData = data;
+      renderLibraryList();
     } catch (e) {
       container.innerHTML = `<div class="text-muted">Fehler: ${e.message}</div>`;
     }
   }
 
+  // ─── Filter & Suche ─────────────────────────────────────────
+  function setLibFilter(filter, el) {
+    _libFilter = filter;
+    document.querySelectorAll('.lib-filter-chip').forEach(c => c.classList.remove('lib-filter-chip--active'));
+    el.classList.add('lib-filter-chip--active');
+    renderLibraryList();
+  }
+
+  function filterLibrary() { renderLibraryList(); }
+
+  function _storyMatchesFilter(story) {
+    if (_libFilter === 'all') return true;
+    // Prüfen ob mindestens ein Part die Bedingung erfüllt
+    return story.parts.some(part => {
+      const uploads = part.uploads || [];
+      if (_libFilter === 'no-tiktok')    return !uploads.find(u => u.platform === 'tiktok');
+      if (_libFilter === 'no-instagram') return !uploads.find(u => u.platform === 'instagram');
+      if (_libFilter === 'no-youtube')   return !uploads.find(u => u.platform === 'youtube');
+      return true;
+    });
+  }
+
+  // ─── Story-Übersicht rendern ─────────────────────────────────
+  function renderLibraryList() {
+    const container = document.getElementById('lib-story-list');
+    const q = (document.getElementById('lib-search').value || '').toLowerCase().trim();
+
+    const filtered = _libData.filter(story => {
+      const matchText = !q || story.title.toLowerCase().includes(q) || story.code.toLowerCase().includes(q);
+      return matchText && _storyMatchesFilter(story);
+    });
+
+    if (!filtered.length) {
+      container.innerHTML = `<div class="empty-state" style="padding:40px 0">
+        <div class="empty-state__icon"><span class="material-symbols-rounded">search_off</span></div>
+        <div class="empty-state__text">${_libData.length ? 'Keine Treffer' : 'Noch keine Videos vorhanden'}</div>
+      </div>`;
+      return;
+    }
+
+    container.innerHTML = '';
+    filtered.forEach((story, idx) => {
+      const allUploads = story.parts.flatMap(p => p.uploads || []);
+      const hasTikTok    = allUploads.some(u => u.platform === 'tiktok');
+      const hasInstagram = allUploads.some(u => u.platform === 'instagram');
+      const hasYouTube   = allUploads.some(u => u.platform === 'youtube');
+
+      const row = document.createElement('div');
+      row.className = 'lib-story-row';
+      row.innerHTML = `
+        <div class="lib-story-row__num">${idx + 1}</div>
+        <div class="lib-story-row__info">
+          <div class="lib-story-row__title">${escHtml(story.title)}</div>
+          <div class="lib-story-row__meta">
+            <span class="story-code-badge" style="font-size:10px;padding:1px 7px;">${story.code}</span>
+            &nbsp;${story.parts.length} Teil(e) · ${formatDate(story.created_at)}
+          </div>
+        </div>
+        <div class="lib-upload-badges">
+          <div class="lib-upload-dot ${hasTikTok ? 'lib-upload-dot--done' : ''}" title="TikTok">
+            <span class="material-symbols-rounded">${hasTikTok ? 'check' : 'play_circle'}</span>
+          </div>
+          <div class="lib-upload-dot ${hasInstagram ? 'lib-upload-dot--done' : ''}" title="Instagram">
+            <span class="material-symbols-rounded">${hasInstagram ? 'check' : 'photo_camera'}</span>
+          </div>
+          <div class="lib-upload-dot ${hasYouTube ? 'lib-upload-dot--done' : ''}" title="YouTube">
+            <span class="material-symbols-rounded">${hasYouTube ? 'check' : 'smart_display'}</span>
+          </div>
+        </div>
+        <span class="material-symbols-rounded" style="color:var(--md-sys-color-on-surface-variant)">chevron_right</span>
+      `;
+      row.addEventListener('click', () => openLibDetail(story));
+      container.appendChild(row);
+    });
+  }
+
+  // ─── Detail-Ansicht öffnen ───────────────────────────────────
+  function openLibDetail(story) {
+    document.getElementById('lib-overview').style.display = 'none';
+    document.getElementById('lib-detail').style.display = 'block';
+    document.getElementById('lib-detail-code').textContent = story.code;
+    document.getElementById('lib-detail-title').textContent = story.title;
+    document.getElementById('lib-detail-date').textContent = formatDate(story.created_at);
+
+    const grid = document.getElementById('lib-parts-grid');
+    grid.innerHTML = '';
+
+    story.parts.forEach(part => {
+      const card = document.createElement('div');
+      card.className = 'lib-card';
+      card.id = 'lib-card-' + part.id;
+
+      const coverHtml = part.cover_path
+        ? `<img class="lib-cover" src="/covers/${part.cover_path.split('/').pop()}" alt="Cover" loading="lazy" />`
+        : '';
+
+      const social = part.social || {};
+      const socialHtml = (social.video_title || social.hashtags) ? `
+        <div class="lib-social">
+          ${social.video_title ? `<div class="lib-social__title">${escHtml(social.video_title)}</div>` : ''}
+          ${social.description ? `<div class="lib-social__desc">${escHtml(social.description)}</div>` : ''}
+          ${social.hashtags ? `<div class="lib-social__tags">${escHtml(social.hashtags)}</div>` : ''}
+          <button class="lib-copy-btn" onclick="copySocialData(${part.id})">
+            <span class="material-symbols-rounded">content_copy</span> Caption kopieren
+          </button>
+        </div>
+      ` : '';
+
+      // Cover-Download Button
+      const coverDownloadHtml = part.cover_path
+        ? `<a class="md-btn md-btn--outlined md-btn--sm" href="/covers/${part.cover_path.split('/').pop()}" download
+              title="Cover herunterladen">
+             <span class="material-symbols-rounded" style="font-size:15px">image</span>
+           </a>`
+        : '';
+
+      card.innerHTML = `
+        <div class="lib-card__thumb">
+          ${coverHtml}
+          <video src="/video/${part.video_path}" preload="metadata" muted
+            style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s"></video>
+          <div class="lib-card__play">
+            <span class="material-symbols-rounded">play_circle</span>
+          </div>
+        </div>
+        <div class="lib-card__body">
+          <div class="lib-card__part">Teil ${part.part_number}</div>
+          ${socialHtml}
+          <div class="lib-platforms" id="platforms-${part.id}"></div>
+          <div class="lib-card__actions">
+            <button class="md-btn md-btn--tonal md-btn--sm"
+              onclick="openVideoModal('/video/${part.video_path}','${escHtml(story.title)} — Teil ${part.part_number}')">
+              <span class="material-symbols-rounded" style="font-size:15px">play_arrow</span> Play
+            </button>
+            <a class="md-btn md-btn--outlined md-btn--sm" href="/download/${part.video_path}" download
+               title="Video herunterladen">
+              <span class="material-symbols-rounded" style="font-size:15px">download</span>
+            </a>
+            ${coverDownloadHtml}
+          </div>
+        </div>
+      `;
+
+      const vidEl = card.querySelector('video');
+      card.addEventListener('mouseenter', () => { vidEl.style.opacity = '1'; vidEl.play().catch(() => {}); });
+      card.addEventListener('mouseleave', () => { vidEl.style.opacity = '0'; vidEl.pause(); vidEl.currentTime = 0; });
+      card.querySelector('.lib-card__play').addEventListener('click', () =>
+        openVideoModal('/video/' + part.video_path, story.title + ' — Teil ' + part.part_number)
+      );
+
+      grid.appendChild(card);
+      renderPlatformChips(part.id, part.uploads || []);
+      card.dataset.social = JSON.stringify(social);
+    });
+  }
+
+  function closeLibDetail() {
+    document.getElementById('lib-detail').style.display = 'none';
+    document.getElementById('lib-overview').style.display = 'block';
+  }
+
+  // ─── Platform-Chips ──────────────────────────────────────────
   function renderPlatformChips(partId, uploads) {
     const container = document.getElementById('platforms-' + partId);
     if (!container) return;
-
     const platforms = [
-      { id: 'tiktok',    label: 'TikTok',     icon: 'play_circle' },
-      { id: 'instagram', label: 'Instagram',   icon: 'photo_camera' },
-      { id: 'youtube',   label: 'YouTube',     icon: 'smart_display' },
+      { id: 'tiktok',    label: 'TikTok',    icon: 'play_circle' },
+      { id: 'instagram', label: 'Instagram', icon: 'photo_camera' },
+      { id: 'youtube',   label: 'YouTube',   icon: 'smart_display' },
     ];
-
     container.innerHTML = '';
     platforms.forEach(p => {
       const existing = uploads.find(u => u.platform === p.id);
@@ -152,11 +312,13 @@
         if (data.error) { showSnack(data.error, 'error'); return; }
         showSnack(`Als ${platform} hochgeladen markiert!`, 'success');
       }
-      const res = await fetch('/api/videos');
-      const videos = await res.json();
-      for (const story of videos) {
+      // Reload und Detail wieder öffnen
+      await loadLibrary();
+      // Aktualisierte Chips rendern (Detail bleibt offen)
+      const story = _libData.find(s => s.parts.some(p => p.id === partId));
+      if (story) {
         const part = story.parts.find(p => p.id === partId);
-        if (part) { renderPlatformChips(partId, part.uploads || []); break; }
+        if (part) renderPlatformChips(partId, part.uploads || []);
       }
     } catch (e) {
       showSnack('Fehler: ' + e.message, 'error');
@@ -167,7 +329,7 @@
     const card = document.getElementById('lib-card-' + partId);
     if (!card) return;
     let social = {};
-    try { social = JSON.parse(card.dataset.social || '{}'); } catch (_) { }
+    try { social = JSON.parse(card.dataset.social || '{}'); } catch (_) {}
     const text = [social.video_title, '', social.description, '', social.hashtags].filter(x => x != null).join('\n').trim();
     navigator.clipboard.writeText(text).catch(() => {
       const ta = document.createElement('textarea');
