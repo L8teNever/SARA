@@ -162,7 +162,7 @@
       row.innerHTML = `
         <div class="lib-story-row__num">${idx + 1}</div>
         <div class="lib-story-row__info">
-          <div class="lib-story-row__title">${escHtml(story.title)}</div>
+          <div class="lib-story-row__title">${idx + 1}. ${escHtml(story.title)}</div>
           <div class="lib-story-row__meta">
             <span class="story-code-badge" style="font-size:10px;padding:1px 7px;">${story.code}</span>
             &nbsp;${story.parts.length} Teil(e) · ${formatDate(story.created_at)}
@@ -249,6 +249,10 @@
               <span class="material-symbols-rounded" style="font-size:15px">download</span>
             </a>
             ${coverDownloadHtml}
+            <button class="md-btn md-btn--outlined md-btn--sm" style="color:var(--md-sys-color-error);border-color:var(--md-sys-color-error)"
+              onclick="deleteVideo(${part.id})">
+              <span class="material-symbols-rounded" style="font-size:15px">delete</span>
+            </button>
           </div>
         </div>
       `;
@@ -349,5 +353,28 @@
     document.getElementById('video-modal').classList.remove('open');
     const vid = document.getElementById('modal-video');
     vid.pause(); vid.src = '';
+  }
+
+  async function deleteVideo(partId) {
+    if (!confirm('Möchtest du dieses Video wirklich löschen? Die Dateien werden vom Server entfernt.')) return;
+    try {
+      const res = await fetch(`/api/videos/${partId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.error) { showSnack(data.error, 'error'); return; }
+      showSnack('Video erfolgreich gelöscht.', 'success');
+      
+      // Story-Detail aktualisieren
+      await loadLibrary();
+      const story = _libData.find(s => s.parts.some(p => p.id === partId));
+      if (story && story.parts.length > 1) {
+        // Wenn noch andere Parts da sind, Detail offen lassen
+        openLibDetail(story);
+      } else {
+        // Sonst zurück zur Übersicht
+        closeLibDetail();
+      }
+    } catch (e) {
+      showSnack('Fehler beim Löschen: ' + e.message, 'error');
+    }
   }
 </script>

@@ -1303,6 +1303,38 @@ def api_get_videos():
     return jsonify(list(grouped.values()))
 
 
+@app.route("/api/videos/<int:part_id>", methods=["DELETE"])
+def api_delete_video(part_id: int):
+    """Löscht ein Video (Datei + Cover + Queue + Uploads) aus dem System."""
+    with get_db() as conn:
+        part = conn.execute(
+            "SELECT video_path, cover_path FROM story_parts WHERE id = ?",
+            (part_id,)
+        ).fetchone()
+        if not part:
+            return jsonify({"error": "Teil nicht gefunden"}), 404
+
+        # Datei vom Datenträger löschen
+        for rel_path in [part["video_path"], part["cover_path"]]:
+            if rel_path:
+                try:
+                    full = BASE_DIR / rel_path
+                    if full.exists():
+                        full.unlink()
+                except Exception:
+                    pass
+
+        # DB zurücksetzen
+        conn.execute(
+            "UPDATE story_parts SET video_path = NULL, cover_path = NULL, status = 'pending' WHERE id = ?",
+            (part_id,)
+        )
+        conn.execute("DELETE FROM video_uploads WHERE story_part_id = ?", (part_id,))
+        conn.execute("DELETE FROM queue WHERE story_part_id = ? AND status IN ('done', 'error')", (part_id,))
+
+    return jsonify({"success": True})
+
+
 @app.route("/video/<path:video_path>")
 def serve_video(video_path: str):
     full_path = BASE_DIR / video_path
