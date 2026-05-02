@@ -320,6 +320,7 @@ def tts_to_file(text: str, output_path: Path) -> Path:
     """
     try:
         from piper.voice import PiperVoice
+        from piper.config import SynthesisConfig
     except ImportError:
         raise RuntimeError("Bitte 'pip install piper-tts' ausführen.")
         
@@ -333,15 +334,15 @@ def tts_to_file(text: str, output_path: Path) -> Path:
         wav_file.setsampwidth(2)
         wav_file.setframerate(voice.config.sample_rate)
         
-        # Wir nutzen die .synthesize() Methode, die ein Generator für Audio-Chunks ist.
-        # Damit funktionieren die Parameter length_scale, noise_scale etc. zuverlässig.
-        for audio_bytes in voice.synthesize(
-            text,
+        # Konfiguration für die Synthese erstellen
+        syn_config = SynthesisConfig(
             length_scale=1.05,
-            noise_scale=0.8,
-            sentence_silence=0.3
-        ):
-            wav_file.writeframes(audio_bytes)
+            noise_scale=0.8
+        )
+        
+        # Wir nutzen die .synthesize() Methode, die AudioChunks liefert.
+        for audio_chunk in voice.synthesize(text, syn_config=syn_config):
+            wav_file.writeframes(audio_chunk.audio_int16_bytes)
         
     return output_path
 
