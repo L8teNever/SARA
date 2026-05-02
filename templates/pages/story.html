@@ -2,253 +2,209 @@
 <section class="tab-content active" id="tab-story">
   <div class="page-header">
     <div class="page-header__eyebrow">
-      <span class="material-symbols-rounded">auto_awesome</span> KI-gesteuert
+      <span class="material-symbols-rounded">lightbulb</span> Story erstellen
     </div>
-    <h1 class="page-header__title">Story generieren</h1>
-    <p class="page-header__sub">Beschreibe ein Thema — SARA erfindet eine Reddit-Story mit Claude AI.</p>
+    <h1 class="page-header__title">Story erstellen</h1>
+    <p class="page-header__sub">Generiere mit ChatGPT, Gemini oder Claude.ai eine Story — oder importiere direkt das JSON.</p>
   </div>
 
-  <!-- API-Key Einstellungen (nur sichtbar wenn kein Server-Key gesetzt) -->
-  <div class="md-card md-card--elevated" id="api-key-card" style="display:none">
-    <div class="card-hdr">
-      <div class="card-hdr__icon" style="background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)">
-        <span class="material-symbols-rounded">key</span>
-      </div>
-      <div class="card-hdr__text">
-        <div class="card-title">Anthropic API-Key</div>
-        <div class="card-subtitle">Wird nur lokal im Browser gespeichert — nie zum Server übertragen (außer für KI-Anfragen).</div>
-      </div>
-    </div>
-    <div class="md-field">
-      <label for="api-key-input">API-Key</label>
-      <div class="input-row">
-        <input type="password" id="api-key-input" class="md-input"
-          placeholder="sk-ant-api03-..." autocomplete="off" />
-        <button class="md-btn md-btn--tonal" onclick="saveApiKey()">
-          <span class="material-symbols-rounded">save</span> Speichern
-        </button>
-      </div>
-    </div>
-    <div id="api-key-status" class="text-muted" style="font-size:12px;margin-top:-8px"></div>
-  </div>
+  <div class="prompt-grid">
+    <!-- Linke Spalte: Prompt kopieren -->
+    <div>
+      <div class="md-card md-card--elevated">
+        <div class="card-hdr">
+          <div class="card-hdr__icon"><span class="material-symbols-rounded">content_copy</span></div>
+          <div class="card-hdr__text">
+            <div class="card-title">Fertiger Prompt</div>
+            <div class="card-subtitle">Kopieren → in ChatGPT / Gemini / Claude.ai einfügen. Letzten Satz mit deinem Thema ersetzen.</div>
+          </div>
+          <button class="md-btn md-btn--filled" id="btn-copy-full" onclick="copyFullPrompt()">
+            <span class="material-symbols-rounded">content_copy</span> Kopieren
+          </button>
+        </div>
 
-  <div class="md-card md-card--elevated">
-    <div class="card-hdr">
-      <div class="card-hdr__icon"><span class="material-symbols-rounded">edit_note</span></div>
-      <div class="card-hdr__text">
-        <div class="card-title">Neues Thema eingeben</div>
-        <div class="card-subtitle">Claude AI · min. 75 Sek. pro Teil · Social-Daten inklusive</div>
+        <textarea id="prompt-template-ta" class="md-textarea"
+          style="font-family:'Courier New',monospace;font-size:12.5px;min-height:480px;line-height:1.6"
+          spellcheck="false"></textarea>
+
+        <div class="btn-row" style="margin-top:12px">
+          <button class="md-btn md-btn--tonal" onclick="copyFullPrompt()">
+            <span class="material-symbols-rounded">content_copy</span> Kopieren
+          </button>
+          <button class="md-btn md-btn--outlined" onclick="resetPromptTemplate()">
+            <span class="material-symbols-rounded">restart_alt</span> Zurücksetzen
+          </button>
+          <span class="text-muted" id="copy-confirm" style="font-size:12px"></span>
+        </div>
       </div>
     </div>
 
-    <div class="md-field">
-      <label for="story-prompt">AI-Prompt</label>
-      <div class="input-row">
-        <input type="text" id="story-prompt" class="md-input"
-          placeholder="z.B. 'betrayal at a family reunion' oder 'revenge on a cheating partner'" />
-        <button class="md-btn md-btn--filled" id="btn-generate" onclick="generateStory()">
-          <span class="material-symbols-rounded">auto_awesome</span> Generieren
-        </button>
-        <div id="generate-spinner" class="spinner hidden"></div>
+    <!-- Rechte Spalte: JSON importieren -->
+    <div>
+      <div class="md-card md-card--elevated">
+        <div class="card-hdr">
+          <div class="card-hdr__icon" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)">
+            <span class="material-symbols-rounded">download</span>
+          </div>
+          <div class="card-hdr__text">
+            <div class="card-title">Antwort importieren</div>
+            <div class="card-subtitle">JSON-Antwort der KI einfügen — SARA speichert die Story automatisch.</div>
+          </div>
+        </div>
+
+        <div class="md-field">
+          <label for="import-json">JSON-Antwort einfügen</label>
+          <textarea id="import-json" class="md-textarea"
+            style="min-height:300px;font-family:'Courier New',monospace;font-size:12.5px"
+            placeholder='{
+  "title": "The Betrayal",
+  "total_parts": 2,
+  "keywords": ["betrayal","trust",...],
+  "parts": [
+    {
+      "part_number": 1,
+      "text": "...",
+      "cliffhanger_hint": "...",
+      "social": {
+        "video_title": "...",
+        "description": "...",
+        "hashtags": "#storytime ..."
+      }
+    }
+  ]
+}'></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="md-btn md-btn--success" onclick="importStory()">
+            <span class="material-symbols-rounded">check_circle</span> Story importieren
+          </button>
+          <button class="md-btn md-btn--outlined" onclick="clearImport()">
+            <span class="material-symbols-rounded">delete_sweep</span> Leeren
+          </button>
+        </div>
+
+        <div id="import-result" class="import-result" style="margin-top:12px">
+          <div class="import-result__title" id="import-result-title"></div>
+          <div class="import-result__body" id="import-result-body"></div>
+          <div class="btn-row" style="margin-top:10px" id="import-result-actions"></div>
+        </div>
       </div>
-    </div>
-
-    <div class="btn-row">
-      <button class="md-btn md-btn--outlined" onclick="switchTab('prompt')">
-        <span class="material-symbols-rounded">lightbulb</span> Ohne API-Key →
-      </button>
-    </div>
-  </div>
-
-  <div id="duplicate-banner" class="duplicate-banner hidden">
-    <span class="duplicate-banner__icon material-symbols-rounded">warning</span>
-    <div class="duplicate-banner__text">
-      <div class="duplicate-banner__title">Ähnliche Story gefunden</div>
-      <div id="duplicate-msg"></div>
-    </div>
-  </div>
-
-  <div class="md-card" id="story-preview-card">
-    <div class="story-meta" id="story-meta-row"></div>
-    <div id="story-parts-container"></div>
-    <div class="md-divider"></div>
-    <div class="section-title"><span class="material-symbols-rounded">label</span>Keywords</div>
-    <div class="chip-row" id="keywords-chips"></div>
-    <div class="md-divider"></div>
-    <div class="btn-row" id="save-actions">
-      <button class="md-btn md-btn--filled" id="btn-save" onclick="saveStory()">
-        <span class="material-symbols-rounded">save</span> Story speichern
-      </button>
-      <button class="md-btn md-btn--outlined" onclick="generateStory()">
-        <span class="material-symbols-rounded">refresh</span> Neu generieren
-      </button>
-      <div id="save-spinner" class="spinner hidden"></div>
     </div>
   </div>
 </section>
 
 <script>
   // ============================================================
-  //  API-Key Verwaltung
+  //  Prompt-Builder
   // ============================================================
-  function getStoredApiKey() {
-    return localStorage.getItem('sara_api_key') || '';
+  const SARA_DEFAULT_PROMPT =
+`You are a creative storyteller specializing in Reddit-style personal stories for TikTok/Reels.
+Generate compelling, emotional, and suspenseful stories that feel authentic and real.
+Stories must be written in English and follow this EXACT JSON format — no text before or after:
+{
+  "title": "Story Title",
+  "total_parts": <number>,
+  "keywords": ["word1","word2","word3","word4","word5","word6","word7","word8","word9","word10"],
+  "parts": [
+    {
+      "part_number": 1,
+      "text": "Text of part 1 — MUST be 160 to 200 words...",
+      "cliffhanger_hint": "brief hint of what comes next",
+      "social": {
+        "video_title": "Catchy TikTok/Reels title with Part 1/2 — max 80 chars",
+        "description": "2-3 sentence caption that teases the story emotionally without spoiling it. End with a question or call-to-action.",
+        "hashtags": "#storytime #reddit #viral #relationship #foryou #fyp #drama"
+      }
+    },
+    {
+      "part_number": 2,
+      "text": "Text of part 2 — MUST be 160 to 200 words...",
+      "cliffhanger_hint": "",
+      "social": {
+        "video_title": "Catchy TikTok/Reels title with Part 2/2 — max 80 chars",
+        "description": "2-3 sentence caption that teases the conclusion. End with a question or call-to-action.",
+        "hashtags": "#storytime #reddit #viral #relationship #foryou #fyp #drama"
+      }
+    }
+  ]
+}
+
+Rules:
+- Each part MUST contain exactly 160–200 words (this guarantees at least 75 seconds of audio per part)
+- Split the story so each part has 160–200 words; never fewer than 160 words per part
+- Each part (except the last) MUST end at the most dramatic, suspenseful cliffhanger possible
+- For 2-part stories: Part 1 MUST end at the single most gripping moment — the listener MUST feel compelled to watch Part 2 immediately
+- Last part always has empty string for cliffhanger_hint
+- keywords: exactly 10 English keywords describing the core story content
+- Write in first person, past tense, raw and emotional style (like r/TIFU or r/relationships)
+- Hook the audience within the very first sentence — no slow build-ups
+- social.video_title: punchy and attention-grabbing, include "Part X/Y" for multi-part, max 80 chars
+- social.description: emotionally tease the story, never spoil the ending, end with a question or CTA
+- social.hashtags: 6–8 relevant hashtags as a single space-separated string
+
+Create a story about: [THEMA HIER EINTRAGEN — z.B. "a woman who discovers her husband has a secret family" — oder Zeile so lassen für eine zufällige Story]`;
+
+  function initPromptTemplate() {
+    const ta = document.getElementById('prompt-template-ta');
+    if (ta && !ta.value) ta.value = SARA_DEFAULT_PROMPT;
   }
 
-  function saveApiKey() {
-    const key = document.getElementById('api-key-input').value.trim();
-    if (key) {
-      localStorage.setItem('sara_api_key', key);
-      document.getElementById('api-key-status').textContent = 'Key gespeichert.';
-      showSnack('API-Key gespeichert!', 'success');
-    } else {
-      localStorage.removeItem('sara_api_key');
-      document.getElementById('api-key-status').textContent = 'Key entfernt.';
+  function resetPromptTemplate() {
+    document.getElementById('prompt-template-ta').value = SARA_DEFAULT_PROMPT;
+    showSnack('Prompt zurückgesetzt.', 'success');
+  }
+
+  async function copyFullPrompt() {
+    const text = document.getElementById('prompt-template-ta').value.trim();
+    if (!text) return;
+    const btnEl = document.getElementById('btn-copy-full');
+    const confirmEl = document.getElementById('copy-confirm');
+    try { await navigator.clipboard.writeText(text); } catch (_) {
+      document.getElementById('prompt-template-ta').select(); document.execCommand('copy');
     }
+    if (btnEl) btnEl.innerHTML = '<span class="material-symbols-rounded">check</span> Kopiert!';
+    if (confirmEl) confirmEl.textContent = '✓ In Zwischenablage — jetzt in ChatGPT / Gemini einfügen!';
+    showSnack('Prompt kopiert!', 'success');
     setTimeout(() => {
-      const el = document.getElementById('api-key-status');
-      if (el) el.textContent = '';
+      if (btnEl) btnEl.innerHTML = '<span class="material-symbols-rounded">content_copy</span> Kopieren';
+      if (confirmEl) confirmEl.textContent = '';
     }, 3000);
   }
 
-  async function initApiKeyCard() {
+  async function importStory() {
+    const jsonText = document.getElementById('import-json').value.trim();
+    if (!jsonText) { showSnack('Bitte zuerst das JSON einfügen.', 'error'); return; }
     try {
-      const cfg = await fetch('/api/config').then(r => r.json());
-      if (!cfg.api_key_configured) {
-        document.getElementById('api-key-card').style.display = 'block';
-        const stored = getStoredApiKey();
-        if (stored) {
-          document.getElementById('api-key-input').value = stored;
-          document.getElementById('api-key-status').textContent = 'Key aus Browser-Speicher geladen.';
-        }
-      }
-    } catch (_) { }
-  }
-
-  // ============================================================
-  //  Story generieren & Vorschau
-  // ============================================================
-  async function generateStory() {
-    const prompt = document.getElementById('story-prompt').value.trim();
-    if (!prompt) { showSnack('Bitte einen Prompt eingeben.', 'error'); return; }
-
-    setLoading('generate', true);
-    document.getElementById('story-preview-card').style.display = 'none';
-    document.getElementById('duplicate-banner').classList.add('hidden');
-    currentStory = null; savedStoryId = null;
-
-    try {
-      const body = { prompt };
-      const storedKey = getStoredApiKey();
-      if (storedKey) body.api_key = storedKey;
-
-      const res = await fetch('/api/generate-story', {
+      const res = await fetch('/api/import-story', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify({ json_text: jsonText })
       });
       const data = await res.json();
       if (data.error) { showSnack(data.error, 'error'); return; }
-      currentStory = data.story;
-
-      if (data.duplicate_check.is_duplicate) {
-        const dup = data.duplicate_check;
-        document.getElementById('duplicate-msg').innerHTML =
-          `Story "<strong>${dup.similar_story.title}</strong>" [${dup.similar_story.code}] hat
-           <strong>${dup.overlap}/10</strong> übereinstimmende Keywords.`;
-        document.getElementById('duplicate-banner').classList.remove('hidden');
+      document.getElementById('import-result-title').textContent = `Story importiert! Code: ${data.code}`;
+      let body = `"${data.title}" wurde gespeichert.`;
+      if (data.duplicate_check && data.duplicate_check.is_duplicate) {
+        body += ` Ähnliche Story gefunden (${data.duplicate_check.overlap}/10 Keywords).`;
       }
-      renderStoryPreview(currentStory);
-    } catch (e) {
-      showSnack('Netzwerkfehler: ' + e.message, 'error');
-    } finally {
-      setLoading('generate', false);
-    }
-  }
-
-  function renderStoryPreview(story) {
-    const card = document.getElementById('story-preview-card');
-    card.style.display = 'block';
-
-    document.getElementById('story-meta-row').innerHTML = `
-      <span style="font-size:18px;font-weight:600;flex:1">${escHtml(story.title)}</span>
-      <span class="md-chip md-chip--primary">
-        <span class="material-symbols-rounded" style="font-size:14px">splitscreen</span>
-        ${story.total_parts} Teil${story.total_parts > 1 ? 'e' : ''}
-      </span>
-    `;
-
-    const container = document.getElementById('story-parts-container');
-    container.innerHTML = '';
-    story.parts.forEach(part => {
-      const wordCount = part.text.split(/\s+/).length;
-      const div = document.createElement('div');
-      div.className = 'part-card';
-      const socialHtml = part.social ? `
-        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--md-sys-color-outline-variant)">
-          <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-primary);margin-bottom:5px">Social</div>
-          <div style="font-size:13px;font-weight:500;margin-bottom:2px">${escHtml(part.social.video_title || '')}</div>
-          <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant);margin-bottom:2px">${escHtml(part.social.description || '')}</div>
-          <div style="font-size:12px;color:var(--md-sys-color-primary)">${escHtml(part.social.hashtags || '')}</div>
-        </div>` : '';
-      div.innerHTML = `
-        <div class="part-header">
-          <span class="part-number-badge">Teil ${part.part_number}</span>
-          <span class="text-muted">${wordCount} Wörter (~${Math.round(wordCount / 2.2)}s)</span>
-        </div>
-        <div class="part-text">${escHtml(part.text)}</div>
-        ${part.cliffhanger_hint ? `<div class="cliffhanger-hint"><span class="material-symbols-rounded" style="font-size:14px">bolt</span><span>${escHtml(part.cliffhanger_hint)}</span></div>` : ''}
-        ${socialHtml}
-      `;
-      container.appendChild(div);
-    });
-
-    document.getElementById('keywords-chips').innerHTML =
-      story.keywords.map(k => `<span class="md-chip">${escHtml(k)}</span>`).join('');
-
-    document.getElementById('save-actions').innerHTML = `
-      <button class="md-btn md-btn--filled" id="btn-save" onclick="saveStory()">
-        <span class="material-symbols-rounded">save</span> Story speichern
-      </button>
-      <button class="md-btn md-btn--outlined" onclick="generateStory()">
-        <span class="material-symbols-rounded">refresh</span> Neu generieren
-      </button>
-      <div id="save-spinner" class="spinner hidden"></div>
-    `;
-  }
-
-  async function saveStory() {
-    if (!currentStory) return;
-    setLoading('save', true);
-    try {
-      const res = await fetch('/api/save-story', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story: currentStory })
-      });
-      const data = await res.json();
-      if (data.error) { showSnack(data.error, 'error'); return; }
-      savedStoryId = data.story_id;
-      showSnack(`Story gespeichert! Code: ${data.code}`, 'success');
-      const badge = document.createElement('span');
-      badge.className = 'story-code-badge'; badge.textContent = data.code;
-      document.getElementById('story-meta-row').insertBefore(badge, document.getElementById('story-meta-row').firstChild);
-      document.getElementById('save-actions').innerHTML = `
-        <button class="md-btn md-btn--tonal" onclick="goToVideoTab(${data.story_id})">
+      document.getElementById('import-result-body').textContent = body;
+      document.getElementById('import-result-actions').innerHTML = `
+        <button class="md-btn md-btn--tonal md-btn--sm" onclick="goToVideoTab(${data.story_id})">
           <span class="material-symbols-rounded">movie</span> Video erstellen
-        </button>
-        <button class="md-btn md-btn--outlined" onclick="generateStory()">
-          <span class="material-symbols-rounded">auto_awesome</span> Neue Story
-        </button>
-      `;
+        </button>`;
+      document.getElementById('import-result').classList.add('visible');
+      showSnack(`Story "${data.title}" importiert! Code: ${data.code}`, 'success');
+      document.getElementById('import-json').value = '';
     } catch (e) {
       showSnack('Fehler: ' + e.message, 'error');
-    } finally {
-      setLoading('save', false);
     }
+  }
+
+  function clearImport() {
+    document.getElementById('import-json').value = '';
+    document.getElementById('import-result').classList.remove('visible');
   }
 
   function goToVideoTab(storyId) { switchTab('video'); pendingSelectStoryId = storyId; }
-
-  initApiKeyCard();
 </script>

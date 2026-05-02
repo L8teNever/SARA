@@ -810,11 +810,6 @@
         <span class="material-symbols-rounded">video_file</span>
         <span class="nav-item__lbl">Hintergründe</span>
       </button>
-      <button class="nav-item" id="snav-prompt" onclick="switchTab('prompt')">
-        <div class="nav-item__pill"></div>
-        <span class="material-symbols-rounded">lightbulb</span>
-        <span class="nav-item__lbl">Prompt</span>
-      </button>
     </nav>
 
     <!-- Main Content -->
@@ -841,10 +836,6 @@
       <div class="bnav-item__pill"><span class="material-symbols-rounded">video_file</span></div>
       <span>Hintergr.</span>
     </button>
-    <button class="bnav-item" id="bnav-prompt" onclick="switchTab('prompt')">
-      <div class="bnav-item__pill"><span class="material-symbols-rounded">lightbulb</span></div>
-      <span>Prompt</span>
-    </button>
   </nav>
 
   <!-- Shared JavaScript -->
@@ -866,7 +857,6 @@
       video:   ['snav-video',   'bnav-video'],
       library: ['snav-library', 'bnav-library'],
       upload:  ['snav-upload',  'bnav-upload'],
-      prompt:  ['snav-prompt',  'bnav-prompt'],
     };
 
     function switchTab(name, pushHistory = true) {
@@ -1108,10 +1098,6 @@
     startSSE();
     updateBadgeOnly();
     initPromptTemplate();
-
-    document.getElementById('story-prompt').addEventListener('keydown', e => {
-      if (e.key === 'Enter') generateStory();
-    });
 
     document.getElementById('video-modal').addEventListener('click', function(e) {
       if (e.target === this) closeModal();
