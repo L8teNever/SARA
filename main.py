@@ -316,23 +316,24 @@ def ensure_piper_model() -> Path:
 def tts_to_file(text: str, output_path: Path) -> Path:
     """
     Komplett lokale Sprachsynthese mit Piper-TTS (High Quality).
-    Optimiert auf emotionaleren Lesefluss durch angepasste Speed- und Pausen-Parameter.
+    Schreibt eine saubere WAV-Datei mit expliziten Parametern.
     """
     try:
         from piper.voice import PiperVoice
     except ImportError:
-        raise RuntimeError("Bitte 'pip install piper-tts' ausführen, um die lokale Stimme zu nutzen.")
+        raise RuntimeError("Bitte 'pip install piper-tts' ausführen.")
         
     model_path = ensure_piper_model()
     voice = PiperVoice.load(str(model_path))
     
-    # Synthese-Einstellungen für natürlicheren Klang:
-    # length_scale: 1.05 (etwas langsamer für mehr Betonung)
-    # sentence_silence: 0.3 (längere Pausen zwischen Sätzen wirken natürlicher)
-    # noise_scale: 0.8 (etwas mehr Varianz in der Stimme)
-    
     import wave
+    # Piper Standard: 22050 Hz, 16-bit (2 bytes), Mono (1 channel)
+    # Wir setzen die Parameter manuell, um "# channels not specified" zu verhindern.
     with wave.open(str(output_path), "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(voice.config.sample_rate)
+        
         voice.synthesize_wav(
             text, 
             wav_file,
@@ -696,7 +697,7 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
     cover_path  = COVERS_DIR / f"{story_code}_part{part_number}.jpg"
 
     # Temporäre Dateien
-    audio_path  = TTS_DIR / f"{story_code}_part{part_number}.mp3"
+    audio_path  = TTS_DIR / f"{story_code}_part{part_number}.wav"
     ass_path    = TTS_DIR / f"{story_code}_part{part_number}.ass"
     bg_concat   = TTS_DIR / f"{story_code}_part{part_number}_bg.mp4"
     tmp_files   = [audio_path, ass_path, bg_concat]
