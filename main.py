@@ -375,12 +375,67 @@ def build_word_timed_ass(text: str, output_path: Path, audio_path: Path) -> Path
     return output_path
 
 
+_WHISPER_MODEL = None
+
 def _get_word_boundaries(text: str, audio_path: Path) -> list:
     """
-    Da wir ein 100% lokales Modell (Piper) ohne Phonem-Timestamps verwenden,
-    nutzen wir das gleichmäßige Timing für die Wörter.
+    Analysiert das lokal generierte Audio mit Faster-Whisper, um präzise Wort-Zeitstempel 
+    (Start/Ende) zu erhalten. Da wir den echten Text kennen, wird dieser als Referenz 
+    genutzt und perfekt auf die Audio-Zeiten gemappt.
     """
-    return _uniform_word_timing(text, audio_path)
+    global _WHISPER_MODEL
+    try:
+        from faster_whisper import WhisperModel
+        if _WHISPER_MODEL is None:
+            print("Lade lokales Whisper-Modell zur exakten Untertitel-Synchronisation...")
+            # Wir nutzen das tiny Modell auf der CPU (schnell und ausreichend für klaren TTS-Sound)
+            _WHISPER_MODEL = WhisperModel("tiny", device="cpu", compute_type="int8")
+            
+        print("Synchronisiere Untertitel mit der Audiospur...")
+        # Durch initial_prompt hilft der Originaltext Whisper, exakt die gleichen Worte zu erkennen
+        segments, _ = _WHISPER_MODEL.transcribe(str(audio_path), word_timestamps=True, initial_prompt=text)
+        
+        whisper_words = []
+        for segment in segments:
+            for word in segment.words:
+                if word.word.strip():
+                    whisper_words.append(word)
+                    
+        if not whisper_words:
+            return _uniform_word_timing(text, audio_path)
+            
+        original_words = text.split()
+        aligned_events = []
+        w_idx = 0
+        
+        for orig_w in original_words:
+            orig_clean = "".join(c for c in orig_w.lower() if c.isalnum())
+            if not orig_clean:
+                # Z.B. nur Satzzeichen. Übernimmt Endzeitpunkt des letzten Wortes.
+                start = aligned_events[-1][2] if aligned_events else 0.0
+                aligned_events.append((orig_w, start, start + 0.1))
+                continue
+                
+            found = False
+            # Suche in den nächsten erkannten Wörtern nach einem Match
+            for i in range(w_idx, min(w_idx + 4, len(whisper_words))):
+                whisp_clean = "".join(c for c in whisper_words[i].word.lower() if c.isalnum())
+                if whisp_clean and (whisp_clean in orig_clean or orig_clean in whisp_clean):
+                    aligned_events.append((orig_w, whisper_words[i].start, whisper_words[i].end))
+                    w_idx = i + 1
+                    found = True
+                    break
+                    
+            if not found:
+                # Fallback, wenn das Wort übersprungen oder falsch verstanden wurde
+                start = aligned_events[-1][2] if aligned_events else 0.0
+                aligned_events.append((orig_w, start, start + 0.3))
+                
+        return aligned_events
+        
+    except Exception as e:
+        print(f"Whisper-Fehler bei der Synchronisation: {e}")
+        return _uniform_word_timing(text, audio_path)
 
 
 def _uniform_word_timing(text: str, audio_path: Path) -> list:

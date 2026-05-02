@@ -4,3 +4,4 @@ piper-tts>=1.2.0
 pillow>=10.0
 requests>=2.31
 imageio-ffmpeg>=0.4
+faster-whisper>=1.0.0
