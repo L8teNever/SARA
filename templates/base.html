@@ -885,6 +885,12 @@
         history.pushState({ tab: name }, '', '/' + name);
       }
 
+      // Wenn wir zu einem anderen Tab wechseln oder die Library neu laden,
+      // stellen wir sicher, dass die Detailansicht geschlossen ist.
+      if (name !== 'library' || pushHistory) {
+        if (typeof closeLibDetail === 'function') closeLibDetail(false);
+      }
+
       if (name === 'video')        { loadStoryList(); loadQueue(); }
       else if (name === 'library') { loadLibrary(); }
       else if (name === 'upload')  { loadBackgrounds(); }
