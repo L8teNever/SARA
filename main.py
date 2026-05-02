@@ -70,10 +70,8 @@ def _find_ffmpeg() -> str:
 
 FFMPEG_EXE = _find_ffmpeg()
 
-# ElevenLabs — Stimmen-Konfiguration
-EL_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # Rachel — ruhige, warme Erzählerstimme
-EL_MODEL_ID = "eleven_turbo_v2_5"      # Schnell + hohe Qualität
-_TTS_TIMING_CACHE: dict = {}           # audio_path → word_events (ElevenLabs pre-computed)
+# Lokale TTS-Konfiguration
+# Wir nutzen Piper-TTS für 100% lokale Sprachgenerierung.
 
 # ---------------------------------------------------------------------------
 # Schrift für drawtext — plattformübergreifend
@@ -294,106 +292,44 @@ def generate_story(prompt: str, api_key: str = "") -> dict:
 
 
 # ---------------------------------------------------------------------------
-# TTS — ElevenLabs (beste Qualität) → Edge-TTS → gTTS (Fallback-Kette)
+# TTS — Piper-TTS (100% lokal, offline, hohe Qualität)
 # ---------------------------------------------------------------------------
+
+def ensure_piper_model() -> Path:
+    import urllib.request
+    model_dir = DATA_DIR / "piper_models"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    onnx_path = model_dir / "en_US-amy-medium.onnx"
+    json_path = model_dir / "en_US-amy-medium.onnx.json"
+    
+    if not onnx_path.exists():
+        print("Lade lokales TTS Modell (en_US-amy-medium.onnx) herunter...")
+        urllib.request.urlretrieve("https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx", onnx_path)
+    if not json_path.exists():
+        print("Lade TTS Modell-Config (en_US-amy-medium.onnx.json) herunter...")
+        urllib.request.urlretrieve("https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx.json", json_path)
+    
+    return onnx_path
+
 
 def tts_to_file(text: str, output_path: Path) -> Path:
     """
-    Priorität: ElevenLabs (Rachel) → Edge-TTS (AriaNeural) → gTTS.
-    ElevenLabs wird genutzt wenn ELEVENLABS_API_KEY gesetzt ist.
-    Speichert Wort-Timing im Cache für build_word_timed_ass.
+    Komplett lokale Sprachsynthese mit Piper-TTS (en_US-amy-medium).
+    Keine Internetverbindung oder API-Keys notwendig.
     """
-    el_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
-    if el_key:
-        try:
-            events = _el_tts_with_timing(text, output_path, el_key)
-            if events:
-                _TTS_TIMING_CACHE[str(output_path)] = events
-            return output_path
-        except Exception:
-            pass  # Weiter zum nächsten Fallback
-
-    # Edge-TTS
     try:
-        import edge_tts
-
-        async def _edge_speak():
-            communicate = edge_tts.Communicate(
-                text=text,
-                voice="en-US-AriaNeural",
-                rate="-3%",
-                pitch="-2Hz",
-            )
-            await communicate.save(str(output_path))
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(_edge_speak())
-        finally:
-            loop.close()
-        return output_path
-
-    except Exception as edge_err:
-        try:
-            from gtts import gTTS
-            tts = gTTS(text=text, lang="en", slow=False)
-            tts.save(str(output_path))
-            return output_path
-        except Exception as gtts_err:
-            raise RuntimeError(
-                f"TTS fehlgeschlagen. ElevenLabs: kein Key / Fehler | "
-                f"Edge-TTS: {edge_err} | gTTS: {gtts_err}"
-            )
-
-
-def _el_tts_with_timing(text: str, output_path: Path, api_key: str) -> list:
-    """
-    Ruft ElevenLabs auf, speichert Audio und gibt Wort-Timing zurück.
-    Nutzt convert_with_timestamps um API-Calls zu sparen.
-    """
-    import base64
-    from elevenlabs import ElevenLabs, VoiceSettings
-
-    client   = ElevenLabs(api_key=api_key)
-    response = client.text_to_speech.convert_with_timestamps(
-        voice_id=EL_VOICE_ID,
-        model_id=EL_MODEL_ID,
-        text=text,
-        voice_settings=VoiceSettings(
-            stability=0.55,
-            similarity_boost=0.85,
-            style=0.0,
-            use_speaker_boost=True,
-        ),
-        output_format="mp3_44100_128",
-    )
-    output_path.write_bytes(base64.b64decode(response.audio_base64))
-    return _el_alignment_to_words(response.alignment)
-
-
-def _el_alignment_to_words(alignment) -> list:
-    """Konvertiert ElevenLabs Zeichen-Alignment zu Wort-Events (word, start, end)."""
-    try:
-        chars  = alignment.characters
-        starts = alignment.character_start_times_seconds
-        ends   = alignment.character_end_times_seconds
-
-        words, word, ws = [], "", None
-        for char, s, e in zip(chars, starts, ends):
-            if char in (" ", "\n", "\t"):
-                if word:
-                    words.append((word, ws, e))
-                    word, ws = "", None
-            else:
-                if ws is None:
-                    ws = s
-                word += char
-        if word:
-            words.append((word, ws, ends[-1] if ends else 0.0))
-        return words
-    except Exception:
-        return []
+        from piper.voice import PiperVoice
+    except ImportError:
+        raise RuntimeError("Bitte 'pip install piper-tts' ausführen, um die lokale Stimme zu nutzen.")
+        
+    model_path = ensure_piper_model()
+    voice = PiperVoice.load(str(model_path))
+    
+    import wave
+    with wave.open(str(output_path), "wb") as wav_file:
+        voice.synthesize(text, wav_file)
+        
+    return output_path
 
 
 # ---------------------------------------------------------------------------
@@ -441,44 +377,10 @@ def build_word_timed_ass(text: str, output_path: Path, audio_path: Path) -> Path
 
 def _get_word_boundaries(text: str, audio_path: Path) -> list:
     """
-    Gibt Wort-Timing zurück — Priorität:
-    1. ElevenLabs-Cache (aus tts_to_file, kein Extra-API-Call)
-    2. Edge-TTS WordBoundary-Events
-    3. Gleichmäßige Aufteilung (Fallback)
+    Da wir ein 100% lokales Modell (Piper) ohne Phonem-Timestamps verwenden,
+    nutzen wir das gleichmäßige Timing für die Wörter.
     """
-    # ElevenLabs hat Timing bereits beim TTS-Aufruf berechnet
-    cached = _TTS_TIMING_CACHE.pop(str(audio_path), None)
-    if cached:
-        return cached
-
-    # Edge-TTS WordBoundary
-    try:
-        import edge_tts
-        events = []
-
-        async def _collect():
-            communicate = edge_tts.Communicate(
-                text=text,
-                voice="en-US-AriaNeural",
-                rate="-3%",
-                pitch="-2Hz",
-            )
-            async for chunk in communicate.stream():
-                if chunk["type"] == "WordBoundary":
-                    offset_sec   = chunk["offset"]   / 1e7
-                    duration_sec = chunk["duration"]  / 1e7
-                    events.append((chunk["text"], offset_sec, offset_sec + duration_sec))
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(_collect())
-        finally:
-            loop.close()
-        return events if events else _uniform_word_timing(text, audio_path)
-
-    except Exception:
-        return _uniform_word_timing(text, audio_path)
+    return _uniform_word_timing(text, audio_path)
 
 
 def _uniform_word_timing(text: str, audio_path: Path) -> list:
@@ -1152,6 +1054,55 @@ def api_queue_live():
             "X-Accel-Buffering": "no",
         }
     )
+
+
+@app.route("/api/queue/<int:job_id>", methods=["DELETE"])
+def api_delete_queue_job(job_id: int):
+    with get_db() as conn:
+        job = conn.execute("SELECT status, story_part_id FROM queue WHERE id = ?", (job_id,)).fetchone()
+        if not job:
+            return jsonify({"error": "Job nicht gefunden"}), 404
+        if job["status"] == "processing":
+            return jsonify({"error": "Laufender Job kann nicht gelöscht werden."}), 400
+        
+        conn.execute("DELETE FROM queue WHERE id = ?", (job_id,))
+        if job["status"] != "done":
+            conn.execute("UPDATE story_parts SET status = 'pending' WHERE id = ?", (job["story_part_id"],))
+    return jsonify({"success": True})
+
+
+@app.route("/api/queue/<int:job_id>/restart", methods=["POST"])
+def api_restart_queue_job(job_id: int):
+    with get_db() as conn:
+        job = conn.execute("SELECT status, story_part_id FROM queue WHERE id = ?", (job_id,)).fetchone()
+        if not job:
+            return jsonify({"error": "Job nicht gefunden"}), 404
+        if job["status"] == "processing":
+            return jsonify({"error": "Laufender Job kann nicht neugestartet werden."}), 400
+        
+        conn.execute(
+            "UPDATE queue SET status = 'pending', error_msg = NULL, progress_label = 'Wartet...', progress_pct = 0 WHERE id = ?",
+            (job_id,)
+        )
+        conn.execute("UPDATE story_parts SET status = 'pending' WHERE id = ?", (job["story_part_id"],))
+    return jsonify({"success": True})
+
+
+@app.route("/api/queue/<int:job_id>/cancel", methods=["POST"])
+def api_cancel_queue_job(job_id: int):
+    with get_db() as conn:
+        job = conn.execute("SELECT status, story_part_id FROM queue WHERE id = ?", (job_id,)).fetchone()
+        if not job:
+            return jsonify({"error": "Job nicht gefunden"}), 404
+        if job["status"] == "processing":
+            return jsonify({"error": "Laufender Job kann nicht abgebrochen werden."}), 400
+        
+        conn.execute(
+            "UPDATE queue SET status = 'error', error_msg = 'Abgebrochen durch Benutzer', progress_label = 'Abgebrochen' WHERE id = ?",
+            (job_id,)
+        )
+        conn.execute("UPDATE story_parts SET status = 'pending' WHERE id = ?", (job["story_part_id"],))
+    return jsonify({"success": True})
 
 
 # ---------------------------------------------------------------------------

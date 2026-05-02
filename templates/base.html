@@ -1005,9 +1005,47 @@
           </div>
           ${isProc ? `<div class="job-progress-row"><div class="job-progress-bar-wrap"><div class="job-progress-bar" style="width:${pct}%"></div></div><span class="job-progress-pct">${pct}%</span></div>${lbl ? `<div class="job-progress-label">${escHtml(lbl)}</div>` : ''}` : (job.status === 'done' && lbl) ? `<div class="job-progress-label" style="color:var(--md-sys-color-success)">${escHtml(lbl)}</div>` : ''}
           ${job.status === 'error' ? `<div style="font-size:12px;margin-top:5px;color:var(--md-sys-color-error)">${escHtml(job.error_msg || 'Fehler')}</div>` : ''}
+          ${!isProc ? `
+          <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+            ${job.status === 'pending' ? `<button class="md-btn md-btn--outlined md-btn--sm" onclick="cancelJob(${job.id})"><span class="material-symbols-rounded">cancel</span>Abbrechen</button>` : ''}
+            ${(job.status === 'error' || job.status === 'done') ? `<button class="md-btn md-btn--tonal md-btn--sm" onclick="restartJob(${job.id})"><span class="material-symbols-rounded">refresh</span>Neustart</button>` : ''}
+            <button class="md-btn md-btn--text md-btn--sm" style="color: var(--md-sys-color-error);" onclick="deleteJob(${job.id})"><span class="material-symbols-rounded">delete</span>Löschen</button>
+          </div>
+          ` : ''}
         `;
       });
       Object.entries(existing).forEach(([id, el]) => { if (!rendered.has(id)) el.remove(); });
+    }
+
+    async function cancelJob(id) {
+      try {
+        const res = await fetch('/api/queue/' + id + '/cancel', { method: 'POST' });
+        const json = await res.json();
+        if (json.success) showSnack('Aufgabe abgebrochen', 'success');
+        else showSnack(json.error || 'Fehler beim Abbrechen', 'error');
+        loadQueue();
+      } catch (e) { showSnack('Netzwerkfehler', 'error'); }
+    }
+
+    async function restartJob(id) {
+      try {
+        const res = await fetch('/api/queue/' + id + '/restart', { method: 'POST' });
+        const json = await res.json();
+        if (json.success) showSnack('Aufgabe neugestartet', 'success');
+        else showSnack(json.error || 'Fehler beim Neustart', 'error');
+        loadQueue();
+      } catch (e) { showSnack('Netzwerkfehler', 'error'); }
+    }
+
+    async function deleteJob(id) {
+      if (!confirm('Aufgabe wirklich aus der Warteschlange löschen?')) return;
+      try {
+        const res = await fetch('/api/queue/' + id, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) showSnack('Aufgabe gelöscht', 'success');
+        else showSnack(json.error || 'Fehler beim Löschen', 'error');
+        loadQueue();
+      } catch (e) { showSnack('Netzwerkfehler', 'error'); }
     }
 
     function updateTopBadge(stats) {
