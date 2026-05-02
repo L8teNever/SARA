@@ -251,31 +251,21 @@ Stories must be written in English and follow this EXACT JSON format — no text
         "hashtags": "#storytime #reddit #viral #relationship #foryou #fyp #drama"
       }
     },
-    {
-      "part_number": 2,
-      "text": "Text of part 2 — MUST be 160 to 200 words...",
-      "cliffhanger_hint": "",
-      "social": {
-        "video_title": "Catchy TikTok/Reels title with Part 2/2 — max 80 chars",
-        "description": "2-3 sentence caption that teases the conclusion. End with a question or call-to-action.",
-        "hashtags": "#storytime #reddit #viral #relationship #foryou #fyp #drama"
-      }
-    }
+    ...
   ]
 }
 
-Rules:
-- Each part MUST contain exactly 160–200 words (this guarantees at least 75 seconds of audio per part)
-- Split the story so each part has 160–200 words; never fewer than 160 words per part
-- Each part (except the last) MUST end at the most dramatic, suspenseful cliffhanger possible
-- For 2-part stories: Part 1 MUST end at the single most gripping moment — the listener MUST feel compelled to watch Part 2 immediately
-- Last part always has empty string for cliffhanger_hint
-- keywords: exactly 10 English keywords describing the core story content
-- Write in first person, past tense, raw and emotional style (like r/TIFU or r/relationships)
-- Hook the audience within the very first sentence — no slow build-ups
-- social.video_title: punchy and attention-grabbing, include "Part X/Y" for multi-part, max 80 chars
-- social.description: emotionally tease the story, never spoil the ending, end with a question or CTA
-- social.hashtags: 6–8 relevant hashtags as a single space-separated string"""
+Rules for Content:
+- Hook the audience within the very first sentence with a MASSIVE attention grabber. It must be shocking, emotional, or mysterious (e.g. "I thought my husband was at work, until I saw his car parked at my best friend's house.").
+- Every part (except the last) MUST end at the absolute peak of tension.
+- IMPORTANT: Every part that is not the final one MUST end with a verbal call-to-action integrated into the story text (e.g. "... and as I opened the door, my heart stopped. See what happened next in Part 2.").
+- For Part 2 and beyond, start with a quick 1-sentence recap or continuation that keeps the momentum (e.g. "So, there I was, staring at the person I trusted most...").
+- Each part MUST contain exactly 160–200 words (this guarantees at least 75 seconds of audio per part).
+- Write in first person, past tense, raw and emotional style (like r/TIFU or r/relationships).
+- keywords: exactly 10 English keywords describing the core story content.
+- social.video_title: punchy and attention-grabbing, include "Part X/Y" for multi-part, max 80 chars.
+- social.description: emotionally tease the story, never spoil the ending, end with a question or CTA.
+- social.hashtags: 6–8 relevant hashtags as a single space-separated string."""
 
 
 def generate_story(prompt: str, api_key: str = "") -> dict:
