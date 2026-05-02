@@ -162,9 +162,9 @@
       row.innerHTML = `
         <div class="lib-story-row__num">${idx + 1}</div>
         <div class="lib-story-row__info">
-          <div class="lib-story-row__title">${idx + 1}. [${story.code}] ${escHtml(story.title)}</div>
+          <div class="lib-story-row__title">${escHtml(story.title)}</div>
           <div class="lib-story-row__meta">
-            <span class="story-code-badge" style="font-size:10px;padding:1px 7px;">${story.code}</span>
+            <span class="story-code-badge" style="font-size:10px;padding:1px 7px">${story.code}</span>
             &nbsp;${story.parts.length} Teil(e) · ${formatDate(story.created_at)}
           </div>
         </div>
@@ -198,7 +198,7 @@
       history.pushState({ tab: 'library', code: story.code }, '', `/library/${story.code}`);
     }
     document.getElementById('lib-detail-code').textContent = story.code;
-    document.getElementById('lib-detail-title').textContent = `[${story.code}] ${story.title}`;
+    document.getElementById('lib-detail-title').textContent = story.title;
     document.getElementById('lib-detail-date').textContent = formatDate(story.created_at);
 
     // Button zum manuellen Abhacken aller Parts

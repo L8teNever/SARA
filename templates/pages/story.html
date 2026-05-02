@@ -4,42 +4,53 @@
     <div class="page-header__eyebrow">
       <span class="material-symbols-rounded">lightbulb</span> Story erstellen
     </div>
-    <h1 class="page-header__title">Story erstellen</h1>
-    <p class="page-header__sub">Generiere mit ChatGPT, Gemini oder Claude.ai eine Story — oder importiere direkt das JSON.</p>
+    <h1 class="page-header__title">Neue Story erstellen</h1>
+    <p class="page-header__sub">Prompt kopieren → in ChatGPT / Gemini / Claude.ai einfügen → Antwort hier importieren.</p>
   </div>
 
   <div class="prompt-grid">
-    <!-- Linke Spalte: Prompt kopieren -->
+    <!-- Linke Spalte: Schritt 1 — Prompt kopieren -->
     <div>
       <div class="md-card md-card--elevated">
         <div class="card-hdr">
           <div class="card-hdr__icon"><span class="material-symbols-rounded">content_copy</span></div>
           <div class="card-hdr__text">
-            <div class="card-title">Fertiger Prompt</div>
-            <div class="card-subtitle">Kopieren → in ChatGPT / Gemini / Claude.ai einfügen. Letzten Satz mit deinem Thema ersetzen.</div>
+            <div class="card-title">Schritt 1 — Prompt für die KI</div>
+            <div class="card-subtitle">Gib dein Thema ein und kopiere den fertigen Prompt — dann in ChatGPT, Gemini oder Claude.ai einfügen.</div>
           </div>
-          <button class="md-btn md-btn--filled" id="btn-copy-full" onclick="copyFullPrompt()">
-            <span class="material-symbols-rounded">content_copy</span> Kopieren
-          </button>
         </div>
 
-        <textarea id="prompt-template-ta" class="md-textarea"
-          style="font-family:'Courier New',monospace;font-size:12.5px;min-height:480px;line-height:1.6"
-          spellcheck="false"></textarea>
+        <div class="md-field">
+          <label for="story-idea">Dein Thema <span style="font-weight:400;opacity:.7">(optional — leer lassen für zufällige Story)</span></label>
+          <input type="text" id="story-idea" class="md-input"
+            placeholder='z.B. "a woman who discovers her husband has a secret family"'>
+        </div>
 
-        <div class="btn-row" style="margin-top:12px">
-          <button class="md-btn md-btn--tonal" onclick="copyFullPrompt()">
-            <span class="material-symbols-rounded">content_copy</span> Kopieren
+        <button class="md-btn md-btn--filled" id="btn-copy-full" onclick="copyFullPrompt()"
+          style="width:100%;justify-content:center">
+          <span class="material-symbols-rounded">content_copy</span> Prompt kopieren
+        </button>
+        <span id="copy-confirm" style="display:block;text-align:center;font-size:12px;margin-top:6px;min-height:18px;color:var(--md-sys-color-success)"></span>
+
+        <div style="margin-top:14px">
+          <button class="md-btn md-btn--text md-btn--sm" onclick="togglePromptPreview(this)"
+            style="color:var(--md-sys-color-on-surface-variant)">
+            <span class="material-symbols-rounded" style="font-size:16px;transition:transform .2s">expand_more</span>
+            Vollständigen Prompt anzeigen / bearbeiten
           </button>
-          <button class="md-btn md-btn--outlined" onclick="resetPromptTemplate()">
-            <span class="material-symbols-rounded">restart_alt</span> Zurücksetzen
-          </button>
-          <span class="text-muted" id="copy-confirm" style="font-size:12px"></span>
+          <div id="prompt-preview-wrap" style="display:none;margin-top:10px">
+            <textarea id="prompt-template-ta" class="md-textarea"
+              style="font-family:'Courier New',monospace;font-size:12px;min-height:280px;line-height:1.55"
+              spellcheck="false"></textarea>
+            <button class="md-btn md-btn--outlined md-btn--sm" onclick="resetPromptTemplate()" style="margin-top:8px">
+              <span class="material-symbols-rounded">restart_alt</span> Zurücksetzen
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Rechte Spalte: JSON importieren -->
+    <!-- Rechte Spalte: Schritt 2 — JSON importieren -->
     <div>
       <div class="md-card md-card--elevated">
         <div class="card-hdr">
@@ -47,8 +58,8 @@
             <span class="material-symbols-rounded">download</span>
           </div>
           <div class="card-hdr__text">
-            <div class="card-title">Antwort importieren</div>
-            <div class="card-subtitle">JSON-Antwort der KI einfügen — SARA speichert die Story automatisch.</div>
+            <div class="card-title">Schritt 2 — KI-Antwort importieren</div>
+            <div class="card-subtitle">JSON-Antwort der KI hier einfügen — SARA speichert die Story automatisch.</div>
           </div>
         </div>
 
@@ -93,23 +104,21 @@
     </div>
   </div>
 
-  <!-- Neue Sektion: Zuletzt gespeicherte Stories -->
-  <div style="margin-top:24px;">
-    <div class="md-card md-card--elevated" style="padding:18px;">
-      <div class="card-hdr" style="margin-bottom:12px;">
+  <!-- Zuletzt gespeicherte Stories -->
+  <div style="margin-top:24px">
+    <div class="md-card md-card--elevated" style="padding:18px">
+      <div class="card-hdr" style="margin-bottom:12px">
         <div class="card-hdr__icon" style="background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)">
           <span class="material-symbols-rounded">history</span>
         </div>
         <div class="card-hdr__text">
-          <div class="card-title">Zuletzt gespeichert</div>
-          <div class="card-subtitle">Deine neuesten Stories im Überblick</div>
+          <div class="card-title">Zuletzt gespeicherte Stories</div>
         </div>
         <button class="md-btn md-btn--icon" onclick="loadRecentStories()">
           <span class="material-symbols-rounded">refresh</span>
         </button>
       </div>
-
-      <div id="recent-stories-list" class="flex-column" style="gap:8px;">
+      <div id="recent-stories-list" class="flex-column" style="gap:8px">
         <div class="spinner" style="margin:20px auto"></div>
       </div>
     </div>
@@ -165,11 +174,20 @@ Rules:
 - social.description: emotionally tease the story, never spoil the ending, end with a question or CTA
 - social.hashtags: 6–8 relevant hashtags as a single space-separated string
 
-Create a story about: [THEMA HIER EINTRAGEN — z.B. "a woman who discovers her husband has a secret family" — oder Zeile so lassen für eine zufällige Story]`;
+Create a story about: [DEIN THEMA HIER EINTRAGEN — z.B. "a woman who discovers her husband has a secret family" — oder Zeile so lassen für eine zufällige Story]`;
 
   function initPromptTemplate() {
     const ta = document.getElementById('prompt-template-ta');
     if (ta && !ta.value) ta.value = SARA_DEFAULT_PROMPT;
+  }
+
+  function togglePromptPreview(btn) {
+    const wrap = document.getElementById('prompt-preview-wrap');
+    const icon = btn.querySelector('.material-symbols-rounded');
+    const isHidden = wrap.style.display === 'none';
+    wrap.style.display = isHidden ? 'block' : 'none';
+    icon.style.transform = isHidden ? 'rotate(180deg)' : '';
+    if (isHidden) initPromptTemplate();
   }
 
   function resetPromptTemplate() {
@@ -178,18 +196,26 @@ Create a story about: [THEMA HIER EINTRAGEN — z.B. "a woman who discovers her 
   }
 
   async function copyFullPrompt() {
-    const text = document.getElementById('prompt-template-ta').value.trim();
-    if (!text) return;
+    const idea = (document.getElementById('story-idea')?.value || '').trim();
+    initPromptTemplate();
+    let text = document.getElementById('prompt-template-ta').value.trim() || SARA_DEFAULT_PROMPT;
+
+    if (idea) {
+      text = text.replace(/Create a story about:.*$/, `Create a story about: ${idea}`);
+    }
+
     const btnEl = document.getElementById('btn-copy-full');
     const confirmEl = document.getElementById('copy-confirm');
     try { await navigator.clipboard.writeText(text); } catch (_) {
-      document.getElementById('prompt-template-ta').select(); document.execCommand('copy');
+      const tmp = document.createElement('textarea');
+      tmp.value = text; document.body.appendChild(tmp); tmp.select();
+      document.execCommand('copy'); tmp.remove();
     }
     if (btnEl) btnEl.innerHTML = '<span class="material-symbols-rounded">check</span> Kopiert!';
-    if (confirmEl) confirmEl.textContent = '✓ In Zwischenablage — jetzt in ChatGPT / Gemini einfügen!';
+    if (confirmEl) confirmEl.textContent = '✓ Jetzt in ChatGPT / Gemini / Claude.ai einfügen!';
     showSnack('Prompt kopiert!', 'success');
     setTimeout(() => {
-      if (btnEl) btnEl.innerHTML = '<span class="material-symbols-rounded">content_copy</span> Kopieren';
+      if (btnEl) btnEl.innerHTML = '<span class="material-symbols-rounded">content_copy</span> Prompt kopieren';
       if (confirmEl) confirmEl.textContent = '';
     }, 3000);
   }
@@ -197,38 +223,28 @@ Create a story about: [THEMA HIER EINTRAGEN — z.B. "a woman who discovers her 
   async function importStory(forceSave = false, forceQueue = false) {
     const jsonText = document.getElementById('import-json').value.trim();
     if (!jsonText) { showSnack('Bitte zuerst das JSON einfügen.', 'error'); return; }
-    
+
     try {
       const res = await fetch('/api/import-story', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          json_text: jsonText, 
-          dry_run: !forceSave,
-          auto_queue: forceQueue
-        })
+        body: JSON.stringify({ json_text: jsonText, dry_run: !forceSave, auto_queue: forceQueue })
       });
       const data = await res.json();
       if (data.error) { showSnack(data.error, 'error'); return; }
 
-      // Falls Duplikat-Check im Dry-Run anschlägt
       if (!forceSave && data.duplicate_check && data.duplicate_check.is_duplicate) {
         const msg = `Ähnliche Story gefunden (${data.duplicate_check.overlap}/10 Keywords).\n\n` +
                     `Gefunden: "${data.duplicate_check.similar_story.title}" [${data.duplicate_check.similar_story.code}]\n\n` +
-                    `Möchtest du die Story trotzdem speichern und direkt in die Warteschlange zum Erstellen schicken?`;
-        if (confirm(msg)) {
-          importStory(true, true);
-        } else {
-          showSnack('Import abgebrochen.', 'info');
-        }
+                    `Möchtest du die Story trotzdem speichern und direkt in die Warteschlange schicken?`;
+        if (confirm(msg)) importStory(true, true);
+        else showSnack('Import abgebrochen.', 'info');
         return;
       }
 
-      // Falls wir hier sind, wurde gespeichert
       document.getElementById('import-result-title').textContent = data.auto_queued ? 'Story gespeichert & eingereiht!' : 'Story importiert!';
       let body = `"${data.title}" wurde gespeichert (Code: ${data.code}).`;
-      if (data.auto_queued) body += " Die Videos werden automatisch erstellt.";
-      
+      if (data.auto_queued) body += ' Die Videos werden automatisch erstellt.';
       document.getElementById('import-result-body').textContent = body;
       document.getElementById('import-result-actions').innerHTML = `
         <button class="md-btn md-btn--tonal md-btn--sm" onclick="goToVideoTab(${data.story_id})">
@@ -255,24 +271,24 @@ Create a story about: [THEMA HIER EINTRAGEN — z.B. "a woman who discovers her 
     try {
       const stories = await fetch('/api/stories').then(r => r.json());
       if (!stories.length) {
-        container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px;">Noch keine Stories vorhanden.</div>';
+        container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px">Noch keine Stories vorhanden.</div>';
         return;
       }
-      // Nur die letzten 5 anzeigen
       const recent = stories.slice(0, 5);
       container.innerHTML = '';
       recent.forEach(s => {
         const row = document.createElement('div');
         row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--md-sys-color-surface-container-high);border-radius:12px;';
         row.innerHTML = `
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">[${s.code}] ${escHtml(s.title)}</div>
-            <div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);opacity:0.7;">${s.total_parts} Teile &middot; ${formatDate(s.created_at)}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(s.title)}</div>
+            <div style="font-size:11px;color:var(--md-sys-color-on-surface-variant);opacity:.7">${s.total_parts} Teile · ${formatDate(s.created_at)}</div>
           </div>
-          <button class="md-btn md-btn--tonal md-btn--sm" onclick="goToVideoTab(${s.id})">
+          <span class="story-code-badge" style="font-size:11px">${s.code}</span>
+          <button class="md-btn md-btn--tonal md-btn--sm" onclick="goToVideoTab(${s.id})" title="Zu Videos">
             <span class="material-symbols-rounded" style="font-size:16px">movie</span>
           </button>
-          <button class="md-btn md-btn--icon" style="color:var(--md-sys-color-error)" onclick="deleteStoryFromCreation(${s.id}, '${escHtml(s.title)}')">
+          <button class="md-btn md-btn--icon" style="color:var(--md-sys-color-error)" onclick="deleteStoryFromCreation(${s.id}, '${escHtml(s.title).replace(/'/g, '&#39;')}')">
             <span class="material-symbols-rounded">delete</span>
           </button>
         `;
@@ -294,6 +310,5 @@ Create a story about: [THEMA HIER EINTRAGEN — z.B. "a woman who discovers her 
     }
   }
 
-  // Initial laden
   loadRecentStories();
 </script>

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Docker\\\\Desktop\\\\SARA\" -Recurse -Force)",
+      "Bash(Select-Object FullName, Name)"
+    ]
+  }
+}

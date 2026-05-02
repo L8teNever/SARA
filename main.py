@@ -373,8 +373,7 @@ def ensure_kokoro_model() -> tuple[Path, Path]:
 
 def tts_to_file(text: str, output_path: Path) -> Path:
     """
-    Lokale High-End Sprachsynthese mit Kokoro-82M (ONNX).
-    Klingt deutlich menschlicher und emotionaler als Piper.
+    Lokale Sprachsynthese mit Kokoro-82M (ONNX).
     """
     try:
         from kokoro_onnx import Kokoro
@@ -742,8 +741,8 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
     tmp_files   = [audio_path, ass_path, bg_concat]
 
     try:
-        # ---- Schritt 1: TTS (lokal, Piper) ----
-        progress(10, "Stimme wird generiert (lokal, Piper)...")
+        # ---- Schritt 1: TTS (Kokoro, lokal) ----
+        progress(10, "Stimme wird generiert (Kokoro, lokal)...")
         tts_to_file(text, audio_path)
         audio_duration = get_audio_duration(audio_path)
 
@@ -1555,7 +1554,7 @@ def api_demo():
         tts_to_file(text, audio_path)
         
         # Wortgrenzen für Untertitel (Whisper)
-        word_events = _get_word_boundaries(audio_path, text)
+        word_events = _get_word_boundaries(text, audio_path)
         ass_content = _build_ass_from_events(word_events, text)
         with open(ass_path, "w", encoding="utf-8") as f:
             f.write(ass_content)
