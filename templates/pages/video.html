@@ -147,7 +147,7 @@ async function createVideo(){
 }
 
 async function deleteStoryFromVideo(id,title){
-  if(!confirm(`Story "${title}" und alle zugehörigen Daten löschen?`)) return;
+  if(!await showConfirm('Story löschen',`"${title}" und alle zugehörigen Daten löschen?`,{confirmLabel:'Löschen',destructive:true}))return;
   try{
     const res=await fetch(`/api/stories/${id}`,{method:'DELETE'});
     const d=await res.json();

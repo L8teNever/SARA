@@ -100,7 +100,7 @@ function uploadFile(file){
 }
 
 async function deleteBackground(filename,btn){
-  if(!confirm(`"${filename}" wirklich löschen?`)) return;
+  if(!await showConfirm('Hintergrund löschen',`"${filename}" wirklich löschen?`,{confirmLabel:'Löschen',destructive:true}))return;
   btn.closest('.bgthumb').style.opacity='.4';
   try{
     const res=await fetch(`/api/backgrounds/${encodeURIComponent(filename)}`,{method:'DELETE'});

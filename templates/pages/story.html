@@ -160,8 +160,13 @@ async function importStory(forceSave=false,forceQueue=false){
     const d=await res.json();
     if(d.error){showSnack(d.error,'error');return}
     if(!forceSave&&d.duplicate_check?.is_duplicate){
-      const msg=`Ähnliche Story gefunden (${d.duplicate_check.overlap}/10 Keywords).\n\nGefunden: "${d.duplicate_check.similar_story.title}" [${d.duplicate_check.similar_story.code}]\n\nTrotzdem speichern und in Warteschlange?`;
-      if(confirm(msg)) importStory(true,true);
+      const dup=d.duplicate_check;
+      const ok=await showConfirm(
+        `Ähnliche Story gefunden (${dup.overlap}/10 Keywords)`,
+        `Gefunden: "${dup.similar_story.title}" [${dup.similar_story.code}]\n\nTrotzdem speichern und in Warteschlange stellen?`,
+        {confirmLabel:'Trotzdem speichern',cancelLabel:'Abbrechen'}
+      );
+      if(ok) importStory(true,true);
       else showSnack('Import abgebrochen.','info');
       return;
     }
@@ -212,7 +217,7 @@ async function loadRecentStories(){
 }
 
 async function deleteRecentStory(id,title){
-  if(!confirm(`Story "${title}" wirklich löschen?`)) return;
+  if(!await showConfirm('Story löschen',`"${title}" wirklich löschen?`,{confirmLabel:'Löschen',destructive:true}))return;
   try{await fetch(`/api/stories/${id}`,{method:'DELETE'});showSnack('Story gelöscht.','success');loadRecentStories()}
   catch(e){showSnack('Fehler.','error')}
 }

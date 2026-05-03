@@ -261,6 +261,14 @@ input,textarea{font:inherit;color:inherit}
 .modal{background:var(--cs1);border-radius:var(--r4);padding:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;animation:mIn .28s cubic-bezier(.2,0,0,1);box-shadow:0 8px 40px rgba(0,0,0,.55)}
 .modal__hdr{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .modal__ttl{flex:1;font-size:16px;font-weight:600}
+/* confirm dialog */
+.cdlg{max-width:360px;padding:24px}
+.cdlg__ico{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:22px;margin-bottom:14px}
+.cdlg__ico--warn{background:rgba(255,100,80,.15);color:#FF6450}
+.cdlg__ico--info{background:var(--cpc);color:var(--copc)}
+.cdlg__ttl{font-size:16px;font-weight:600;margin-bottom:8px}
+.cdlg__msg{font-size:13px;color:var(--cosv);line-height:1.6;margin-bottom:22px;white-space:pre-wrap}
+.cdlg__acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 
 /* ── Snackbar ────────────────────────────────────────────── */
 .snack{background:var(--cs3);color:var(--cos);padding:12px 18px;border-radius:var(--r3);font-size:13px;font-weight:500;pointer-events:auto;box-shadow:0 4px 16px rgba(0,0,0,.4);animation:snkIn .25s ease;border-left:4px solid transparent;max-width:100%;word-break:break-word}
@@ -342,7 +350,7 @@ input,textarea{font:inherit;color:inherit}
     </div>
 
     <!-- Bottom nav (mobile) -->
-    <nav class="botnav" style="display:flex">
+    <nav class="botnav">
       <button class="botnav__item nav-btn is-active" data-tab="story" onclick="switchTab('story')">
         <span class="mi">auto_stories</span><span>Story</span>
       </button>
@@ -367,6 +375,19 @@ input,textarea{font:inherit;color:inherit}
       <button class="btn btn--icon" onclick="closeModal()"><span class="mi">close</span></button>
     </div>
     <video id="modal-video" controls playsinline style="width:100%;border-radius:12px;max-height:70vh;display:block"></video>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="mback" id="confirm-modal" onclick="if(event.target===this)_cdlgClose(false)">
+  <div class="modal cdlg">
+    <div class="cdlg__ico cdlg__ico--warn" id="cdlg-ico"><span class="mi">warning</span></div>
+    <div class="cdlg__ttl" id="cdlg-title"></div>
+    <div class="cdlg__msg" id="cdlg-msg"></div>
+    <div class="cdlg__acts">
+      <button class="btn btn--text btn--sm" id="cdlg-cancel" onclick="_cdlgClose(false)">Abbrechen</button>
+      <button class="btn btn--filled btn--sm" id="cdlg-ok" onclick="_cdlgClose(true)">Bestätigen</button>
+    </div>
   </div>
 </div>
 
@@ -526,7 +547,29 @@ function updateQBadge(stats){
 
 async function cancelJob(id){try{const r=await fetch(`/api/queue/${id}/cancel`,{method:'POST'});const j=await r.json();showSnack(j.success?'Abgebrochen':j.error||'Fehler',j.success?'success':'error');loadQueue()}catch{showSnack('Netzwerkfehler','error')}}
 async function restartJob(id){try{const r=await fetch(`/api/queue/${id}/restart`,{method:'POST'});const j=await r.json();showSnack(j.success?'Neugestartet':j.error||'Fehler',j.success?'success':'error');loadQueue()}catch{showSnack('Netzwerkfehler','error')}}
-async function deleteJob(id){if(!confirm('Aufgabe wirklich löschen?'))return;try{const r=await fetch(`/api/queue/${id}`,{method:'DELETE'});const j=await r.json();showSnack(j.success?'Gelöscht':j.error||'Fehler',j.success?'success':'error');loadQueue()}catch{showSnack('Netzwerkfehler','error')}}
+async function deleteJob(id){if(!await showConfirm('Aufgabe löschen','Diese Aufgabe aus der Warteschlange entfernen?',{confirmLabel:'Löschen',destructive:true}))return;try{const r=await fetch(`/api/queue/${id}`,{method:'DELETE'});const j=await r.json();showSnack(j.success?'Gelöscht':j.error||'Fehler',j.success?'success':'error');loadQueue()}catch{showSnack('Netzwerkfehler','error')}}
+
+/* ── Confirm Dialog ──────────────────────────────────────── */
+let _cdlgResolve=null;
+function showConfirm(title,msg,{confirmLabel='Bestätigen',cancelLabel='Abbrechen',destructive=false}={}){
+  return new Promise(resolve=>{
+    _cdlgResolve=resolve;
+    document.getElementById('cdlg-title').textContent=title;
+    document.getElementById('cdlg-msg').textContent=msg;
+    const ok=document.getElementById('cdlg-ok');
+    ok.textContent=confirmLabel;
+    ok.style.cssText=destructive?'background:var(--ce);color:#fff':'';
+    document.getElementById('cdlg-cancel').textContent=cancelLabel;
+    const ico=document.getElementById('cdlg-ico');
+    ico.className='cdlg__ico '+(destructive?'cdlg__ico--warn':'cdlg__ico--info');
+    ico.innerHTML=`<span class="mi">${destructive?'delete':'help'}</span>`;
+    document.getElementById('confirm-modal').classList.add('open');
+  });
+}
+function _cdlgClose(result){
+  document.getElementById('confirm-modal').classList.remove('open');
+  if(_cdlgResolve){_cdlgResolve(result);_cdlgResolve=null}
+}
 
 /* ── Modal ───────────────────────────────────────────────── */
 function openVideoModal(src,title){

@@ -210,7 +210,7 @@ function copySocial(partId){
 }
 
 async function deleteLibVideo(partId){
-  if(!confirm('Video wirklich löschen?')) return;
+  if(!await showConfirm('Video löschen','Dieses Video wirklich löschen?',{confirmLabel:'Löschen',destructive:true}))return;
   try{
     const res=await fetch(`/api/videos/${partId}`,{method:'DELETE'});
     const d=await res.json();
@@ -224,7 +224,7 @@ async function deleteLibVideo(partId){
 }
 
 async function deleteLibStory(storyId,title){
-  if(!confirm(`Story "${title}" inklusive ALLER Videos löschen?`)) return;
+  if(!await showConfirm('Story löschen',`"${title}" inklusive aller Videos löschen?`,{confirmLabel:'Löschen',destructive:true}))return;
   try{
     const res=await fetch(`/api/stories/${storyId}`,{method:'DELETE'});
     const d=await res.json();
@@ -235,7 +235,7 @@ async function deleteLibStory(storyId,title){
 }
 
 async function markAllUploaded(story){
-  if(!confirm(`Alle Teile von "${story.title}" als hochgeladen markieren?`)) return;
+  if(!await showConfirm('Alle markieren',`Alle Teile von "${story.title}" als hochgeladen markieren?`,{confirmLabel:'Markieren'}))return;
   try{
     for(const part of story.parts){
       for(const p of['tiktok1','tiktok2']){

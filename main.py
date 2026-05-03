@@ -138,9 +138,10 @@ app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB Upload-Limit
 # ---------------------------------------------------------------------------
 
 def get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 
@@ -1240,10 +1241,10 @@ def api_queue_live():
         import time
         while True:
             try:
-                with get_db() as conn:
+                conn = get_db()
+                try:
                     is_active = conn.execute("SELECT value FROM settings WHERE key = 'prod_active'").fetchone()
                     prod_active = (is_active["value"] != "0") if is_active else True
-                    
                     jobs = conn.execute(
                         """SELECT q.id, q.status, q.progress_pct, q.progress_label,
                                   q.error_msg, q.created_at, q.started_at, q.finished_at,
@@ -1254,10 +1255,12 @@ def api_queue_live():
                            JOIN stories s ON s.id = sp.story_id
                            ORDER BY q.id DESC LIMIT 100"""
                     ).fetchall()
-                payload = json.dumps({
-                    "jobs": [dict(j) for j in jobs],
-                    "prod_active": prod_active
-                })
+                    payload = json.dumps({
+                        "jobs": [dict(j) for j in jobs],
+                        "prod_active": prod_active
+                    })
+                finally:
+                    conn.close()
                 yield f"data: {payload}\n\n"
             except Exception as e:
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
