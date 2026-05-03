@@ -138,14 +138,29 @@ app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB Upload-Limit
 # ---------------------------------------------------------------------------
 
 def get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=30)
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=60)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout=30000")
+    # WAL-Modus aktivieren für bessere Nebenläufigkeit
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=60000")
     return conn
+
+@contextmanager
+def db_session():
+    conn = get_db()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def init_db():
-    with get_db() as conn:
+    with db_session() as conn:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.executescript("""
@@ -248,7 +263,7 @@ def generate_story_code() -> str:
     chars = string.ascii_uppercase + string.digits
     while True:
         code = "".join(random.choices(chars, k=6))
-        with get_db() as conn:
+        with db_session() as conn:
             row = conn.execute("SELECT id FROM stories WHERE code = ?", (code,)).fetchone()
         if row is None:
             return code
@@ -256,7 +271,7 @@ def generate_story_code() -> str:
 
 def check_duplicate(keywords: list) -> dict:
     new_set = set(k.lower() for k in keywords)
-    with get_db() as conn:
+    with db_session() as conn:
         rows = conn.execute("SELECT id, code, title, keywords_json FROM stories").fetchall()
     for row in rows:
         existing = set(k.lower() for k in json.loads(row["keywords_json"]))
@@ -277,7 +292,7 @@ def allowed_video(filename: str) -> bool:
 def _set_progress(job_id: int, pct: int, label: str):
     """Aktualisiert den Fortschritt eines Jobs in der DB."""
     try:
-        with get_db() as conn:
+        with db_session() as conn:
             conn.execute(
                 "UPDATE queue SET progress_pct = ?, progress_label = ? WHERE id = ?",
                 (pct, label, job_id)
@@ -711,7 +726,7 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
     def progress(pct: int, label: str):
         _set_progress(job_id, pct, label)
 
-    with get_db() as conn:
+    with db_session() as conn:
         part = conn.execute(
             """SELECT sp.*, s.code, s.title
                FROM story_parts sp
@@ -816,7 +831,7 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
         progress(95, "Datenbank aktualisiert…")
         rel_cover = str(cover_path.relative_to(BASE_DIR)).replace("\\", "/")
 
-        with get_db() as conn:
+        with db_session() as conn:
             conn.execute(
                 "UPDATE story_parts SET cover_path = ? WHERE id = ?",
                 (rel_cover, story_part_id)
@@ -944,7 +959,7 @@ def queue_worker():
             job_id = None
             story_part_id = None
 
-            with get_db() as conn:
+            with db_session() as conn:
                 is_active = conn.execute(
                     "SELECT value FROM settings WHERE key = 'prod_active'"
                 ).fetchone()
@@ -985,7 +1000,7 @@ def queue_worker():
                 output_path = create_video_for_part(story_part_id, job_id)
                 rel_path = str(output_path.relative_to(BASE_DIR)).replace("\\", "/")
 
-                with get_db() as conn:
+                with db_session() as conn:
                     conn.execute(
                         "UPDATE queue SET status = 'done', progress_pct = 100, "
                         "progress_label = 'Fertig! ✅', finished_at = datetime('now') WHERE id = ?",
@@ -998,7 +1013,7 @@ def queue_worker():
 
             except Exception as e:
                 err_msg = str(e)
-                with get_db() as conn:
+                with db_session() as conn:
                     conn.execute(
                         "UPDATE queue SET status = 'error', error_msg = ?, "
                         "progress_label = 'Fehler ❌', finished_at = datetime('now') WHERE id = ?",
@@ -1060,7 +1075,7 @@ def api_save_story():
         return jsonify({"error": "Keine Story-Daten."}), 400
     code = generate_story_code()
     try:
-        with get_db() as conn:
+        with db_session() as conn:
             cursor = conn.execute(
                 "INSERT INTO stories (code, title, keywords_json, total_parts) VALUES (?, ?, ?, ?)",
                 (code, story["title"], json.dumps(story["keywords"]), story["total_parts"])
@@ -1079,7 +1094,7 @@ def api_save_story():
 
 @app.route("/api/stories", methods=["GET"])
 def api_get_stories():
-    with get_db() as conn:
+    with db_session() as conn:
         stories = conn.execute(
             "SELECT id, code, title, total_parts, created_at FROM stories ORDER BY created_at DESC"
         ).fetchall()
@@ -1108,7 +1123,7 @@ def api_get_stories():
 
 @app.route("/api/stories/<int:story_id>", methods=["GET"])
 def api_get_story(story_id: int):
-    with get_db() as conn:
+    with db_session() as conn:
         story = conn.execute("SELECT * FROM stories WHERE id = ?", (story_id,)).fetchone()
         if not story:
             abort(404)
@@ -1132,7 +1147,7 @@ def api_create_video():
     if not story_id:
         return jsonify({"error": "story_id fehlt."}), 400
 
-    with get_db() as conn:
+    with db_session() as conn:
         if part_number:
             parts = conn.execute(
                 "SELECT id FROM story_parts WHERE story_id = ? AND part_number = ?",
@@ -1147,7 +1162,7 @@ def api_create_video():
         return jsonify({"error": "Keine Story-Teile gefunden."}), 404
 
     # Settings laden
-    with get_db() as conn:
+    with db_session() as conn:
         interval_min = int(conn.execute("SELECT value FROM settings WHERE key = 'prod_interval_min'").fetchone()["value"] or 0)
         
         # Letzten Planungszeitpunkt finden
@@ -1196,7 +1211,7 @@ def api_create_video():
 def api_settings():
     if request.method == "POST":
         data = request.get_json() or {}
-        with get_db() as conn:
+        with db_session() as conn:
             for k, v in data.items():
                 conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, str(v)))
                 if k == 'prod_active' and str(v) == '0':
@@ -1204,14 +1219,14 @@ def api_settings():
                     _kill_active_subs()
         return jsonify({"success": True})
     else:
-        with get_db() as conn:
+        with db_session() as conn:
             rows = conn.execute("SELECT key, value FROM settings").fetchall()
         return jsonify({r["key"]: r["value"] for r in rows})
 
 
 @app.route("/api/queue", methods=["GET"])
 def api_get_queue():
-    with get_db() as conn:
+    with db_session() as conn:
         jobs = conn.execute(
             """SELECT q.id, q.status, q.error_msg, q.created_at, q.finished_at,
                       q.progress_pct, q.progress_label,
@@ -1228,7 +1243,7 @@ def api_get_queue():
 
 @app.route("/api/queue/stats", methods=["GET"])
 def api_queue_stats():
-    with get_db() as conn:
+    with db_session() as conn:
         stats = conn.execute(
             "SELECT status, COUNT(*) as count FROM queue GROUP BY status"
         ).fetchall()
@@ -1279,7 +1294,7 @@ def api_queue_live():
 
 @app.route("/api/queue/<int:job_id>", methods=["DELETE"])
 def api_delete_queue_job(job_id: int):
-    with get_db() as conn:
+    with db_session() as conn:
         job = conn.execute("SELECT status, story_part_id FROM queue WHERE id = ?", (job_id,)).fetchone()
         if not job:
             return jsonify({"error": "Job nicht gefunden"}), 404
@@ -1294,7 +1309,7 @@ def api_delete_queue_job(job_id: int):
 
 @app.route("/api/queue/<int:job_id>/restart", methods=["POST"])
 def api_restart_queue_job(job_id: int):
-    with get_db() as conn:
+    with db_session() as conn:
         job = conn.execute("SELECT status, story_part_id FROM queue WHERE id = ?", (job_id,)).fetchone()
         if not job:
             return jsonify({"error": "Job nicht gefunden"}), 404
@@ -1311,7 +1326,7 @@ def api_restart_queue_job(job_id: int):
 
 @app.route("/api/queue/<int:job_id>/cancel", methods=["POST"])
 def api_cancel_queue_job(job_id: int):
-    with get_db() as conn:
+    with db_session() as conn:
         job = conn.execute("SELECT status, story_part_id FROM queue WHERE id = ?", (job_id,)).fetchone()
         if not job:
             return jsonify({"error": "Job nicht gefunden"}), 404
@@ -1332,7 +1347,7 @@ def api_cancel_queue_job(job_id: int):
 
 @app.route("/api/backgrounds", methods=["GET"])
 def api_get_backgrounds():
-    with get_db() as conn:
+    with db_session() as conn:
         bgs = conn.execute("SELECT * FROM backgrounds ORDER BY uploaded_at DESC").fetchall()
     return jsonify([dict(b) for b in bgs])
 
@@ -1351,7 +1366,7 @@ def api_upload_background():
     unique_name   = f"{uuid.uuid4().hex}.{ext}"
     save_path     = BACKGROUNDS_DIR / unique_name
     file.save(str(save_path))
-    with get_db() as conn:
+    with db_session() as conn:
         conn.execute(
             "INSERT INTO backgrounds (filename, original_name) VALUES (?, ?)",
             (unique_name, original_name)
@@ -1365,7 +1380,7 @@ def api_delete_background(filename: str):
     file_path = BACKGROUNDS_DIR / safe_name
     if file_path.exists():
         file_path.unlink()
-    with get_db() as conn:
+    with db_session() as conn:
         conn.execute("DELETE FROM backgrounds WHERE filename = ?", (safe_name,))
     return jsonify({"success": True})
 
@@ -1388,7 +1403,7 @@ def serve_cover(filename: str):
 
 @app.route("/api/videos", methods=["GET"])
 def api_get_videos():
-    with get_db() as conn:
+    with db_session() as conn:
         videos = conn.execute(
             """SELECT sp.id, sp.part_number, sp.video_path, sp.cover_path, sp.status,
                       sp.social_json,
@@ -1434,7 +1449,7 @@ def api_get_videos():
 @app.route("/api/videos/<int:part_id>", methods=["DELETE"])
 def api_delete_video(part_id: int):
     """Löscht ein Video (Datei + Cover + Queue + Uploads) aus dem System."""
-    with get_db() as conn:
+    with db_session() as conn:
         part = conn.execute(
             "SELECT video_path, cover_path FROM story_parts WHERE id = ?",
             (part_id,)
@@ -1466,7 +1481,7 @@ def api_delete_video(part_id: int):
 @app.route("/api/stories/<int:story_id>", methods=["DELETE"])
 def api_delete_story(story_id: int):
     """Löscht eine komplette Story inklusive aller Parts, Dateien und Ordner."""
-    with get_db() as conn:
+    with db_session() as conn:
         story = conn.execute("SELECT code FROM stories WHERE id = ?", (story_id,)).fetchone()
         if not story:
             return jsonify({"error": "Story nicht gefunden"}), 404
@@ -1552,28 +1567,20 @@ def api_add_upload():
     notes         = data.get("notes", "")
     if not story_part_id:
         return jsonify({"error": "story_part_id fehlt."}), 400
-    conn = get_db()
-    try:
+    with db_session() as conn:
         cursor = conn.execute(
             "INSERT INTO video_uploads (story_part_id, platform, notes) VALUES (?, ?, ?)",
             (story_part_id, platform, notes)
         )
         new_id = cursor.lastrowid
-        conn.commit()
-    finally:
-        conn.close()
     return jsonify({"success": True, "id": new_id,
                     "uploaded_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")})
 
 
 @app.route("/api/uploads/<int:upload_id>", methods=["DELETE"])
 def api_delete_upload(upload_id: int):
-    conn = get_db()
-    try:
+    with db_session() as conn:
         conn.execute("DELETE FROM video_uploads WHERE id = ?", (upload_id,))
-        conn.commit()
-    finally:
-        conn.close()
     return jsonify({"success": True})
 
 
@@ -1629,7 +1636,7 @@ def api_import_story():
 
     code = generate_story_code()
     try:
-        with get_db() as conn:
+        with db_session() as conn:
             cursor = conn.execute(
                 "INSERT INTO stories (code, title, keywords_json, total_parts) VALUES (?, ?, ?, ?)",
                 (code, story["title"], json.dumps(story["keywords"]), story["total_parts"])
