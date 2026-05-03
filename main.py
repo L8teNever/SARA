@@ -140,13 +140,14 @@ app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB Upload-Limit
 def get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 
 def init_db():
     with get_db() as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS stories (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1551,19 +1552,28 @@ def api_add_upload():
     notes         = data.get("notes", "")
     if not story_part_id:
         return jsonify({"error": "story_part_id fehlt."}), 400
-    with get_db() as conn:
+    conn = get_db()
+    try:
         cursor = conn.execute(
             "INSERT INTO video_uploads (story_part_id, platform, notes) VALUES (?, ?, ?)",
             (story_part_id, platform, notes)
         )
-    return jsonify({"success": True, "id": cursor.lastrowid,
+        new_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({"success": True, "id": new_id,
                     "uploaded_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")})
 
 
 @app.route("/api/uploads/<int:upload_id>", methods=["DELETE"])
 def api_delete_upload(upload_id: int):
-    with get_db() as conn:
+    conn = get_db()
+    try:
         conn.execute("DELETE FROM video_uploads WHERE id = ?", (upload_id,))
+        conn.commit()
+    finally:
+        conn.close()
     return jsonify({"success": True})
 
 
