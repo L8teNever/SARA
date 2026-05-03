@@ -96,7 +96,7 @@ async function loadStoryList(){
           </div>
           <div class="li__trail">
             ${trail}
-            <button class="btn btn--icon" style="color:var(--ce);opacity:.7" onclick="event.stopPropagation();deleteStoryFromVideo(${s.id},'${escHtml(s.title).replace(/'/g,"&#39;")}')">
+            <button class="btn btn--icon" style="color:var(--ce);opacity:.7" onclick="event.stopPropagation();deleteStoryFromVideo(${s.id},'${escHtml(s.title).replace(/'/g,"&#39;")}',this)">
               <span class="mi">delete</span>
             </button>
           </div>
@@ -169,12 +169,13 @@ async function createVideo(){
   }
 }
 
-async function deleteStoryFromVideo(id,title){
+async function deleteStoryFromVideo(id,title,btn){
   if(!await showConfirm('Story löschen',`"${title}" und alle zugehörigen Daten löschen?`,{confirmLabel:'Löschen',destructive:true}))return;
+  if(btn){btn.disabled=true;btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px"></div>'}
   try{
     const res=await fetch(`/api/stories/${id}`,{method:'DELETE'});
     const d=await res.json();
-    if(d.error){showSnack(d.error,'error');return}
+    if(d.error){showSnack(d.error,'error');if(btn){btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>'}return}
     showSnack('Story gelöscht.','success');
     if(selectedStoryId===id){
       selectedStoryId=null;
@@ -182,7 +183,7 @@ async function deleteStoryFromVideo(id,title){
       document.getElementById('selected-story-info').textContent='';
     }
     loadStoryList();
-  }catch(e){showSnack('Fehler: '+e.message,'error')}
+  }catch(e){showSnack('Fehler: '+e.message,'error');if(btn){btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>'}}
 }
 
 async function loadProdSettings(){

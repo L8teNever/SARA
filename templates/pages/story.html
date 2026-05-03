@@ -268,7 +268,7 @@ async function loadRecentStories(){
           <button class="btn btn--tonal btn--sm" onclick="event.stopPropagation();switchTab('video');pendingSelectStoryId=${s.id}" title="Zu Videos">
             <span class="mi" style="font-size:16px">movie</span>
           </button>
-          <button class="btn btn--icon" style="color:var(--ce)" onclick="event.stopPropagation();deleteRecentStory(${s.id},'${escHtml(s.title).replace(/'/g,"&#39;")}')">
+          <button class="btn btn--icon" style="color:var(--ce)" onclick="event.stopPropagation();deleteRecentStory(${s.id},'${escHtml(s.title).replace(/'/g,"&#39;")}',this)">
             <span class="mi">delete</span>
           </button>
         </div>`;
@@ -277,10 +277,11 @@ async function loadRecentStories(){
   }catch(e){c.innerHTML='<div class="empty" style="padding:16px 0"><span class="empty__sub">Fehler beim Laden</span></div>'}
 }
 
-async function deleteRecentStory(id,title){
+async function deleteRecentStory(id,title,btn){
   if(!await showConfirm('Story löschen',`"${title}" wirklich löschen?`,{confirmLabel:'Löschen',destructive:true}))return;
+  if(btn){btn.disabled=true;btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px"></div>'}
   try{await fetch(`/api/stories/${id}`,{method:'DELETE'});showSnack('Story gelöscht.','success');loadRecentStories()}
-  catch(e){showSnack('Fehler.','error')}
+  catch(e){showSnack('Fehler.','error');if(btn){btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>'}}
 }
 
 loadRecentStories();

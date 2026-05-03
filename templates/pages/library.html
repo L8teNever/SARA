@@ -121,11 +121,11 @@ function renderLibraryList(){
       <span class="mi" style="color:var(--cosv)">chevron_right</span>`;
     row.querySelector('.lrow__check').addEventListener('click',e=>{
       e.stopPropagation();
-      if(!allDone) markAllUploaded(story);
+      if(!allDone) markAllUploaded(story,e.currentTarget);
     });
     row.querySelector('.lrow__del').addEventListener('click',e=>{
       e.stopPropagation();
-      deleteLibStory(story.story_id,story.title);
+      deleteLibStory(story.story_id,story.title,e.currentTarget);
     });
     row.addEventListener('click',()=>openLibDetail(story));
     c.appendChild(row);
@@ -140,7 +140,7 @@ function openLibDetail(story,push=true){
   document.getElementById('lib-detail-title').textContent=story.title;
   document.getElementById('lib-detail-date').textContent=formatDate(story.created_at);
   const mb=document.getElementById('lib-mark-all-btn');
-  mb.style.display='';mb.onclick=()=>markAllUploaded(story);
+  mb.style.display='';mb.onclick=()=>markAllUploaded(story,mb);
   const grid=document.getElementById('lib-parts-grid');
   grid.innerHTML='';
   story.parts.forEach(part=>{
@@ -170,7 +170,7 @@ function openLibDetail(story,push=true){
           <button class="btn btn--outlined btn--sm" onclick="copySocial(${part.id})" title="Caption kopieren">
             <span class="mi" style="font-size:15px">content_copy</span>
           </button>
-          <button class="btn btn--outlined btn--sm" style="color:var(--ce);border-color:var(--ce)" onclick="deleteLibVideo(${part.id})">
+          <button class="btn btn--outlined btn--sm" style="color:var(--ce);border-color:var(--ce)" onclick="deleteLibVideo(${part.id},this)">
             <span class="mi" style="font-size:15px">delete</span>
           </button>
         </div>
@@ -202,12 +202,13 @@ function renderPlatChips(partId,uploads){
     btn.className='pchip'+(ex?' pchip--ok':'');
     btn.title=ex?`Hochgeladen ${formatDateShort(ex.uploaded_at)} — Klicken zum Entfernen`:`Als ${p.l} markieren`;
     btn.innerHTML=`<span class="mi">${ex?'check_circle':p.i}</span>${p.l}${ex?` · ${formatDateShort(ex.uploaded_at)}`:''}`;
-    btn.addEventListener('click',()=>toggleUpload(partId,p.id,ex?ex.id:null));
+    btn.addEventListener('click',()=>toggleUpload(partId,p.id,ex?ex.id:null,btn));
     c.appendChild(btn);
   });
 }
 
-async function toggleUpload(partId,platform,uploadId){
+async function toggleUpload(partId,platform,uploadId,btn){
+  if(btn){btn.disabled=true;const oldHtml=btn.innerHTML;btn._oh=oldHtml;btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px;margin-right:4px"></div>'+platform}
   try{
     if(uploadId){
       await fetch(`/api/uploads/${uploadId}`,{method:'DELETE'});
@@ -215,13 +216,13 @@ async function toggleUpload(partId,platform,uploadId){
     }else{
       const res=await fetch('/api/uploads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_part_id:partId,platform})});
       const d=await res.json();
-      if(d.error){showSnack(d.error,'error');return}
+      if(d.error){showSnack(d.error,'error');if(btn){btn.disabled=false;btn.innerHTML=btn._oh}return}
       showSnack(`Als ${platform} markiert!`,'success');
     }
     await loadLibrary();
     const story=_libData.find(s=>s.parts.some(p=>p.id===partId));
     if(story){const part=story.parts.find(p=>p.id===partId);if(part) renderPlatChips(partId,part.uploads||[])}
-  }catch(e){showSnack('Fehler: '+e.message,'error')}
+  }catch(e){showSnack('Fehler: '+e.message,'error');if(btn){btn.disabled=false;btn.innerHTML=btn._oh}}
 }
 
 function copySocial(partId){
@@ -233,33 +234,37 @@ function copySocial(partId){
   showSnack('Caption kopiert!','success');
 }
 
-async function deleteLibVideo(partId){
+async function deleteLibVideo(partId,btn){
   if(!await showConfirm('Video löschen','Dieses Video wirklich löschen?',{confirmLabel:'Löschen',destructive:true}))return;
+  if(btn){btn.disabled=true;btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px"></div>'}
   try{
     const res=await fetch(`/api/videos/${partId}`,{method:'DELETE'});
     const d=await res.json();
-    if(d.error){showSnack(d.error,'error');return}
+    if(d.error){showSnack(d.error,'error');if(btn){btn.disabled=false;btn.innerHTML='<span class="mi" style="font-size:15px">delete</span>'}return}
     showSnack('Video gelöscht.','success');
     await loadLibrary();
     const story=_libData.find(s=>s.parts.some(p=>p.id===partId));
     if(story&&story.parts.length>1) openLibDetail(story,false);
     else closeLibDetail(false);
-  }catch(e){showSnack('Fehler: '+e.message,'error')}
+  }catch(e){showSnack('Fehler: '+e.message,'error');if(btn){btn.disabled=false;btn.innerHTML='<span class="mi" style="font-size:15px">delete</span>'}}
 }
 
-async function deleteLibStory(storyId,title){
+async function deleteLibStory(storyId,title,btn){
   if(!await showConfirm('Story löschen',`"${title}" inklusive aller Videos löschen?`,{confirmLabel:'Löschen',destructive:true}))return;
+  if(btn){btn.disabled=true;btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px"></div>'}
   try{
     const res=await fetch(`/api/stories/${storyId}`,{method:'DELETE'});
     const d=await res.json();
-    if(d.error){showSnack(d.error,'error');return}
+    if(d.error){showSnack(d.error,'error');if(btn){btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>'}return}
     showSnack('Story gelöscht.','success');
     loadLibrary();
-  }catch(e){showSnack('Fehler: '+e.message,'error')}
+  }catch(e){showSnack('Fehler: '+e.message,'error');if(btn){btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>'}}
 }
 
-async function markAllUploaded(story){
+async function markAllUploaded(story,btn){
   if(!await showConfirm('Alle markieren',`Alle Teile von "${story.title}" als hochgeladen markieren?`,{confirmLabel:'Markieren'}))return;
+  const oldHtml=btn?btn.innerHTML:null;
+  if(btn){btn.disabled=true;btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px;margin-right:6px"></div> Markiere…'}
   try{
     for(const part of story.parts){
       for(const p of['tiktok1','tiktok2']){
@@ -272,6 +277,6 @@ async function markAllUploaded(story){
     await loadLibrary();
     const updated=_libData.find(s=>s.story_id===story.story_id);
     if(updated) openLibDetail(updated,false);
-  }catch(e){showSnack('Fehler: '+e.message,'error')}
+  }catch(e){showSnack('Fehler: '+e.message,'error');if(btn){btn.disabled=false;btn.innerHTML=oldHtml}}
 }
 </script>

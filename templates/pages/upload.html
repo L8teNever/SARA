@@ -109,12 +109,14 @@ function uploadFile(file){
 
 async function deleteBackground(filename,btn){
   if(!await showConfirm('Hintergrund löschen',`"${filename}" wirklich löschen?`,{confirmLabel:'Löschen',destructive:true}))return;
-  btn.closest('.bgthumb').style.opacity='.4';
+  btn.disabled=true;
+  btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px"></div>';
+  btn.closest('.bgthumb').style.opacity='.5';
   try{
     const res=await fetch(`/api/backgrounds/${encodeURIComponent(filename)}`,{method:'DELETE'});
     const d=await res.json();
     if(d.success){showSnack('Gelöscht.','success');loadBackgrounds()}
-    else{showSnack(d.error||'Fehler','error');btn.closest('.bgthumb').style.opacity=''}
-  }catch(e){showSnack('Fehler: '+e.message,'error');btn.closest('.bgthumb').style.opacity=''}
+    else{showSnack(d.error||'Fehler','error');btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>';btn.closest('.bgthumb').style.opacity=''}
+  }catch(e){showSnack('Fehler: '+e.message,'error');btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>';btn.closest('.bgthumb').style.opacity=''}
 }
 </script>
