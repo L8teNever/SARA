@@ -168,35 +168,50 @@ async function copyFullPrompt(){
   },3000);
 }
 
-async function importStory(forceSave=false,forceQueue=false){
+async function importStory(){
   const txt=document.getElementById('import-json').value.trim();
   if(!txt){showSnack('Bitte zuerst das JSON einfügen.','error');return}
+  
   try{
-    const res=await fetch('/api/import-story',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({json_text:txt,dry_run:!forceSave,auto_queue:forceQueue})});
-    const d=await res.json();
-    if(d.error){showSnack(d.error,'error');return}
-    if(!forceSave){
-      if(d.duplicate_check?.is_duplicate){
-        const dup=d.duplicate_check;
-        const ok=await showConfirm(
-          `Ähnliche Story gefunden (${dup.overlap}/10 Keywords)`,
-          `Gefunden: "${dup.similar_story.title}" [${dup.similar_story.code}]\n\nTrotzdem speichern und in Warteschlange stellen?`,
-          {confirmLabel:'Trotzdem speichern',cancelLabel:'Abbrechen'}
-        );
-        if(ok) importStory(true,true);
-        else showSnack('Import abgebrochen.','info');
-        return;
-      }
-      // Kein Duplikat? Dann direkt speichern
-      return importStory(true, false);
+    // 1. Check (Dry Run)
+    const res1=await fetch('/api/import-story',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({json_text:txt,dry_run:true,auto_queue:false})
+    });
+    const d1=await res1.json();
+    if(d1.error){showSnack(d1.error,'error');return}
+    
+    let forceQueue=false;
+    if(d1.duplicate_check?.is_duplicate){
+      const dup=d1.duplicate_check;
+      const ok=await showConfirm(
+        `Ähnliche Story gefunden (${dup.overlap}/10 Keywords)`,
+        `Gefunden: "${dup.similar_story.title}" [${dup.similar_story.code}]\n\nTrotzdem speichern und in Warteschlange stellen?`,
+        {confirmLabel:'Trotzdem speichern',cancelLabel:'Abbrechen'}
+      );
+      if(!ok){showSnack('Import abgebrochen.','info');return}
+      forceQueue=true;
     }
-    document.getElementById('import-result-title').textContent=d.auto_queued?'Story gespeichert & eingereiht!':'Story importiert!';
-    document.getElementById('import-result-body').textContent=`"${d.title}" wurde gespeichert (Code: ${d.code}).`+(d.auto_queued?' Videos werden automatisch erstellt.':'');
-    document.getElementById('import-result-actions').innerHTML=`<button class="btn btn--tonal btn--sm" onclick="switchTab('video');pendingSelectStoryId=${d.story_id}"><span class="mi">movie</span> Video-Status</button>`;
+    
+    // 2. Tatsächlich speichern
+    const res2=await fetch('/api/import-story',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({json_text:txt,dry_run:false,auto_queue:forceQueue})
+    });
+    const d2=await res2.json();
+    if(d2.error){showSnack(d2.error,'error');return}
+    
+    // Erfolg anzeigen
+    document.getElementById('import-result-title').textContent=d2.auto_queued?'Story gespeichert & eingereiht!':'Story importiert!';
+    document.getElementById('import-result-body').textContent=`"${d2.title}" wurde gespeichert (Code: ${d2.code}).`+(d2.auto_queued?' Videos werden automatisch erstellt.':'');
+    document.getElementById('import-result-actions').innerHTML=`<button class="btn btn--tonal btn--sm" onclick="switchTab('video');pendingSelectStoryId=${d2.story_id}"><span class="mi">movie</span> Video-Status</button>`;
     document.getElementById('import-result').classList.add('show');
-    showSnack(`"${d.title}" ${d.auto_queued?'wird produziert':'importiert'}!`,'success');
+    showSnack(`"${d2.title}" ${d2.auto_queued?'wird produziert':'importiert'}!`,'success');
     document.getElementById('import-json').value='';
     loadRecentStories();
+    
   }catch(e){showSnack('Fehler: '+e.message,'error')}
 }
 
