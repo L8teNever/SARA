@@ -5,7 +5,9 @@
       "Bash(Select-Object FullName, Name)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/)",
       "PowerShell(Get-Process *)",
-      "PowerShell(Stop-Process *)"
+      "PowerShell(Stop-Process *)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('main.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('main.py', encoding='utf-8'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")"
     ]
   }
 }

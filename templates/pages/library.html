@@ -3,6 +3,15 @@
   <!-- Overview -->
   <div id="lib-overview">
     <div class="wrap">
+
+      <div class="page-hdr">
+        <div class="page-hdr__ico"><span class="mi">video_library</span></div>
+        <div>
+          <div class="page-hdr__title">Bibliothek</div>
+          <div class="page-hdr__sub">Fertige Videos verwalten und Upload-Status tracken</div>
+        </div>
+      </div>
+
       <div style="position:sticky;top:0;z-index:10;background:var(--cs);padding-bottom:10px;margin-bottom:2px">
         <div style="position:relative;margin-bottom:10px">
           <span class="mi" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:20px;color:var(--cosv);pointer-events:none">search</span>
@@ -14,8 +23,9 @@
           <button class="fchip" data-f="no-t2" onclick="setLibFilter('no-t2',this)"><span class="mi">play_circle</span> Kein TikTok 2</button>
         </div>
       </div>
+
       <div id="lib-story-list">
-        <div class="empty"><span class="mi">videocam_off</span><span class="empty__ttl">Noch keine Videos</span><span class="empty__sub">Erstelle Videos im Video-Tab</span></div>
+        <div style="display:flex;justify-content:center;padding:40px"><div class="spinner spinner--lg"></div></div>
       </div>
     </div>
   </div>

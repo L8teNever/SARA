@@ -16,6 +16,7 @@ import re
 import json
 import uuid
 import random
+import shutil
 import string
 import sqlite3
 import asyncio
@@ -29,7 +30,6 @@ from contextlib import contextmanager
 # Globale Liste für aktive Subprozesse (FFmpeg etc.)
 _ACTIVE_SUBPROCESSES = []
 def _run_sub(args, **kwargs):
-    import subprocess
     # capture_output auf Popen-Argumente umbiegen
     if kwargs.pop('capture_output', False):
         kwargs['stdout'] = subprocess.PIPE
@@ -49,8 +49,6 @@ def _run_sub(args, **kwargs):
             _ACTIVE_SUBPROCESSES.remove(p)
 
 def _kill_active_subs():
-    import signal
-    import os
     while _ACTIVE_SUBPROCESSES:
         p = _ACTIVE_SUBPROCESSES.pop()
         try:
@@ -58,7 +56,8 @@ def _kill_active_subs():
                 subprocess.run(['taskkill', '/F', '/T', '/PID', str(p.pid)], capture_output=True)
             else:
                 p.terminate()
-        except: pass
+        except Exception:
+            pass
 
 
 from flask import (
@@ -162,8 +161,6 @@ def db_session():
 
 def init_db():
     with db_session() as conn:
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS stories (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -420,7 +417,7 @@ def tts_to_file(text: str, output_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 def _get_duration(file_path: Path) -> float:
-    result = subprocess.run(
+    result = _run_sub(
         [FFMPEG_EXE, "-i", str(file_path)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -764,7 +761,7 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
         tts_to_file(text, audio_path)
         audio_duration = get_audio_duration(audio_path)
 
-        # ---- Schritt 3: ASS-Untertitel mit Wort-Highlighting ----
+        # ---- Schritt 2: ASS-Untertitel mit Wort-Highlighting ----
         progress(30, "Wort-Timing wird berechnet…")
         build_word_timed_ass(text, ass_path, audio_path)
 
@@ -793,8 +790,8 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
             bg_frame_path = None
         create_cover_image(story_title, story_code, part_number, cover_path,
                            bg_frame_path=bg_frame_path)
-        if bg_frame_path and Path(bg_frame_path).exists():
-            Path(bg_frame_path).unlink(missing_ok=True)
+        if bg_frame_path and bg_frame_path.exists():
+            bg_frame_path.unlink(missing_ok=True)
 
         # ---- Schritt 5: FFmpeg --- 9:16 Crop + ASS-Overlay + Audio ----
         progress(65, "Video wird gerendert (9:16 Hochformat)...")
@@ -882,7 +879,7 @@ def _assemble_background_loop(bg_videos: list, target_duration: float, output: P
     try:
         for i, (vid, dur) in enumerate(clip_list):
             tmp_clip = output.parent / f"_tmp_clip_{i}_{uuid.uuid4().hex[:6]}.mp4"
-            result = subprocess.run(
+            result = _run_sub(
                 [
                     FFMPEG_EXE, "-y",
                     "-i", str(vid),
@@ -912,7 +909,7 @@ def _assemble_background_loop(bg_videos: list, target_duration: float, output: P
                 safe_path = str(clip.resolve()).replace("\\", "/")
                 f.write(f"file '{safe_path}'\n")
 
-        result = subprocess.run(
+        result = _run_sub(
             [
                 FFMPEG_EXE, "-y",
                 "-f", "concat",
@@ -1514,7 +1511,6 @@ def api_delete_story(story_id: int):
         story_out_dir = OUTPUTS_DIR / story_code
         if story_out_dir.exists() and story_out_dir.is_dir():
             try:
-                import shutil
                 shutil.rmtree(story_out_dir)
             except Exception:
                 pass
@@ -1589,9 +1585,6 @@ def api_delete_upload(upload_id: int):
 # Flask-Routen — Prompt-Builder
 # ---------------------------------------------------------------------------
 
-PROMPT_TEMPLATE_SYSTEM = SYSTEM_PROMPT
-
-
 @app.route("/api/get-prompt-template", methods=["POST"])
 def api_get_prompt_template():
     data = request.get_json(silent=True) or {}
@@ -1600,9 +1593,9 @@ def api_get_prompt_template():
         return jsonify({"error": "Bitte eine Idee eingeben."}), 400
     user_msg = f"Create a story about: {idea}"
     return jsonify({
-        "system_prompt": PROMPT_TEMPLATE_SYSTEM,
+        "system_prompt": SYSTEM_PROMPT,
         "user_message":  user_msg,
-        "combined":      f"[SYSTEM]\n{PROMPT_TEMPLATE_SYSTEM}\n\n[USER]\n{user_msg}",
+        "combined":      f"[SYSTEM]\n{SYSTEM_PROMPT}\n\n[USER]\n{user_msg}",
     })
 
 

@@ -1,64 +1,91 @@
 <section class="page is-active" data-tab="story">
 <div class="wrap">
 
-  <div class="lbl"><span class="mi">looks_one</span> Prompt generieren</div>
-  <div class="card">
-    <div class="field">
-      <label class="flabel" for="story-idea">Thema <span style="font-weight:400;opacity:.6;text-transform:none;letter-spacing:0">(optional — leer = zufällige Story)</span></label>
-      <input id="story-idea" class="inp" type="text" placeholder='z.B. "a woman who discovers her husband has a secret family"'>
+  <div class="page-hdr">
+    <div class="page-hdr__ico"><span class="mi">auto_stories</span></div>
+    <div>
+      <div class="page-hdr__title">Story erstellen</div>
+      <div class="page-hdr__sub">Prompt kopieren → KI verwenden → JSON importieren</div>
     </div>
-    <button class="btn btn--filled btn--lg" id="btn-copy-full" onclick="copyFullPrompt()" style="margin-top:4px">
-      <span class="mi">content_copy</span> Prompt kopieren
-    </button>
-    <div id="copy-confirm" style="text-align:center;font-size:12px;min-height:18px;margin-top:6px;color:var(--cg)"></div>
-    <div style="margin-top:10px">
-      <button class="btn btn--text btn--sm" onclick="togglePromptPreview(this)" style="color:var(--cosv)">
-        <span class="mi" style="font-size:16px;transition:transform .2s">expand_more</span>
-        Prompt anzeigen / bearbeiten
+  </div>
+
+  <!-- Step 1: Prompt -->
+  <div class="step-card">
+    <div class="step-card__hdr">
+      <div class="step-card__num">01</div>
+      <div>
+        <div class="step-card__title">Prompt generieren</div>
+        <div class="step-card__sub">Thema eingeben und Prompt in ChatGPT, Gemini oder Claude einfügen</div>
+      </div>
+    </div>
+    <div class="step-card__body">
+      <div class="field">
+        <label class="flabel" for="story-idea">Thema <span style="font-weight:400;opacity:.6;text-transform:none;letter-spacing:0">(optional — leer = zufällige Story)</span></label>
+        <input id="story-idea" class="inp" type="text" placeholder='z.B. "a woman who discovers her husband has a secret family"'>
+      </div>
+      <button class="btn btn--filled btn--lg" id="btn-copy-full" onclick="copyFullPrompt()" style="margin-top:4px">
+        <span class="mi">content_copy</span> Prompt kopieren
       </button>
-      <div id="prompt-preview-wrap" style="display:none;margin-top:10px">
-        <textarea id="prompt-template-ta" class="ta" style="font-family:'Courier New',monospace;font-size:12px;min-height:260px;line-height:1.55" spellcheck="false"></textarea>
-        <button class="btn btn--outlined btn--sm" onclick="resetPromptTemplate()" style="margin-top:8px">
-          <span class="mi">restart_alt</span> Zurücksetzen
+      <div id="copy-confirm" style="text-align:center;font-size:12px;min-height:18px;margin-top:8px;color:var(--cg)"></div>
+      <div style="margin-top:10px">
+        <button class="btn btn--text btn--sm" onclick="togglePromptPreview(this)" style="color:var(--cosv)">
+          <span class="mi" style="font-size:16px;transition:transform .2s">expand_more</span>
+          Prompt anzeigen / bearbeiten
         </button>
+        <div id="prompt-preview-wrap" style="display:none;margin-top:10px">
+          <textarea id="prompt-template-ta" class="ta" style="font-family:'Courier New',monospace;font-size:12px;min-height:260px;line-height:1.55" spellcheck="false"></textarea>
+          <button class="btn btn--outlined btn--sm" onclick="resetPromptTemplate()" style="margin-top:8px">
+            <span class="mi">restart_alt</span> Zurücksetzen
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
-  <div style="display:flex;align-items:center;gap:12px;margin:6px 0 4px">
-    <div class="divider" style="flex:1;margin:0"></div>
-    <span style="font-size:12px;color:var(--cosv);white-space:nowrap">In ChatGPT / Gemini / Claude einfügen → Antwort kopieren</span>
-    <div class="divider" style="flex:1;margin:0"></div>
+  <!-- Connector -->
+  <div class="step-conn">
+    <span class="mi">arrow_downward</span>
+    <span>In ChatGPT / Gemini / Claude.ai einfügen → Antwort kopieren</span>
   </div>
 
-  <div class="lbl"><span class="mi">looks_two</span> KI-Antwort importieren</div>
-  <div class="card">
-    <div class="field">
-      <label class="flabel" for="import-json">JSON-Antwort</label>
-      <textarea id="import-json" class="ta" style="min-height:180px;font-family:'Courier New',monospace;font-size:12.5px"
-        placeholder='{
+  <!-- Step 2: Import -->
+  <div class="step-card">
+    <div class="step-card__hdr">
+      <div class="step-card__num">02</div>
+      <div>
+        <div class="step-card__title">KI-Antwort importieren</div>
+        <div class="step-card__sub">JSON-Antwort hier einfügen und speichern</div>
+      </div>
+    </div>
+    <div class="step-card__body">
+      <div class="field">
+        <label class="flabel" for="import-json">JSON-Antwort</label>
+        <textarea id="import-json" class="ta" style="min-height:180px;font-family:'Courier New',monospace;font-size:12.5px"
+          placeholder='{
   "title": "The Betrayal",
   "total_parts": 2,
   "keywords": ["betrayal","trust",...],
   "parts": [...]
 }'></textarea>
-    </div>
-    <div class="row">
-      <button class="btn btn--filled" onclick="importStory()" style="flex:1">
-        <span class="mi">check_circle</span> Story importieren
-      </button>
-      <button class="btn btn--outlined" onclick="clearImport()">
-        <span class="mi">delete_sweep</span> Leeren
-      </button>
-    </div>
-    <div class="impres" id="import-result">
-      <div class="impres__ttl" id="import-result-title"></div>
-      <div class="impres__body" id="import-result-body"></div>
-      <div id="import-result-actions" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"></div>
+      </div>
+      <div class="row">
+        <button class="btn btn--filled" onclick="importStory()" style="flex:1">
+          <span class="mi">check_circle</span> Story importieren
+        </button>
+        <button class="btn btn--outlined" onclick="clearImport()">
+          <span class="mi">delete_sweep</span> Leeren
+        </button>
+      </div>
+      <div class="impres" id="import-result">
+        <div class="impres__ttl" id="import-result-title"></div>
+        <div class="impres__body" id="import-result-body"></div>
+        <div id="import-result-actions" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"></div>
+      </div>
     </div>
   </div>
 
-  <div class="lbl"><span class="mi">history</span> Zuletzt gespeichert</div>
+  <!-- Recent Stories -->
+  <div class="lbl" style="margin-top:28px"><span class="mi">history</span> Zuletzt gespeichert</div>
   <div id="recent-stories-list">
     <div style="display:flex;justify-content:center;padding:24px"><div class="spinner"></div></div>
   </div>
@@ -171,9 +198,7 @@ async function copyFullPrompt(){
 async function importStory(){
   const txt=document.getElementById('import-json').value.trim();
   if(!txt){showSnack('Bitte zuerst das JSON einfügen.','error');return}
-  
   try{
-    // 1. Check (Dry Run)
     const res1=await fetch('/api/import-story',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -181,7 +206,6 @@ async function importStory(){
     });
     const d1=await res1.json();
     if(d1.error){showSnack(d1.error,'error');return}
-    
     let forceQueue=false;
     if(d1.duplicate_check?.is_duplicate){
       const dup=d1.duplicate_check;
@@ -193,8 +217,6 @@ async function importStory(){
       if(!ok){showSnack('Import abgebrochen.','info');return}
       forceQueue=true;
     }
-    
-    // 2. Tatsächlich speichern
     const res2=await fetch('/api/import-story',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -202,8 +224,6 @@ async function importStory(){
     });
     const d2=await res2.json();
     if(d2.error){showSnack(d2.error,'error');return}
-    
-    // Erfolg anzeigen
     document.getElementById('import-result-title').textContent=d2.auto_queued?'Story gespeichert & eingereiht!':'Story importiert!';
     document.getElementById('import-result-body').textContent=`"${d2.title}" wurde gespeichert (Code: ${d2.code}).`+(d2.auto_queued?' Videos werden automatisch erstellt.':'');
     document.getElementById('import-result-actions').innerHTML=`<button class="btn btn--tonal btn--sm" onclick="switchTab('video');pendingSelectStoryId=${d2.story_id}"><span class="mi">movie</span> Video-Status</button>`;
@@ -211,7 +231,6 @@ async function importStory(){
     showSnack(`"${d2.title}" ${d2.auto_queued?'wird produziert':'importiert'}!`,'success');
     document.getElementById('import-json').value='';
     loadRecentStories();
-    
   }catch(e){showSnack('Fehler: '+e.message,'error')}
 }
 
