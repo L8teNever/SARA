@@ -175,16 +175,20 @@ async function importStory(forceSave=false,forceQueue=false){
     const res=await fetch('/api/import-story',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({json_text:txt,dry_run:!forceSave,auto_queue:forceQueue})});
     const d=await res.json();
     if(d.error){showSnack(d.error,'error');return}
-    if(!forceSave&&d.duplicate_check?.is_duplicate){
-      const dup=d.duplicate_check;
-      const ok=await showConfirm(
-        `Ähnliche Story gefunden (${dup.overlap}/10 Keywords)`,
-        `Gefunden: "${dup.similar_story.title}" [${dup.similar_story.code}]\n\nTrotzdem speichern und in Warteschlange stellen?`,
-        {confirmLabel:'Trotzdem speichern',cancelLabel:'Abbrechen'}
-      );
-      if(ok) importStory(true,true);
-      else showSnack('Import abgebrochen.','info');
-      return;
+    if(!forceSave){
+      if(d.duplicate_check?.is_duplicate){
+        const dup=d.duplicate_check;
+        const ok=await showConfirm(
+          `Ähnliche Story gefunden (${dup.overlap}/10 Keywords)`,
+          `Gefunden: "${dup.similar_story.title}" [${dup.similar_story.code}]\n\nTrotzdem speichern und in Warteschlange stellen?`,
+          {confirmLabel:'Trotzdem speichern',cancelLabel:'Abbrechen'}
+        );
+        if(ok) importStory(true,true);
+        else showSnack('Import abgebrochen.','info');
+        return;
+      }
+      // Kein Duplikat? Dann direkt speichern
+      return importStory(true, false);
     }
     document.getElementById('import-result-title').textContent=d.auto_queued?'Story gespeichert & eingereiht!':'Story importiert!';
     document.getElementById('import-result-body').textContent=`"${d.title}" wurde gespeichert (Code: ${d.code}).`+(d.auto_queued?' Videos werden automatisch erstellt.':'');
