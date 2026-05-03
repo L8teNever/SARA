@@ -254,6 +254,7 @@ input,textarea{font:inherit;color:inherit}
 .empty__ttl{font-size:15px;font-weight:500;color:var(--cos)}
 .empty__sub{font-size:13px;opacity:.7}
 .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.spin{animation:spin 1.5s linear infinite}
 
 /* ── Modal ───────────────────────────────────────────────── */
 .mback{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:20px}
@@ -445,8 +446,17 @@ function startSSE(){
   _sseSource.onmessage=e=>{
     try{
       const d=JSON.parse(e.data);
-      if(d.jobs)  renderQueueList(d.jobs);
-      if(d.stats){renderQueueStats(d.stats);updateQBadge(d.stats)}
+      if(d.jobs) renderQueueList(d.jobs);
+      if(d.stats){
+        renderQueueStats(d.stats);
+        updateQBadge(d.stats);
+      } else if (d.jobs) {
+        // Berechne Stats aus Jobs falls Server sie nicht mitschickt
+        const s = {pending:0, processing:0, done:0, error:0};
+        d.jobs.forEach(j => { if(s[j.status]!==undefined) s[j.status]++ });
+        renderQueueStats(s);
+        updateQBadge(s);
+      }
       if(typeof d.prod_active!=='undefined'){_prodActive=d.prod_active;if(typeof updateProdBtn==='function')updateProdBtn()}
     }catch(_){}
   };
@@ -475,65 +485,72 @@ function renderQueueStats(stats){
 function renderQueueList(jobs){
   const c=document.getElementById('queue-list');
   if(!c) return;
+  
   if(!jobs.length){
     c.innerHTML='<div class="empty"><span class="mi">hourglass_empty</span><span class="empty__ttl">Warteschlange leer</span></div>';
     return;
   }
-  const active=jobs.filter(j=>j.status==='processing'||j.status==='pending');
-  const done  =jobs.filter(j=>j.status==='done'||j.status==='error');
-  const existing={};
-  c.querySelectorAll('.jcard[data-jid]').forEach(el=>{existing[el.dataset.jid]=el});
-  const seen=new Set();
 
-  function mkJob(job,target){
-    seen.add(String(job.id));
-    let el=existing[String(job.id)];
+  // Wir nutzen ein Dokument-Fragment oder bauen den HTML-String erst komplett, 
+  // um Layout-Flickern zu minimieren.
+  const activeJobs = jobs.filter(j=>j.status==='processing'||j.status==='pending');
+  const doneJobs   = jobs.filter(j=>j.status==='done'||j.status==='error');
+
+  function getJobHtml(job){
     const isP=job.status==='processing';
     const pct=job.progress_pct||0;
     const lbl=job.progress_label||'';
     const ico={pending:'hourglass_empty',processing:'settings',done:'check_circle',error:'error'};
-    if(!el){el=document.createElement('div');el.dataset.jid=job.id;target.appendChild(el)}
-    el.className='jcard'+(isP?' jcard--on':'');
-    el.innerHTML=`
-      <div class="jcard__hdr">
-        <div class="jcard__ico"><span class="mi">${ico[job.status]||'help'}</span></div>
-        <div class="jcard__title">${escHtml(job.title)} — Teil ${job.part_number}</div>
-        <span class="chip chip--${job.status}">${statusLabel(job.status)}</span>
-      </div>
-      <div class="jcard__meta">${job.code} · ${formatDate(job.created_at)}${job.started_at?` · ⏱ ${getDuration(job.started_at,job.finished_at)}`:''}</div>
-      ${isP?`<div class="jcard__bar"><div class="jcard__track"><div class="jcard__fill" style="width:${pct}%"></div></div><span class="jcard__pct">${pct}%</span></div>${lbl?`<div class="jcard__plbl">${escHtml(lbl)}</div>`:''}`:
-        (job.status==='done'&&lbl)?`<div class="jcard__plbl" style="color:var(--cg)">${escHtml(lbl)}</div>`:''}
-      ${job.status==='error'?`<div class="jcard__err">${escHtml(job.error_msg||'Fehler')}</div>`:''}
-      ${!isP?`<div class="jcard__acts">
-        ${job.status==='pending'?`<button class="btn btn--outlined btn--sm" onclick="cancelJob(${job.id})"><span class="mi">cancel</span>Abbrechen</button>`:''}
-        ${(job.status==='error'||job.status==='done')?`<button class="btn btn--tonal btn--sm" onclick="restartJob(${job.id})"><span class="mi">refresh</span>Neustart</button>`:''}
-        <button class="btn btn--danger btn--sm" onclick="deleteJob(${job.id})"><span class="mi">delete</span>Löschen</button>
-      </div>`:''}`;
+    return `
+      <div class="jcard${isP?' jcard--on':''}" data-jid="${job.id}">
+        <div class="jcard__hdr">
+          <div class="jcard__ico"><span class="mi ${isP?'spin':''}">${ico[job.status]||'help'}</span></div>
+          <div class="jcard__title">${escHtml(job.title)} — Teil ${job.part_number}</div>
+          <span class="chip chip--${job.status}">${statusLabel(job.status)}</span>
+        </div>
+        <div class="jcard__meta">${job.code} · ${formatDate(job.created_at)}${job.started_at?` · ⏱ ${getDuration(job.started_at,job.finished_at)}`:''}</div>
+        ${isP?`<div class="jcard__bar"><div class="jcard__track"><div class="jcard__fill" style="width:${pct}%"></div></div><span class="jcard__pct">${pct}%</span></div>${lbl?`<div class="jcard__plbl">${escHtml(lbl)}</div>`:''}`:
+          (job.status==='done'&&lbl)?`<div class="jcard__plbl" style="color:var(--cg)">${escHtml(lbl)}</div>`:''}
+        ${job.status==='error'?`<div class="jcard__err">${escHtml(job.error_msg||'Fehler')}</div>`:''}
+        ${!isP?`<div class="jcard__acts">
+          ${job.status==='pending'?`<button class="btn btn--outlined btn--sm" onclick="cancelJob(${job.id})"><span class="mi">cancel</span>Abbrechen</button>`:''}
+          ${(job.status==='error'||job.status==='done')?`<button class="btn btn--tonal btn--sm" onclick="restartJob(${job.id})"><span class="mi">refresh</span>Neustart</button>`:''}
+          <button class="btn btn--danger btn--sm" onclick="deleteJob(${job.id})"><span class="mi">delete</span>Löschen</button>
+        </div>`:''}
+      </div>`;
   }
 
-  c.innerHTML='';
-  const aw=document.createElement('div');
-  active.forEach(j=>mkJob(j,aw));
-  if(active.length) c.appendChild(aw);
+  let html = '<div class="queue-active-wrap">';
+  activeJobs.forEach(j => html += getJobHtml(j));
+  html += '</div>';
 
-  if(done.length){
+  if(doneJobs.length){
     const key='sara_qdone';
     const col=localStorage.getItem(key)==='true';
-    const sep=document.createElement('div');
-    sep.className='csep';
-    sep.innerHTML=`<div class="csep__line"></div><span class="csep__txt"><span class="mi csep__ico${col?' col':''}">expand_more</span>Abgeschlossen (${done.length})</span><div class="csep__line"></div>`;
-    const dw=document.createElement('div');
-    dw.style.display=col?'none':'block';
-    sep.onclick=()=>{
-      const h=dw.style.display==='none';
-      dw.style.display=h?'block':'none';
-      sep.querySelector('.csep__ico').classList.toggle('col',!h);
-      localStorage.setItem(key,!h);
-    };
-    done.forEach(j=>mkJob(j,dw));
-    c.appendChild(sep);c.appendChild(dw);
+    html += `
+      <div class="csep" onclick="toggleQueueDone(this)">
+        <div class="csep__line"></div>
+        <span class="csep__txt"><span class="mi csep__ico${col?' col':''}">expand_more</span>Abgeschlossen (${doneJobs.length})</span>
+        <div class="csep__line"></div>
+      </div>
+      <div class="queue-done-wrap" style="display:${col?'none':'block'}">
+        ${doneJobs.map(j => getJobHtml(j)).join('')}
+      </div>`;
   }
-  Object.entries(existing).forEach(([id,el])=>{if(!seen.has(id))el.remove()});
+
+  // Nur updaten wenn sich der HTML-Inhalt wirklich geändert hat (rudimentäres Virtual DOM)
+  if (c.dataset.lastHtml !== html) {
+    c.innerHTML = html;
+    c.dataset.lastHtml = html;
+  }
+}
+
+function toggleQueueDone(sep){
+  const dw = sep.nextElementSibling;
+  const h = dw.style.display==='none';
+  dw.style.display = h?'block':'none';
+  sep.querySelector('.csep__ico').classList.toggle('col', !h);
+  localStorage.setItem('sara_qdone', !h);
 }
 
 function updateQBadge(stats){
