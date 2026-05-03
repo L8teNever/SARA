@@ -69,7 +69,7 @@
 }'></textarea>
       </div>
       <div class="row">
-        <button class="btn btn--filled" onclick="importStory()" style="flex:1">
+        <button class="btn btn--filled" id="btn-import-story" onclick="importStory()" style="flex:1">
           <span class="mi">check_circle</span> Story importieren
         </button>
         <button class="btn btn--outlined" onclick="clearImport()">
@@ -198,6 +198,10 @@ async function copyFullPrompt(){
 async function importStory(){
   const txt=document.getElementById('import-json').value.trim();
   if(!txt){showSnack('Bitte zuerst das JSON einfügen.','error');return}
+  const btn=document.getElementById('btn-import-story');
+  const oldHtml=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML='<div class="spinner spinner--sm" style="width:18px;height:18px;border-width:2px;margin-right:8px"></div> Prüfe…';
   try{
     const res1=await fetch('/api/import-story',{
       method:'POST',
@@ -209,6 +213,7 @@ async function importStory(){
     let forceQueue=false;
     if(d1.duplicate_check?.is_duplicate){
       const dup=d1.duplicate_check;
+      btn.innerHTML='<div class="spinner spinner--sm" style="width:18px;height:18px;border-width:2px;margin-right:8px"></div> Warte…';
       const ok=await showConfirm(
         `Ähnliche Story gefunden (${dup.overlap}/10 Keywords)`,
         `Gefunden: "${dup.similar_story.title}" [${dup.similar_story.code}]\n\nTrotzdem speichern und in Warteschlange stellen?`,
@@ -217,6 +222,7 @@ async function importStory(){
       if(!ok){showSnack('Import abgebrochen.','info');return}
       forceQueue=true;
     }
+    btn.innerHTML='<div class="spinner spinner--sm" style="width:18px;height:18px;border-width:2px;margin-right:8px"></div> Speichern…';
     const res2=await fetch('/api/import-story',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -232,6 +238,7 @@ async function importStory(){
     document.getElementById('import-json').value='';
     loadRecentStories();
   }catch(e){showSnack('Fehler: '+e.message,'error')}
+  finally{btn.disabled=false;btn.innerHTML=oldHtml}
 }
 
 function clearImport(){
