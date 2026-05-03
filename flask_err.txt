@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "C:\Users\Docker\Desktop\SARA\main.py", line 1667, in <module>
+    init_db()
+  File "C:\Users\Docker\Desktop\SARA\main.py", line 149, in init_db
+    conn.executescript("""
+sqlite3.OperationalError: database is locked

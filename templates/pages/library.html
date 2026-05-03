@@ -1,377 +1,257 @@
-<!-- ============================================================ TAB 3: Bibliothek ============================================================ -->
-<section class="tab-content" id="tab-library">
+<section class="page" data-tab="library">
 
-  <!-- ─── Story-Übersicht (Listenansicht) ─── -->
+  <!-- Overview -->
   <div id="lib-overview">
-    <div class="page-header">
-      <div class="page-header__eyebrow"><span class="material-symbols-rounded">video_library</span> Ausgabe</div>
-      <h1 class="page-header__title">Meine Stories</h1>
-      <p class="page-header__sub">Klicke auf eine Story um alle Videos zu sehen.</p>
-    </div>
-
-    <!-- Suchleiste + Filter -->
-    <div class="md-card md-card--elevated" style="margin-bottom:16px;padding:12px 16px;">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-        <div style="position:relative;flex:1;min-width:180px;">
-          <span class="material-symbols-rounded" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--md-sys-color-on-surface-variant);pointer-events:none">search</span>
-          <input class="md-input" id="lib-search" type="text" placeholder="Story suchen…" oninput="filterLibrary()"
-            style="padding-left:38px;min-height:38px;font-size:14px;" />
+    <div class="wrap">
+      <div style="position:sticky;top:0;z-index:10;background:var(--cs);padding-bottom:10px;margin-bottom:2px">
+        <div style="position:relative;margin-bottom:10px">
+          <span class="mi" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:20px;color:var(--cosv);pointer-events:none">search</span>
+          <input class="inp" id="lib-search" type="text" placeholder="Story suchen…" oninput="filterLibrary()" style="padding-left:42px">
         </div>
-        <div class="chip-row" id="lib-filter-chips" style="margin:0;gap:6px;">
-          <button class="md-chip lib-filter-chip lib-filter-chip--active" data-filter="all" onclick="setLibFilter('all',this)">
-            <span class="material-symbols-rounded">layers</span> Alle
-          </button>
-          <button class="md-chip lib-filter-chip" data-filter="no-tiktok" onclick="setLibFilter('no-tiktok',this)">
-            <span class="material-symbols-rounded">play_circle</span> Kein TikTok
-          </button>
-          <button class="md-chip lib-filter-chip" data-filter="no-instagram" onclick="setLibFilter('no-instagram',this)">
-            <span class="material-symbols-rounded">photo_camera</span> Kein Instagram
-          </button>
-          <button class="md-chip lib-filter-chip" data-filter="no-youtube" onclick="setLibFilter('no-youtube',this)">
-            <span class="material-symbols-rounded">smart_display</span> Kein YouTube
-          </button>
+        <div class="row" id="lib-filter-chips" style="gap:6px">
+          <button class="fchip is-on" data-f="all" onclick="setLibFilter('all',this)"><span class="mi">layers</span> Alle</button>
+          <button class="fchip" data-f="no-tiktok" onclick="setLibFilter('no-tiktok',this)"><span class="mi">play_circle</span> Kein TikTok</button>
+          <button class="fchip" data-f="no-instagram" onclick="setLibFilter('no-instagram',this)"><span class="mi">photo_camera</span> Kein Instagram</button>
+          <button class="fchip" data-f="no-youtube" onclick="setLibFilter('no-youtube',this)"><span class="mi">smart_display</span> Kein YouTube</button>
         </div>
       </div>
-    </div>
-
-    <div id="lib-story-list">
-      <div class="empty-state">
-        <div class="empty-state__icon"><span class="material-symbols-rounded">videocam_off</span></div>
-        <div class="empty-state__text">Noch keine Videos vorhanden</div>
-        <div class="empty-state__hint">Erstelle Videos über den "Video erstellen"-Tab</div>
+      <div id="lib-story-list">
+        <div class="empty"><span class="mi">videocam_off</span><span class="empty__ttl">Noch keine Videos</span><span class="empty__sub">Erstelle Videos im Video-Tab</span></div>
       </div>
     </div>
   </div>
 
-  <!-- ─── Story-Detailansicht (Parts) ─── -->
-  <div id="lib-detail" style="display:none;">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
-      <button class="md-btn md-btn--tonal md-btn--sm" onclick="closeLibDetail()">
-        <span class="material-symbols-rounded">arrow_back</span> Zurück
-      </button>
-      <span class="story-code-badge" id="lib-detail-code"></span>
-      <span style="font-weight:600;font-size:17px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="lib-detail-title"></span>
-      <span class="text-muted" id="lib-detail-date"></span>
-      <button class="md-btn md-btn--outlined md-btn--sm mark-all-done-btn" style="display:none" id="lib-mark-all-btn">
-        <span class="material-symbols-rounded">done_all</span> Alle als erledigt
-      </button>
+  <!-- Detail -->
+  <div id="lib-detail" style="display:none">
+    <div class="wrap">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px">
+        <button class="btn btn--tonal btn--sm" onclick="closeLibDetail()">
+          <span class="mi">arrow_back</span> Zurück
+        </button>
+        <span class="badge" id="lib-detail-code"></span>
+        <span style="font-size:16px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="lib-detail-title"></span>
+        <span style="font-size:12px;color:var(--cosv)" id="lib-detail-date"></span>
+        <button class="btn btn--outlined btn--sm" id="lib-mark-all-btn" style="display:none">
+          <span class="mi">done_all</span> Alle erledigt
+        </button>
+      </div>
+      <div id="lib-parts-grid"></div>
     </div>
-    <div id="lib-parts-grid"></div>
   </div>
 
 </section>
 
-<style>
-  .lib-filter-chip { cursor: pointer; transition: background .15s, color .15s; }
-  .lib-filter-chip--active { background: var(--md-sys-color-primary-container) !important; border-color: transparent !important; color: var(--md-sys-color-on-primary-container) !important; }
-</style>
-
 <script>
-  // ============================================================
-  //  Bibliothek — Daten & State
-  // ============================================================
-  let _libData = [];
-  let _libFilter = 'all';
+let _libData=[];
+let _libFilter='all';
 
-  async function loadLibrary() {
-    const container = document.getElementById('lib-story-list');
-    container.innerHTML = '<div class="spinner" style="margin:40px auto"></div>';
-    try {
-      const data = await fetch('/api/videos').then(r => r.json());
-      _libData = data;
-      renderLibraryList();
-    } catch (e) {
-      container.innerHTML = `<div class="text-muted">Fehler: ${e.message}</div>`;
-    }
-  }
-
-  function setLibFilter(filter, el) {
-    _libFilter = filter;
-    document.querySelectorAll('.lib-filter-chip').forEach(c => c.classList.remove('lib-filter-chip--active'));
-    el.classList.add('lib-filter-chip--active');
+async function loadLibrary(){
+  const c=document.getElementById('lib-story-list');
+  c.innerHTML='<div style="display:flex;justify-content:center;padding:40px"><div class="spinner spinner--lg"></div></div>';
+  try{
+    _libData=await fetch('/api/videos').then(r=>r.json());
     renderLibraryList();
+    if(pendingLibraryCode){
+      const s=_libData.find(x=>x.code===pendingLibraryCode);
+      if(s){pendingLibraryCode=null;openLibDetail(s,false)}
+    }
+  }catch(e){c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
+}
+
+function setLibFilter(f,el){
+  _libFilter=f;
+  document.querySelectorAll('#lib-filter-chips .fchip').forEach(c=>c.classList.remove('is-on'));
+  el.classList.add('is-on');
+  renderLibraryList();
+}
+function filterLibrary(){renderLibraryList()}
+
+function _matches(story){
+  if(_libFilter==='all') return true;
+  return story.parts.some(p=>{
+    const u=p.uploads||[];
+    if(_libFilter==='no-tiktok')    return !u.find(x=>x.platform==='tiktok');
+    if(_libFilter==='no-instagram') return !u.find(x=>x.platform==='instagram');
+    if(_libFilter==='no-youtube')   return !u.find(x=>x.platform==='youtube');
+    return true;
+  });
+}
+
+function renderLibraryList(){
+  const c=document.getElementById('lib-story-list');
+  const q=(document.getElementById('lib-search').value||'').toLowerCase().trim();
+  const filtered=_libData.filter(s=>(!q||s.title.toLowerCase().includes(q)||s.code.toLowerCase().includes(q))&&_matches(s));
+  if(!filtered.length){
+    c.innerHTML=`<div class="empty"><span class="mi">search_off</span><span class="empty__ttl">${_libData.length?'Keine Treffer':'Noch keine Videos'}</span></div>`;
+    return;
   }
+  c.innerHTML='';
+  filtered.forEach(story=>{
+    const ups=story.parts.flatMap(p=>p.uploads||[]);
+    const hasT=ups.some(u=>u.platform==='tiktok');
+    const hasI=ups.some(u=>u.platform==='instagram');
+    const hasY=ups.some(u=>u.platform==='youtube');
+    const row=document.createElement('div');
+    row.className='lrow';
+    row.innerHTML=`
+      <div class="lrow__info">
+        <div class="lrow__title">${escHtml(story.title)}</div>
+        <div class="lrow__meta"><span class="badge">${story.code}</span>&nbsp;·&nbsp;${story.parts.length} Teil(e) · ${formatDate(story.created_at)}</div>
+      </div>
+      <div class="lrow__plat">
+        <div class="pdot${hasT?' pdot--ok':''}" title="TikTok">T</div>
+        <div class="pdot${hasI?' pdot--ok':''}" title="Instagram">I</div>
+        <div class="pdot${hasY?' pdot--ok':''}" title="YouTube">Y</div>
+      </div>
+      <button class="btn btn--icon" style="color:var(--ce)" onclick="event.stopPropagation();deleteLibStory(${story.story_id},'${escHtml(story.title).replace(/'/g,"&#39;")}')">
+        <span class="mi">delete</span>
+      </button>
+      <span class="mi" style="color:var(--cosv)">chevron_right</span>`;
+    row.addEventListener('click',()=>openLibDetail(story));
+    c.appendChild(row);
+  });
+}
 
-  function filterLibrary() { renderLibraryList(); }
-
-  function _storyMatchesFilter(story) {
-    if (_libFilter === 'all') return true;
-    return story.parts.some(part => {
-      const uploads = part.uploads || [];
-      if (_libFilter === 'no-tiktok')    return !uploads.find(u => u.platform === 'tiktok');
-      if (_libFilter === 'no-instagram') return !uploads.find(u => u.platform === 'instagram');
-      if (_libFilter === 'no-youtube')   return !uploads.find(u => u.platform === 'youtube');
-      return true;
-    });
-  }
-
-  // ─── Story-Übersicht rendern ─────────────────────────────────
-  function renderLibraryList() {
-    const container = document.getElementById('lib-story-list');
-    const q = (document.getElementById('lib-search').value || '').toLowerCase().trim();
-
-    const filtered = _libData.filter(story => {
-      const matchText = !q || story.title.toLowerCase().includes(q) || story.code.toLowerCase().includes(q);
-      return matchText && _storyMatchesFilter(story);
-    });
-
-    if (!filtered.length) {
-      container.innerHTML = `<div class="empty-state" style="padding:40px 0">
-        <div class="empty-state__icon"><span class="material-symbols-rounded">search_off</span></div>
-        <div class="empty-state__text">${_libData.length ? 'Keine Treffer' : 'Noch keine Videos vorhanden'}</div>
+function openLibDetail(story,push=true){
+  document.getElementById('lib-overview').style.display='none';
+  document.getElementById('lib-detail').style.display='block';
+  if(push) history.pushState({tab:'library',code:story.code},'',`/library/${story.code}`);
+  document.getElementById('lib-detail-code').textContent=story.code;
+  document.getElementById('lib-detail-title').textContent=story.title;
+  document.getElementById('lib-detail-date').textContent=formatDate(story.created_at);
+  const mb=document.getElementById('lib-mark-all-btn');
+  mb.style.display='';mb.onclick=()=>markAllUploaded(story);
+  const grid=document.getElementById('lib-parts-grid');
+  grid.innerHTML='';
+  story.parts.forEach(part=>{
+    const social=part.social||{};
+    const card=document.createElement('div');
+    card.className='vcard';card.id='lib-card-'+part.id;
+    card.innerHTML=`
+      <div class="vcard__thumb" onclick="openVideoModal('/video/${part.video_path}','${escHtml(story.title)} — Teil ${part.part_number}')">
+        ${part.cover_path?`<img src="/covers/${part.cover_path.split('/').pop()}" alt="Cover" loading="lazy">`:''}
+        <video src="/video/${part.video_path}" preload="metadata" muted style="opacity:0"></video>
+        <div class="vcard__pov"><span class="mi">play_circle</span></div>
+      </div>
+      <div class="vcard__body">
+        <div class="vcard__part">Teil ${part.part_number}</div>
+        ${social.video_title?`<div class="vcard__ttl">${escHtml(social.video_title)}</div>`:''}
+        ${social.description?`<div class="vcard__desc">${escHtml(social.description)}</div>`:''}
+        ${social.hashtags?`<div class="vcard__tags">${escHtml(social.hashtags)}</div>`:''}
+        <div class="vcard__plat" id="plat-${part.id}"></div>
+        <div class="vcard__acts">
+          <button class="btn btn--tonal btn--sm" onclick="openVideoModal('/video/${part.video_path}','${escHtml(story.title)} — Teil ${part.part_number}')">
+            <span class="mi" style="font-size:15px">play_arrow</span> Play
+          </button>
+          <a class="btn btn--outlined btn--sm" href="/download/${part.video_path}" download title="Video">
+            <span class="mi" style="font-size:15px">download</span>
+          </a>
+          ${part.cover_path?`<a class="btn btn--outlined btn--sm" href="/covers/${part.cover_path.split('/').pop()}" download title="Cover"><span class="mi" style="font-size:15px">image</span></a>`:''}
+          <button class="btn btn--outlined btn--sm" onclick="copySocial(${part.id})" title="Caption kopieren">
+            <span class="mi" style="font-size:15px">content_copy</span>
+          </button>
+          <button class="btn btn--outlined btn--sm" style="color:var(--ce);border-color:var(--ce)" onclick="deleteLibVideo(${part.id})">
+            <span class="mi" style="font-size:15px">delete</span>
+          </button>
+        </div>
       </div>`;
-      return;
+    const vid=card.querySelector('video');
+    const thumb=card.querySelector('.vcard__thumb');
+    thumb.addEventListener('mouseenter',()=>{vid.style.opacity='1';vid.play().catch(()=>{})});
+    thumb.addEventListener('mouseleave',()=>{vid.style.opacity='0';vid.pause();vid.currentTime=0});
+    grid.appendChild(card);
+    renderPlatChips(part.id,part.uploads||[]);
+    card.dataset.social=JSON.stringify(social);
+  });
+}
+
+function closeLibDetail(push=true){
+  document.getElementById('lib-detail').style.display='none';
+  document.getElementById('lib-overview').style.display='block';
+  if(push) history.pushState({tab:'library'},'','/library');
+}
+
+function renderPlatChips(partId,uploads){
+  const c=document.getElementById('plat-'+partId);
+  if(!c) return;
+  const plats=[{id:'tiktok',l:'TikTok',i:'play_circle'},{id:'instagram',l:'Instagram',i:'photo_camera'},{id:'youtube',l:'YouTube',i:'smart_display'}];
+  c.innerHTML='';
+  plats.forEach(p=>{
+    const ex=uploads.find(u=>u.platform===p.id);
+    const btn=document.createElement('button');
+    btn.className='pchip'+(ex?' pchip--ok':'');
+    btn.title=ex?`Hochgeladen ${formatDateShort(ex.uploaded_at)} — Klicken zum Entfernen`:`Als ${p.l} markieren`;
+    btn.innerHTML=`<span class="mi">${ex?'check_circle':p.i}</span>${p.l}${ex?` · ${formatDateShort(ex.uploaded_at)}`:''}`;
+    btn.addEventListener('click',()=>toggleUpload(partId,p.id,ex?ex.id:null));
+    c.appendChild(btn);
+  });
+}
+
+async function toggleUpload(partId,platform,uploadId){
+  try{
+    if(uploadId){
+      await fetch(`/api/uploads/${uploadId}`,{method:'DELETE'});
+      showSnack(`${platform} entfernt.`,'success');
+    }else{
+      const res=await fetch('/api/uploads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_part_id:partId,platform})});
+      const d=await res.json();
+      if(d.error){showSnack(d.error,'error');return}
+      showSnack(`Als ${platform} markiert!`,'success');
     }
+    await loadLibrary();
+    const story=_libData.find(s=>s.parts.some(p=>p.id===partId));
+    if(story){const part=story.parts.find(p=>p.id===partId);if(part) renderPlatChips(partId,part.uploads||[])}
+  }catch(e){showSnack('Fehler: '+e.message,'error')}
+}
 
-    container.innerHTML = '';
-    filtered.forEach(story => {
-      const allUploads = story.parts.flatMap(p => p.uploads || []);
-      const hasTikTok    = allUploads.some(u => u.platform === 'tiktok');
-      const hasInstagram = allUploads.some(u => u.platform === 'instagram');
-      const hasYouTube   = allUploads.some(u => u.platform === 'youtube');
+function copySocial(partId){
+  const card=document.getElementById('lib-card-'+partId);
+  if(!card) return;
+  let s={};try{s=JSON.parse(card.dataset.social||'{}')}catch(_){}
+  const t=[s.video_title,'',s.description,'',s.hashtags].filter(x=>x!=null).join('\n').trim();
+  navigator.clipboard.writeText(t).catch(()=>{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()});
+  showSnack('Caption kopiert!','success');
+}
 
-      const row = document.createElement('div');
-      row.className = 'lib-row';
-      row.innerHTML = `
-        <div class="lib-row__info">
-          <div class="lib-row__title">${escHtml(story.title)}</div>
-          <div class="lib-row__meta">
-            <span class="story-code-badge" style="font-size:10px;padding:1px 7px">${story.code}</span>
-            &nbsp;${story.parts.length} Teil(e) · ${formatDate(story.created_at)}
-          </div>
-        </div>
-        <div class="lib-row__plat">
-          <div class="lib-pdot ${hasTikTok ? 'lib-pdot--done' : ''}" title="TikTok">T</div>
-          <div class="lib-pdot ${hasInstagram ? 'lib-pdot--done' : ''}" title="Instagram">I</div>
-          <div class="lib-pdot ${hasYouTube ? 'lib-pdot--done' : ''}" title="YouTube">Y</div>
-        </div>
-        <button class="md-btn md-btn--icon" style="color:var(--md-sys-color-error)"
-          onclick="event.stopPropagation(); deleteStory(${story.story_id}, '${escHtml(story.title).replace(/'/g, '&#39;')}')">
-          <span class="material-symbols-rounded">delete</span>
-        </button>
-        <span class="material-symbols-rounded" style="color:var(--md-sys-color-on-surface-variant)">chevron_right</span>
-      `;
-      row.addEventListener('click', () => openLibDetail(story));
-      container.appendChild(row);
-    });
-  }
+async function deleteLibVideo(partId){
+  if(!confirm('Video wirklich löschen?')) return;
+  try{
+    const res=await fetch(`/api/videos/${partId}`,{method:'DELETE'});
+    const d=await res.json();
+    if(d.error){showSnack(d.error,'error');return}
+    showSnack('Video gelöscht.','success');
+    await loadLibrary();
+    const story=_libData.find(s=>s.parts.some(p=>p.id===partId));
+    if(story&&story.parts.length>1) openLibDetail(story,false);
+    else closeLibDetail(false);
+  }catch(e){showSnack('Fehler: '+e.message,'error')}
+}
 
-  // ─── Detail-Ansicht öffnen ───────────────────────────────────
-  function openLibDetail(story, pushHistory = true) {
-    document.getElementById('lib-overview').style.display = 'none';
-    document.getElementById('lib-detail').style.display = 'block';
-    if (pushHistory) {
-      history.pushState({ tab: 'library', code: story.code }, '', `/library/${story.code}`);
-    }
-    document.getElementById('lib-detail-code').textContent = story.code;
-    document.getElementById('lib-detail-title').textContent = story.title;
-    document.getElementById('lib-detail-date').textContent = formatDate(story.created_at);
+async function deleteLibStory(storyId,title){
+  if(!confirm(`Story "${title}" inklusive ALLER Videos löschen?`)) return;
+  try{
+    const res=await fetch(`/api/stories/${storyId}`,{method:'DELETE'});
+    const d=await res.json();
+    if(d.error){showSnack(d.error,'error');return}
+    showSnack('Story gelöscht.','success');
+    loadLibrary();
+  }catch(e){showSnack('Fehler: '+e.message,'error')}
+}
 
-    const markBtn = document.getElementById('lib-mark-all-btn');
-    markBtn.style.display = '';
-    markBtn.onclick = () => markAllAsUploaded(story);
-
-    const grid = document.getElementById('lib-parts-grid');
-    grid.innerHTML = '';
-
-    story.parts.forEach(part => {
-      const card = document.createElement('div');
-      card.className = 'lib-vcard';
-      card.id = 'lib-card-' + part.id;
-
-      const social = part.social || {};
-
-      // Thumbnail
-      const thumbHtml = `
-        <div class="lib-vcard__thumb" onclick="openVideoModal('/video/${part.video_path}','${escHtml(story.title)} — Teil ${part.part_number}')">
-          ${part.cover_path ? `<img class="lib-vcover" src="/covers/${part.cover_path.split('/').pop()}" alt="Cover" loading="lazy">` : ''}
-          <video src="/video/${part.video_path}" preload="metadata" muted style="opacity:0"></video>
-          <div class="vplay-ov"><span class="material-symbols-rounded">play_circle</span></div>
-        </div>`;
-
-      const socialHtml = (social.video_title || social.hashtags) ? `
-        <div class="lib-vcard__vtitle">${escHtml(social.video_title || '')}</div>
-        ${social.description ? `<div class="lib-vcard__desc">${escHtml(social.description)}</div>` : ''}
-        ${social.hashtags ? `<div class="lib-vcard__tags">${escHtml(social.hashtags)}</div>` : ''}
-      ` : '';
-
-      card.innerHTML = `
-        ${thumbHtml}
-        <div class="lib-vcard__body">
-          <div class="lib-vcard__part">Teil ${part.part_number}</div>
-          ${socialHtml}
-          <div class="lib-vcard__plat" id="platforms-${part.id}"></div>
-          <div class="lib-vcard__acts">
-            <button class="md-btn md-btn--tonal md-btn--sm"
-              onclick="openVideoModal('/video/${part.video_path}','${escHtml(story.title)} — Teil ${part.part_number}')">
-              <span class="material-symbols-rounded" style="font-size:15px">play_arrow</span> Play
-            </button>
-            <a class="md-btn md-btn--outlined md-btn--sm" href="/download/${part.video_path}" download title="Video herunterladen">
-              <span class="material-symbols-rounded" style="font-size:15px">download</span>
-            </a>
-            ${part.cover_path ? `<a class="md-btn md-btn--outlined md-btn--sm" href="/covers/${part.cover_path.split('/').pop()}" download title="Cover herunterladen"><span class="material-symbols-rounded" style="font-size:15px">image</span></a>` : ''}
-            <button class="md-btn md-btn--outlined md-btn--sm" onclick="copySocialData(${part.id})" title="Caption kopieren">
-              <span class="material-symbols-rounded" style="font-size:15px">content_copy</span>
-            </button>
-            <button class="md-btn md-btn--outlined md-btn--sm" style="color:var(--md-sys-color-error);border-color:var(--md-sys-color-error)"
-              onclick="deleteVideo(${part.id})">
-              <span class="material-symbols-rounded" style="font-size:15px">delete</span>
-            </button>
-          </div>
-        </div>
-      `;
-
-      const vidEl = card.querySelector('video');
-      const thumb = card.querySelector('.lib-vcard__thumb');
-      thumb.addEventListener('mouseenter', () => { vidEl.style.opacity = '1'; vidEl.play().catch(() => {}); });
-      thumb.addEventListener('mouseleave', () => { vidEl.style.opacity = '0'; vidEl.pause(); vidEl.currentTime = 0; });
-
-      grid.appendChild(card);
-      renderPlatformChips(part.id, part.uploads || []);
-      card.dataset.social = JSON.stringify(social);
-    });
-  }
-
-  function closeLibDetail(pushHistory = true) {
-    document.getElementById('lib-detail').style.display = 'none';
-    document.getElementById('lib-overview').style.display = 'block';
-    if (pushHistory) {
-      history.pushState({ tab: 'library' }, '', '/library');
-    }
-  }
-
-  // ─── Platform-Chips ──────────────────────────────────────────
-  function renderPlatformChips(partId, uploads) {
-    const container = document.getElementById('platforms-' + partId);
-    if (!container) return;
-    const platforms = [
-      { id: 'tiktok',    label: 'TikTok',    icon: 'play_circle' },
-      { id: 'instagram', label: 'Instagram', icon: 'photo_camera' },
-      { id: 'youtube',   label: 'YouTube',   icon: 'smart_display' },
-    ];
-    container.innerHTML = '';
-    platforms.forEach(p => {
-      const existing = uploads.find(u => u.platform === p.id);
-      const btn = document.createElement('button');
-      btn.className = 'platform-chip' + (existing ? ' uploaded' : '');
-      btn.title = existing
-        ? `Hochgeladen am ${formatDate(existing.uploaded_at)} — Klicken zum Entfernen`
-        : `Als ${p.label} hochgeladen markieren`;
-      btn.innerHTML = `
-        <span class="material-symbols-rounded">${existing ? 'check_circle' : p.icon}</span>
-        ${p.label}${existing ? ` · ${formatDateShort(existing.uploaded_at)}` : ''}
-      `;
-      btn.addEventListener('click', () => toggleUpload(partId, p.id, existing ? existing.id : null));
-      container.appendChild(btn);
-    });
-  }
-
-  async function toggleUpload(partId, platform, uploadId) {
-    try {
-      if (uploadId) {
-        await fetch(`/api/uploads/${uploadId}`, { method: 'DELETE' });
-        showSnack(`${platform} Upload entfernt.`, 'success');
-      } else {
-        const res = await fetch('/api/uploads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ story_part_id: partId, platform })
-        });
-        const data = await res.json();
-        if (data.error) { showSnack(data.error, 'error'); return; }
-        showSnack(`Als ${platform} hochgeladen markiert!`, 'success');
-      }
-      await loadLibrary();
-      const story = _libData.find(s => s.parts.some(p => p.id === partId));
-      if (story) {
-        const part = story.parts.find(p => p.id === partId);
-        if (part) renderPlatformChips(partId, part.uploads || []);
-      }
-    } catch (e) {
-      showSnack('Fehler: ' + e.message, 'error');
-    }
-  }
-
-  function copySocialData(partId) {
-    const card = document.getElementById('lib-card-' + partId);
-    if (!card) return;
-    let social = {};
-    try { social = JSON.parse(card.dataset.social || '{}'); } catch (_) {}
-    const text = [social.video_title, '', social.description, '', social.hashtags].filter(x => x != null).join('\n').trim();
-    navigator.clipboard.writeText(text).catch(() => {
-      const ta = document.createElement('textarea');
-      ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
-    });
-    showSnack('Caption kopiert — jetzt in TikTok / Instagram einfügen!', 'success');
-  }
-
-  function openVideoModal(src, title) {
-    document.getElementById('modal-title').textContent = title;
-    const vid = document.getElementById('modal-video');
-    vid.src = src; vid.load();
-    document.getElementById('video-modal').classList.add('open');
-  }
-
-  function closeModal() {
-    document.getElementById('video-modal').classList.remove('open');
-    const vid = document.getElementById('modal-video');
-    vid.pause(); vid.src = '';
-  }
-
-  async function deleteVideo(partId) {
-    if (!confirm('Möchtest du dieses Video wirklich löschen? Die Dateien werden vom Server entfernt.')) return;
-    try {
-      const res = await fetch(`/api/videos/${partId}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.error) { showSnack(data.error, 'error'); return; }
-      showSnack('Video erfolgreich gelöscht.', 'success');
-      await loadLibrary();
-      const story = _libData.find(s => s.parts.some(p => p.id === partId));
-      if (story && story.parts.length > 1) {
-        openLibDetail(story, false);
-      } else {
-        closeLibDetail();
-      }
-    } catch (e) {
-      showSnack('Fehler beim Löschen: ' + e.message, 'error');
-    }
-  }
-
-  async function deleteStory(storyId, title) {
-    if (!confirm(`Möchtest du die komplette Story "${title}" inklusive ALLER Videos löschen?`)) return;
-    try {
-      const res = await fetch(`/api/stories/${storyId}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.error) { showSnack(data.error, 'error'); return; }
-      showSnack('Story wurde komplett gelöscht.', 'success');
-      loadLibrary();
-    } catch (e) {
-      showSnack('Fehler beim Löschen der Story: ' + e.message, 'error');
-    }
-  }
-
-  async function markAllAsUploaded(story) {
-    if (!confirm(`Möchtest du alle Teile der Story "${story.title}" als hochgeladen markieren?`)) return;
-    try {
-      const platforms = ['tiktok', 'instagram', 'youtube'];
-      for (const part of story.parts) {
-        for (const p of platforms) {
-          const exists = (part.uploads || []).some(u => u.platform === p);
-          if (!exists) {
-            await fetch('/api/uploads', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ story_part_id: part.id, platform: p })
-            });
-          }
+async function markAllUploaded(story){
+  if(!confirm(`Alle Teile von "${story.title}" als hochgeladen markieren?`)) return;
+  try{
+    for(const part of story.parts){
+      for(const p of['tiktok','instagram','youtube']){
+        if(!(part.uploads||[]).some(u=>u.platform===p)){
+          await fetch('/api/uploads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_part_id:part.id,platform:p})});
         }
       }
-      showSnack('Alle Teile wurden als erledigt markiert.', 'success');
-      await loadLibrary();
-      const updatedStory = _libData.find(s => s.story_id === story.story_id);
-      if (updatedStory) openLibDetail(updatedStory, false);
-    } catch (e) {
-      showSnack('Fehler beim Markieren: ' + e.message, 'error');
     }
-  }
+    showSnack('Alle als erledigt markiert.','success');
+    await loadLibrary();
+    const updated=_libData.find(s=>s.story_id===story.story_id);
+    if(updated) openLibDetail(updated,false);
+  }catch(e){showSnack('Fehler: '+e.message,'error')}
+}
 </script>

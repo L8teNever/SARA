@@ -1,133 +1,73 @@
-<!-- ============================================================ TAB 1: Story erstellen ============================================================ -->
-<section class="tab-content active" id="tab-story">
+<section class="page is-active" data-tab="story">
+<div class="wrap">
 
-  <!-- 3-Schritt Workflow-Leiste -->
-  <div class="workflow-bar">
-    <div class="workflow-bar__step">
-      <div class="workflow-bar__num">1</div>
-      <span class="workflow-bar__label">Prompt kopieren</span>
+  <div class="lbl"><span class="mi">looks_one</span> Prompt generieren</div>
+  <div class="card">
+    <div class="field">
+      <label class="flabel" for="story-idea">Thema <span style="font-weight:400;opacity:.6;text-transform:none;letter-spacing:0">(optional — leer = zufällige Story)</span></label>
+      <input id="story-idea" class="inp" type="text" placeholder='z.B. "a woman who discovers her husband has a secret family"'>
     </div>
-    <span class="material-symbols-rounded workflow-bar__arrow">arrow_forward</span>
-    <div class="workflow-bar__step">
-      <div class="workflow-bar__num">2</div>
-      <span class="workflow-bar__label">In KI einfügen</span>
-    </div>
-    <span class="material-symbols-rounded workflow-bar__arrow">arrow_forward</span>
-    <div class="workflow-bar__step">
-      <div class="workflow-bar__num">3</div>
-      <span class="workflow-bar__label">Antwort importieren</span>
+    <button class="btn btn--filled btn--lg" id="btn-copy-full" onclick="copyFullPrompt()" style="margin-top:4px">
+      <span class="mi">content_copy</span> Prompt kopieren
+    </button>
+    <div id="copy-confirm" style="text-align:center;font-size:12px;min-height:18px;margin-top:6px;color:var(--cg)"></div>
+    <div style="margin-top:10px">
+      <button class="btn btn--text btn--sm" onclick="togglePromptPreview(this)" style="color:var(--cosv)">
+        <span class="mi" style="font-size:16px;transition:transform .2s">expand_more</span>
+        Prompt anzeigen / bearbeiten
+      </button>
+      <div id="prompt-preview-wrap" style="display:none;margin-top:10px">
+        <textarea id="prompt-template-ta" class="ta" style="font-family:'Courier New',monospace;font-size:12px;min-height:260px;line-height:1.55" spellcheck="false"></textarea>
+        <button class="btn btn--outlined btn--sm" onclick="resetPromptTemplate()" style="margin-top:8px">
+          <span class="mi">restart_alt</span> Zurücksetzen
+        </button>
+      </div>
     </div>
   </div>
 
-  <div class="prompt-grid">
-    <!-- Linke Spalte: Schritt 1 — Prompt kopieren -->
-    <div>
-      <div class="md-card md-card--elevated">
-        <div class="card-hdr">
-          <div class="card-hdr__icon" style="background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);font-size:15px;font-weight:800">1</div>
-          <div class="card-hdr__text">
-            <div class="card-title">Prompt für die KI</div>
-            <div class="card-subtitle">ChatGPT · Gemini · Claude.ai</div>
-          </div>
-        </div>
+  <div style="display:flex;align-items:center;gap:12px;margin:6px 0 4px">
+    <div class="divider" style="flex:1;margin:0"></div>
+    <span style="font-size:12px;color:var(--cosv);white-space:nowrap">In ChatGPT / Gemini / Claude einfügen → Antwort kopieren</span>
+    <div class="divider" style="flex:1;margin:0"></div>
+  </div>
 
-        <div class="md-field">
-          <label for="story-idea">Thema <span style="font-weight:400;opacity:.65">(optional)</span></label>
-          <input type="text" id="story-idea" class="md-input"
-            placeholder='z.B. "a woman who discovers her husband has a secret family"'>
-        </div>
-
-        <button class="md-btn md-btn--filled" id="btn-copy-full" onclick="copyFullPrompt()"
-          style="width:100%;justify-content:center">
-          <span class="material-symbols-rounded">content_copy</span> Prompt kopieren
-        </button>
-        <span id="copy-confirm" style="display:block;text-align:center;font-size:12px;margin-top:6px;min-height:18px;color:var(--md-sys-color-success)"></span>
-
-        <div style="margin-top:14px">
-          <button class="md-btn md-btn--text md-btn--sm" onclick="togglePromptPreview(this)"
-            style="color:var(--md-sys-color-on-surface-variant)">
-            <span class="material-symbols-rounded" style="font-size:16px;transition:transform .2s">expand_more</span>
-            Prompt anzeigen / bearbeiten
-          </button>
-          <div id="prompt-preview-wrap" style="display:none;margin-top:10px">
-            <textarea id="prompt-template-ta" class="md-textarea"
-              style="font-family:'Courier New',monospace;font-size:12px;min-height:280px;line-height:1.55"
-              spellcheck="false"></textarea>
-            <button class="md-btn md-btn--outlined md-btn--sm" onclick="resetPromptTemplate()" style="margin-top:8px">
-              <span class="material-symbols-rounded">restart_alt</span> Zurücksetzen
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Rechte Spalte: Schritt 2 — JSON importieren -->
-    <div>
-      <div class="md-card md-card--elevated">
-        <div class="card-hdr">
-          <div class="card-hdr__icon" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);font-size:15px;font-weight:800">3</div>
-          <div class="card-hdr__text">
-            <div class="card-title">KI-Antwort importieren</div>
-            <div class="card-subtitle">JSON hier einfügen — SARA speichert automatisch</div>
-          </div>
-        </div>
-
-        <div class="md-field">
-          <label for="import-json">JSON-Antwort</label>
-          <textarea id="import-json" class="md-textarea"
-            style="min-height:260px;font-family:'Courier New',monospace;font-size:12.5px"
-            placeholder='{
+  <div class="lbl"><span class="mi">looks_two</span> KI-Antwort importieren</div>
+  <div class="card">
+    <div class="field">
+      <label class="flabel" for="import-json">JSON-Antwort</label>
+      <textarea id="import-json" class="ta" style="min-height:180px;font-family:'Courier New',monospace;font-size:12.5px"
+        placeholder='{
   "title": "The Betrayal",
   "total_parts": 2,
   "keywords": ["betrayal","trust",...],
   "parts": [...]
 }'></textarea>
-        </div>
-
-        <div class="btn-row">
-          <button class="md-btn md-btn--success" onclick="importStory()">
-            <span class="material-symbols-rounded">check_circle</span> Importieren
-          </button>
-          <button class="md-btn md-btn--outlined" onclick="clearImport()">
-            <span class="material-symbols-rounded">delete_sweep</span> Leeren
-          </button>
-        </div>
-
-        <div id="import-result" class="import-result" style="margin-top:12px">
-          <div class="import-result__title" id="import-result-title"></div>
-          <div class="import-result__body" id="import-result-body"></div>
-          <div class="btn-row" style="margin-top:10px" id="import-result-actions"></div>
-        </div>
-      </div>
+    </div>
+    <div class="row">
+      <button class="btn btn--filled" onclick="importStory()" style="flex:1">
+        <span class="mi">check_circle</span> Story importieren
+      </button>
+      <button class="btn btn--outlined" onclick="clearImport()">
+        <span class="mi">delete_sweep</span> Leeren
+      </button>
+    </div>
+    <div class="impres" id="import-result">
+      <div class="impres__ttl" id="import-result-title"></div>
+      <div class="impres__body" id="import-result-body"></div>
+      <div id="import-result-actions" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"></div>
     </div>
   </div>
 
-  <!-- Zuletzt gespeicherte Stories -->
-  <div style="margin-top:24px">
-    <div class="md-card md-card--elevated" style="padding:18px">
-      <div class="card-hdr" style="margin-bottom:12px">
-        <div class="card-hdr__icon" style="background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)">
-          <span class="material-symbols-rounded">history</span>
-        </div>
-        <div class="card-hdr__text">
-          <div class="card-title">Zuletzt gespeichert</div>
-        </div>
-        <button class="md-btn md-btn--icon" onclick="loadRecentStories()">
-          <span class="material-symbols-rounded">refresh</span>
-        </button>
-      </div>
-      <div id="recent-stories-list">
-        <div class="spinner" style="margin:20px auto"></div>
-      </div>
-    </div>
+  <div class="lbl"><span class="mi">history</span> Zuletzt gespeichert</div>
+  <div id="recent-stories-list">
+    <div style="display:flex;justify-content:center;padding:24px"><div class="spinner"></div></div>
   </div>
+
+</div>
 </section>
 
 <script>
-  // ============================================================
-  //  Prompt-Builder
-  // ============================================================
-  const SARA_DEFAULT_PROMPT =
+const SARA_DEFAULT_PROMPT=
 `You are a creative storyteller specializing in Reddit-style personal stories for TikTok/Reels.
 Generate compelling, emotional, and suspenseful stories that feel authentic and real.
 Stories must be written in English and follow this EXACT JSON format — no text before or after:
@@ -172,141 +112,110 @@ Rules:
 - social.description: emotionally tease the story, never spoil the ending, end with a question or CTA
 - social.hashtags: 6–8 relevant hashtags as a single space-separated string
 
-Create a story about: [DEIN THEMA HIER EINTRAGEN — z.B. "a woman who discovers her husband has a secret family" — oder Zeile so lassen für eine zufällige Story]`;
+Create a story about: [DEIN THEMA HIER EINTRAGEN — oder Zeile so lassen für eine zufällige Story]`;
 
-  function initPromptTemplate() {
-    const ta = document.getElementById('prompt-template-ta');
-    if (ta && !ta.value) ta.value = SARA_DEFAULT_PROMPT;
+function initPromptTemplate(){
+  const ta=document.getElementById('prompt-template-ta');
+  if(ta&&!ta.value) ta.value=SARA_DEFAULT_PROMPT;
+}
+
+function togglePromptPreview(btn){
+  const wrap=document.getElementById('prompt-preview-wrap');
+  const ico=btn.querySelector('.mi');
+  const hidden=wrap.style.display==='none';
+  wrap.style.display=hidden?'block':'none';
+  ico.style.transform=hidden?'rotate(180deg)':'';
+  if(hidden) initPromptTemplate();
+}
+
+function resetPromptTemplate(){
+  document.getElementById('prompt-template-ta').value=SARA_DEFAULT_PROMPT;
+  showSnack('Prompt zurückgesetzt.','success');
+}
+
+async function copyFullPrompt(){
+  const idea=(document.getElementById('story-idea')?.value||'').trim();
+  initPromptTemplate();
+  let text=document.getElementById('prompt-template-ta').value.trim()||SARA_DEFAULT_PROMPT;
+  if(idea) text=text.replace(/Create a story about:.*$/,`Create a story about: ${idea}`);
+  const btn=document.getElementById('btn-copy-full');
+  const cfm=document.getElementById('copy-confirm');
+  try{await navigator.clipboard.writeText(text)}catch(_){
+    const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();
   }
+  if(btn) btn.innerHTML='<span class="mi">check</span> Kopiert!';
+  if(cfm) cfm.textContent='✓ Jetzt in ChatGPT / Gemini / Claude.ai einfügen!';
+  showSnack('Prompt kopiert!','success');
+  setTimeout(()=>{
+    if(btn) btn.innerHTML='<span class="mi">content_copy</span> Prompt kopieren';
+    if(cfm) cfm.textContent='';
+  },3000);
+}
 
-  function togglePromptPreview(btn) {
-    const wrap = document.getElementById('prompt-preview-wrap');
-    const icon = btn.querySelector('.material-symbols-rounded');
-    const isHidden = wrap.style.display === 'none';
-    wrap.style.display = isHidden ? 'block' : 'none';
-    icon.style.transform = isHidden ? 'rotate(180deg)' : '';
-    if (isHidden) initPromptTemplate();
-  }
-
-  function resetPromptTemplate() {
-    document.getElementById('prompt-template-ta').value = SARA_DEFAULT_PROMPT;
-    showSnack('Prompt zurückgesetzt.', 'success');
-  }
-
-  async function copyFullPrompt() {
-    const idea = (document.getElementById('story-idea')?.value || '').trim();
-    initPromptTemplate();
-    let text = document.getElementById('prompt-template-ta').value.trim() || SARA_DEFAULT_PROMPT;
-
-    if (idea) {
-      text = text.replace(/Create a story about:.*$/, `Create a story about: ${idea}`);
+async function importStory(forceSave=false,forceQueue=false){
+  const txt=document.getElementById('import-json').value.trim();
+  if(!txt){showSnack('Bitte zuerst das JSON einfügen.','error');return}
+  try{
+    const res=await fetch('/api/import-story',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({json_text:txt,dry_run:!forceSave,auto_queue:forceQueue})});
+    const d=await res.json();
+    if(d.error){showSnack(d.error,'error');return}
+    if(!forceSave&&d.duplicate_check?.is_duplicate){
+      const msg=`Ähnliche Story gefunden (${d.duplicate_check.overlap}/10 Keywords).\n\nGefunden: "${d.duplicate_check.similar_story.title}" [${d.duplicate_check.similar_story.code}]\n\nTrotzdem speichern und in Warteschlange?`;
+      if(confirm(msg)) importStory(true,true);
+      else showSnack('Import abgebrochen.','info');
+      return;
     }
+    document.getElementById('import-result-title').textContent=d.auto_queued?'Story gespeichert & eingereiht!':'Story importiert!';
+    document.getElementById('import-result-body').textContent=`"${d.title}" wurde gespeichert (Code: ${d.code}).`+(d.auto_queued?' Videos werden automatisch erstellt.':'');
+    document.getElementById('import-result-actions').innerHTML=`<button class="btn btn--tonal btn--sm" onclick="switchTab('video');pendingSelectStoryId=${d.story_id}"><span class="mi">movie</span> Video-Status</button>`;
+    document.getElementById('import-result').classList.add('show');
+    showSnack(`"${d.title}" ${d.auto_queued?'wird produziert':'importiert'}!`,'success');
+    document.getElementById('import-json').value='';
+    loadRecentStories();
+  }catch(e){showSnack('Fehler: '+e.message,'error')}
+}
 
-    const btnEl = document.getElementById('btn-copy-full');
-    const confirmEl = document.getElementById('copy-confirm');
-    try { await navigator.clipboard.writeText(text); } catch (_) {
-      const tmp = document.createElement('textarea');
-      tmp.value = text; document.body.appendChild(tmp); tmp.select();
-      document.execCommand('copy'); tmp.remove();
+function clearImport(){
+  document.getElementById('import-json').value='';
+  document.getElementById('import-result').classList.remove('show');
+}
+
+async function loadRecentStories(){
+  const c=document.getElementById('recent-stories-list');
+  try{
+    const stories=await fetch('/api/stories').then(r=>r.json());
+    if(!stories.length){
+      c.innerHTML='<div class="empty" style="padding:28px 0"><span class="mi">auto_stories</span><span class="empty__ttl">Noch keine Stories</span></div>';
+      return;
     }
-    if (btnEl) btnEl.innerHTML = '<span class="material-symbols-rounded">check</span> Kopiert!';
-    if (confirmEl) confirmEl.textContent = '✓ Jetzt in ChatGPT / Gemini / Claude.ai einfügen!';
-    showSnack('Prompt kopiert!', 'success');
-    setTimeout(() => {
-      if (btnEl) btnEl.innerHTML = '<span class="material-symbols-rounded">content_copy</span> Prompt kopieren';
-      if (confirmEl) confirmEl.textContent = '';
-    }, 3000);
-  }
-
-  async function importStory(forceSave = false, forceQueue = false) {
-    const jsonText = document.getElementById('import-json').value.trim();
-    if (!jsonText) { showSnack('Bitte zuerst das JSON einfügen.', 'error'); return; }
-
-    try {
-      const res = await fetch('/api/import-story', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ json_text: jsonText, dry_run: !forceSave, auto_queue: forceQueue })
-      });
-      const data = await res.json();
-      if (data.error) { showSnack(data.error, 'error'); return; }
-
-      if (!forceSave && data.duplicate_check && data.duplicate_check.is_duplicate) {
-        const msg = `Ähnliche Story gefunden (${data.duplicate_check.overlap}/10 Keywords).\n\n` +
-                    `Gefunden: "${data.duplicate_check.similar_story.title}" [${data.duplicate_check.similar_story.code}]\n\n` +
-                    `Möchtest du die Story trotzdem speichern und direkt in die Warteschlange schicken?`;
-        if (confirm(msg)) importStory(true, true);
-        else showSnack('Import abgebrochen.', 'info');
-        return;
-      }
-
-      document.getElementById('import-result-title').textContent = data.auto_queued ? 'Story gespeichert & eingereiht!' : 'Story importiert!';
-      let body = `"${data.title}" wurde gespeichert (Code: ${data.code}).`;
-      if (data.auto_queued) body += ' Die Videos werden automatisch erstellt.';
-      document.getElementById('import-result-body').textContent = body;
-      document.getElementById('import-result-actions').innerHTML = `
-        <button class="md-btn md-btn--tonal md-btn--sm" onclick="goToVideoTab(${data.story_id})">
-          <span class="material-symbols-rounded">movie</span> Video-Status prüfen
-        </button>`;
-      document.getElementById('import-result').classList.add('visible');
-      showSnack(`Story "${data.title}" ${data.auto_queued ? 'wird produziert' : 'importiert'}!`, 'success');
-      document.getElementById('import-json').value = '';
-      loadRecentStories();
-    } catch (e) {
-      showSnack('Fehler: ' + e.message, 'error');
-    }
-  }
-
-  function clearImport() {
-    document.getElementById('import-json').value = '';
-    document.getElementById('import-result').classList.remove('visible');
-  }
-
-  function goToVideoTab(storyId) { switchTab('video'); pendingSelectStoryId = storyId; }
-
-  async function loadRecentStories() {
-    const container = document.getElementById('recent-stories-list');
-    try {
-      const stories = await fetch('/api/stories').then(r => r.json());
-      if (!stories.length) {
-        container.innerHTML = '<div class="text-muted" style="text-align:center;padding:10px">Noch keine Stories vorhanden.</div>';
-        return;
-      }
-      const recent = stories.slice(0, 5);
-      container.innerHTML = '';
-      recent.forEach(s => {
-        const row = document.createElement('div');
-        row.className = 'sitem';
-        row.innerHTML = `
-          <div class="sitem__dot sitem__dot--done"></div>
-          <div class="sitem__body">
-            <div class="sitem__title">${escHtml(s.title)}</div>
-            <div class="sitem__meta"><span class="story-code-badge" style="font-size:10px;padding:1px 7px">${s.code}</span> · ${s.total_parts} Teile · ${formatDate(s.created_at)}</div>
-          </div>
-          <button class="md-btn md-btn--tonal md-btn--sm" onclick="goToVideoTab(${s.id})" title="Zu Videos">
-            <span class="material-symbols-rounded" style="font-size:16px">movie</span>
+    c.innerHTML='';
+    stories.slice(0,6).forEach(s=>{
+      const el=document.createElement('div');
+      el.className='li';
+      el.innerHTML=`
+        <div class="li__lead"><div class="sdot sdot--ok"></div></div>
+        <div class="li__body">
+          <div class="li__title">${escHtml(s.title)}</div>
+          <div class="li__sub"><span class="badge">${s.code}</span>&nbsp;·&nbsp;${s.total_parts} Teile · ${formatDate(s.created_at)}</div>
+        </div>
+        <div class="li__trail">
+          <button class="btn btn--tonal btn--sm" onclick="event.stopPropagation();switchTab('video');pendingSelectStoryId=${s.id}" title="Zu Videos">
+            <span class="mi" style="font-size:16px">movie</span>
           </button>
-          <button class="sitem__del" onclick="deleteStoryFromCreation(${s.id}, '${escHtml(s.title).replace(/'/g, '&#39;')}')">
-            <span class="material-symbols-rounded">delete</span>
+          <button class="btn btn--icon" style="color:var(--ce)" onclick="event.stopPropagation();deleteRecentStory(${s.id},'${escHtml(s.title).replace(/'/g,"&#39;")}')">
+            <span class="mi">delete</span>
           </button>
-        `;
-        container.appendChild(row);
-      });
-    } catch (e) {
-      container.innerHTML = '<div class="text-muted">Fehler beim Laden.</div>';
-    }
-  }
+        </div>`;
+      c.appendChild(el);
+    });
+  }catch(e){c.innerHTML='<div class="empty" style="padding:16px 0"><span class="empty__sub">Fehler beim Laden</span></div>'}
+}
 
-  async function deleteStoryFromCreation(id, title) {
-    if (!confirm(`Story "${title}" wirklich löschen?`)) return;
-    try {
-      await fetch(`/api/stories/${id}`, { method: 'DELETE' });
-      showSnack('Story gelöscht.', 'success');
-      loadRecentStories();
-    } catch (e) {
-      showSnack('Fehler.', 'error');
-    }
-  }
+async function deleteRecentStory(id,title){
+  if(!confirm(`Story "${title}" wirklich löschen?`)) return;
+  try{await fetch(`/api/stories/${id}`,{method:'DELETE'});showSnack('Story gelöscht.','success');loadRecentStories()}
+  catch(e){showSnack('Fehler.','error')}
+}
 
-  loadRecentStories();
+loadRecentStories();
 </script>

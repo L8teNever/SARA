@@ -3,7 +3,9 @@
     "allow": [
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Docker\\\\Desktop\\\\SARA\" -Recurse -Force)",
       "Bash(Select-Object FullName, Name)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Stop-Process *)"
     ]
   }
 }

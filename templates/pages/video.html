@@ -1,328 +1,211 @@
-<!-- ============================================================ TAB 2: Video erstellen ============================================================ -->
-<section class="tab-content" id="tab-video">
-  <div class="page-header">
-    <div class="page-header__eyebrow"><span class="material-symbols-rounded">movie</span> Produktion</div>
-    <h1 class="page-header__title">Video erstellen</h1>
-    <p class="page-header__sub">Story auswählen → Videos erstellen → Warteschlange abarbeiten.</p>
+<section class="page" data-tab="video">
+<div class="wrap">
+
+  <!-- Production status -->
+  <div class="tbox" id="prod-status-bar">
+    <span class="mi" id="prod-status-icon" style="font-size:22px">check_circle</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:14px;font-weight:600" id="prod-status-label">Produktion aktiv</div>
+      <div style="font-size:12px;opacity:.8" id="prod-status-hint">Videos werden automatisch produziert</div>
+    </div>
+    <button class="btn btn--outlined btn--sm" id="btn-toggle-prod" onclick="toggleProdStatus()">
+      <span class="mi">pause_circle</span> Pausieren
+    </button>
   </div>
 
-  <div class="d-grid-2">
-    <!-- Linke Spalte: Story auswählen -->
-    <div>
-      <div class="md-card md-card--elevated">
-        <div class="card-hdr">
-          <div class="card-hdr__icon"><span class="material-symbols-rounded">auto_stories</span></div>
-          <div class="card-hdr__text">
-            <div class="card-title">Story auswählen</div>
-            <div class="card-subtitle">Klicke eine Story an, dann auf "Erstellen"</div>
-          </div>
-        </div>
-
-        <div id="story-list">
-          <div class="empty-state" style="padding:24px 0">
-            <div class="empty-state__icon"><span class="material-symbols-rounded">book</span></div>
-            <div class="empty-state__text">Keine Stories vorhanden</div>
-          </div>
-        </div>
-
-        <div class="md-divider" style="margin:14px 0 12px"></div>
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <button class="md-btn md-btn--filled" id="btn-create-video" onclick="createVideo()" disabled>
-            <span class="material-symbols-rounded">video_settings</span> Videos erstellen
-          </button>
-          <span class="text-muted" id="selected-story-info" style="font-size:13px"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Rechte Spalte: Produktionssteuerung + Warteschlange -->
-    <div style="display:flex;flex-direction:column;gap:16px">
-
-      <!-- Produktionssteuerung -->
-      <div class="md-card md-card--elevated">
-        <div class="card-hdr">
-          <div class="card-hdr__icon" style="background:var(--md-sys-color-tertiary-container);color:var(--md-sys-color-on-tertiary-container)">
-            <span class="material-symbols-rounded">tune</span>
-          </div>
-          <div class="card-hdr__text">
-            <div class="card-title">Produktion</div>
-          </div>
-        </div>
-
-        <div id="prod-status-bar" style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--md-sys-color-surface-container-highest);border-radius:var(--md-shape-large);margin-bottom:14px">
-          <span class="material-symbols-rounded" id="prod-status-icon" style="color:var(--md-sys-color-success)">check_circle</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:500" id="prod-status-label">Produktion aktiv</div>
-            <div style="font-size:12px;color:var(--md-sys-color-on-surface-variant)" id="prod-status-hint">Videos werden automatisch produziert</div>
-          </div>
-          <button class="md-btn md-btn--outlined md-btn--sm" id="btn-toggle-prod" onclick="toggleProdStatus()">
-            <span class="material-symbols-rounded">pause_circle</span> Pausieren
-          </button>
-        </div>
-
-        <div style="display:flex;gap:8px;align-items:center">
-          <input type="number" id="prod-interval" class="md-input" value="0" min="0" style="width:72px">
-          <span style="font-size:13px;color:var(--md-sys-color-on-surface-variant)">Min. Pause</span>
-          <button class="md-btn md-btn--tonal md-btn--sm" onclick="saveProdSettings()">
-            <span class="material-symbols-rounded">save</span> Speichern
-          </button>
-        </div>
-        <span style="font-size:11px;color:var(--md-sys-color-on-surface-variant);margin-top:4px;display:block">0 = sofort nacheinander</span>
-      </div>
-
-      <!-- Warteschlange -->
-      <div class="md-card md-card--elevated">
-        <div class="card-hdr">
-          <div class="card-hdr__icon" style="background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)">
-            <span class="material-symbols-rounded">queue</span>
-          </div>
-          <div class="card-hdr__text">
-            <div class="card-title">Warteschlange</div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <div class="card-subtitle" style="margin:0">Immer nur 1 Video gleichzeitig</div>
-              <span id="sse-status"></span>
-            </div>
-          </div>
-        </div>
-        <div id="queue-stats" class="flex-row" style="margin-bottom:10px;gap:6px"></div>
-        <div id="queue-list">
-          <div class="empty-state" style="padding:24px 0">
-            <div class="empty-state__icon"><span class="material-symbols-rounded">hourglass_empty</span></div>
-            <div class="empty-state__text">Warteschlange ist leer</div>
-          </div>
-        </div>
-      </div>
-    </div>
+  <!-- Interval (secondary) -->
+  <div class="row" style="margin-bottom:16px">
+    <span style="font-size:13px;color:var(--cosv)">Pause zwischen Videos:</span>
+    <input type="number" id="prod-interval" class="inp" value="0" min="0" style="width:64px;height:36px;font-size:14px">
+    <span style="font-size:13px;color:var(--cosv)">Min.</span>
+    <button class="btn btn--tonal btn--sm" onclick="saveProdSettings()">
+      <span class="mi">save</span> Speichern
+    </button>
   </div>
+
+  <!-- Story list -->
+  <div class="lbl"><span class="mi">auto_stories</span> Stories</div>
+  <div id="story-list">
+    <div class="empty"><span class="mi">auto_stories</span><span class="empty__ttl">Keine Stories vorhanden</span><span class="empty__sub">Erstelle zuerst eine Story im Story-Tab</span></div>
+  </div>
+
+  <!-- Create button -->
+  <button class="btn btn--filled btn--lg" id="btn-create-video" onclick="createVideo()" disabled style="margin-top:12px">
+    <span class="mi">video_settings</span> Videos erstellen
+  </button>
+  <div id="selected-story-info" style="font-size:12px;color:var(--cosv);text-align:center;margin-top:6px;min-height:16px"></div>
+
+  <!-- Queue -->
+  <div class="lbl" style="margin-top:20px">
+    <span class="mi">queue</span> Warteschlange
+    <span id="sse-status" style="font-size:11px;text-transform:none;letter-spacing:0;font-weight:400;opacity:.7;margin-left:-4px"></span>
+  </div>
+  <div id="queue-stats" class="row" style="margin-bottom:8px"></div>
+  <div id="queue-list">
+    <div class="empty"><span class="mi">hourglass_empty</span><span class="empty__ttl">Warteschlange leer</span></div>
+  </div>
+
+</div>
 </section>
 
-<style>
-  @media (max-width: 599px) {
-    #prod-status-hint { display: none; }
-    #prod-status-bar { padding: 10px 12px; gap: 8px; }
-  }
-</style>
-
 <script>
-  // ============================================================
-  //  Story-Liste & Video-Erstellung
-  // ============================================================
-  async function loadStoryList() {
-    loadProdSettings();
-    const container = document.getElementById('story-list');
-    container.innerHTML = '<div class="spinner" style="margin:16px auto"></div>';
-    try {
-      const stories = await fetch('/api/stories').then(r => r.json());
-      if (!stories.length) {
-        container.innerHTML = `<div class="empty-state" style="padding:24px 0">
-          <div class="empty-state__icon"><span class="material-symbols-rounded">book</span></div>
-          <div class="empty-state__text">Keine Stories vorhanden</div>
-          <div class="empty-state__hint">Erstelle oder importiere zuerst eine Story</div>
-        </div>`;
-        return;
-      }
+async function loadStoryList(){
+  loadProdSettings();
+  const c=document.getElementById('story-list');
+  c.innerHTML='<div style="display:flex;justify-content:center;padding:24px"><div class="spinner"></div></div>';
+  try{
+    const stories=await fetch('/api/stories').then(r=>r.json());
+    if(!stories.length){
+      c.innerHTML='<div class="empty"><span class="mi">auto_stories</span><span class="empty__ttl">Keine Stories</span><span class="empty__sub">Importiere zuerst eine Story</span></div>';
+      return;
+    }
+    const done  =stories.filter(s=>s.total_parts>0&&s.video_done_parts>=s.total_parts);
+    const queued=stories.filter(s=>s.video_done_parts<s.total_parts&&s.video_queue_parts>0);
+    const ready =stories.filter(s=>s.video_done_parts<s.total_parts&&s.video_queue_parts===0);
+    c.innerHTML='';
 
-      const finished = stories.filter(s => s.total_parts > 0 && s.video_done_parts >= s.total_parts);
-      const inQueue  = stories.filter(s => s.video_done_parts < s.total_parts && s.video_queue_parts > 0);
-      const pending  = stories.filter(s => s.video_done_parts < s.total_parts && s.video_queue_parts === 0);
-
-      container.innerHTML = '';
-
-      function renderSitem(s) {
-        const isDone = s.total_parts > 0 && s.video_done_parts >= s.total_parts;
-        const isQueued = s.video_queue_parts > 0;
-
-        let dotClass = 'sitem__dot';
-        let badgeHtml = '';
-        if (isDone) {
-          dotClass += ' sitem__dot--done';
-          badgeHtml = `<span class="sitem__badge sitem__badge--done">Fertig</span>`;
-        } else if (isQueued) {
-          dotClass += ' sitem__dot--queue';
-          badgeHtml = `<span class="sitem__badge sitem__badge--active">${s.video_queue_parts} in Queue</span>`;
-        } else if (s.video_done_parts > 0) {
-          badgeHtml = `<span class="sitem__badge">${s.video_done_parts}/${s.total_parts}</span>`;
-        }
-
-        const item = document.createElement('div');
-        item.className = 'sitem' + (s.id === selectedStoryId ? ' selected' : '') + (isDone ? ' done' : '');
-        item.dataset.id = s.id;
-        item.innerHTML = `
-          <div class="${dotClass}"></div>
-          <div class="sitem__body">
-            <div class="sitem__title">${escHtml(s.title)}</div>
-            <div class="sitem__meta"><span class="story-code-badge" style="font-size:10px;padding:1px 7px">${s.code}</span> · ${s.total_parts} Teil(e) · ${formatDate(s.created_at)}</div>
-          </div>
-          ${badgeHtml}
-          <button class="sitem__del" onclick="event.stopPropagation(); deleteStoryFromList(${s.id}, '${escHtml(s.title).replace(/'/g, '&#39;')}')">
-            <span class="material-symbols-rounded">delete</span>
+    function mkItem(s){
+      const isDone=s.total_parts>0&&s.video_done_parts>=s.total_parts;
+      const isQ=s.video_queue_parts>0;
+      let dot=isDone?'sdot sdot--ok':isQ?'sdot sdot--on':'sdot';
+      let trail='';
+      if(isDone) trail='<span class="chip chip--done">Fertig</span>';
+      else if(isQ) trail=`<span class="chip chip--proc">${s.video_queue_parts} in Queue</span>`;
+      else if(s.video_done_parts>0) trail=`<span class="chip chip--pend">${s.video_done_parts}/${s.total_parts}</span>`;
+      const el=document.createElement('div');
+      el.className='li'+(s.id===selectedStoryId?' is-sel':'')+(isDone?' is-dim':'');
+      el.dataset.id=s.id;
+      el.innerHTML=`
+        <div class="li__lead"><div class="${dot}"></div></div>
+        <div class="li__body">
+          <div class="li__title">${escHtml(s.title)}</div>
+          <div class="li__sub"><span class="badge">${s.code}</span>&nbsp;·&nbsp;${s.total_parts} Teil(e) · ${formatDate(s.created_at)}</div>
+        </div>
+        <div class="li__trail">
+          ${trail}
+          <button class="btn btn--icon" style="color:var(--ce);opacity:.7" onclick="event.stopPropagation();deleteStoryFromVideo(${s.id},'${escHtml(s.title).replace(/'/g,"&#39;")}')">
+            <span class="mi">delete</span>
           </button>
-        `;
-        item.addEventListener('click', () => selectStory(s.id, s.title, s.code));
-        return item;
-      }
-
-      function createSeparator(id, label, count, storageKey) {
-        const sep = document.createElement('div');
-        sep.style.cssText = 'display:flex;align-items:center;gap:8px;margin:12px 0 6px;cursor:pointer;user-select:none;';
-        const isCollapsed = localStorage.getItem(storageKey) === 'true';
-
-        sep.onclick = () => {
-          const c = document.getElementById(id);
-          const i = sep.querySelector('.md-icon-collapse');
-          const isHidden = c.style.display === 'none';
-          c.style.display = isHidden ? 'block' : 'none';
-          i.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
-          localStorage.setItem(storageKey, !isHidden);
-        };
-
-        sep.innerHTML = `
-          <div style="flex:1;height:1px;background:var(--md-sys-color-outline-variant)"></div>
-          <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--md-sys-color-on-surface-variant);opacity:.7;white-space:nowrap;display:flex;align-items:center;gap:4px">
-            <span class="material-symbols-rounded md-icon-collapse" style="font-size:16px;transition:transform .2s;${isCollapsed ? 'transform:rotate(-90deg)' : ''}">expand_more</span>
-            ${label} (${count})
-          </span>
-          <div style="flex:1;height:1px;background:var(--md-sys-color-outline-variant)"></div>`;
-        return sep;
-      }
-
-      if (pending.length) {
-        pending.forEach(s => container.appendChild(renderSitem(s)));
-      }
-
-      if (inQueue.length) {
-        container.appendChild(createSeparator('queue-stories-container', 'In Warteschlange', inQueue.length, 'sara_queue_collapsed'));
-        const qc = document.createElement('div');
-        qc.id = 'queue-stories-container';
-        qc.style.display = (localStorage.getItem('sara_queue_collapsed') === 'true') ? 'none' : 'block';
-        inQueue.forEach(s => qc.appendChild(renderSitem(s)));
-        container.appendChild(qc);
-      }
-
-      if (finished.length) {
-        container.appendChild(createSeparator('finished-stories-container', 'Bereits produziert', finished.length, 'sara_finished_collapsed'));
-        const fc = document.createElement('div');
-        fc.id = 'finished-stories-container';
-        fc.style.display = (localStorage.getItem('sara_finished_collapsed') === 'true') ? 'none' : 'block';
-        finished.forEach(s => fc.appendChild(renderSitem(s)));
-        container.appendChild(fc);
-      }
-
-      if (pendingSelectStoryId) {
-        const s = stories.find(st => st.id === pendingSelectStoryId);
-        if (s) selectStory(s.id, s.title, s.code);
-        pendingSelectStoryId = null;
-      }
-    } catch (e) {
-      container.innerHTML = `<div class="text-muted">Fehler: ${e.message}</div>`;
+        </div>`;
+      el.addEventListener('click',()=>selectStory(s.id,s.title,s.code));
+      return el;
     }
-  }
 
-  function selectStory(id, title, code) {
-    selectedStoryId = id;
-    document.querySelectorAll('.sitem').forEach(el =>
-      el.classList.toggle('selected', parseInt(el.dataset.id) === id)
-    );
-    document.getElementById('btn-create-video').disabled = false;
-    document.getElementById('selected-story-info').textContent = title ? `"${title}"` : '';
-  }
-
-  async function createVideo() {
-    if (!selectedStoryId) return;
-    try {
-      const res = await fetch('/api/create-video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ story_id: selectedStoryId })
-      });
-      const data = await res.json();
-      if (data.error) { showSnack(data.error, 'error'); return; }
-      showSnack(`${data.job_ids.length} Job(s) zur Warteschlange hinzugefügt!`, 'success');
-      loadQueue();
-    } catch (e) {
-      showSnack('Fehler: ' + e.message, 'error');
+    function mkSep(id,label,count,key){
+      const col=localStorage.getItem(key)==='true';
+      const sep=document.createElement('div');
+      sep.className='csep';
+      sep.innerHTML=`<div class="csep__line"></div><span class="csep__txt"><span class="mi csep__ico${col?' col':''}">expand_more</span>${label} (${count})</span><div class="csep__line"></div>`;
+      const wrap=document.createElement('div');
+      wrap.id=id;wrap.style.display=col?'none':'block';
+      sep.onclick=()=>{
+        const h=wrap.style.display==='none';
+        wrap.style.display=h?'block':'none';
+        sep.querySelector('.csep__ico').classList.toggle('col',!h);
+        localStorage.setItem(key,!h);
+      };
+      return{sep,wrap};
     }
-  }
 
-  async function deleteStoryFromList(storyId, title) {
-    if (!confirm(`Möchtest du die Story "${title}" und alle zugehörigen Daten wirklich löschen?`)) return;
-    try {
-      const res = await fetch(`/api/stories/${storyId}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.error) { showSnack(data.error, 'error'); return; }
-      showSnack('Story gelöscht.', 'success');
-      if (selectedStoryId === storyId) {
-        selectedStoryId = null;
-        document.getElementById('btn-create-video').disabled = true;
-        document.getElementById('selected-story-info').textContent = '';
-      }
-      loadStoryList();
-    } catch (e) {
-      showSnack('Fehler: ' + e.message, 'error');
+    ready.forEach(s=>c.appendChild(mkItem(s)));
+
+    if(queued.length){
+      const{sep,wrap}=mkSep('q-s','In Warteschlange',queued.length,'sara_qstory_col');
+      queued.forEach(s=>wrap.appendChild(mkItem(s)));
+      c.appendChild(sep);c.appendChild(wrap);
     }
-  }
-
-  async function loadProdSettings() {
-    try {
-      const settings = await fetch('/api/settings').then(r => r.json());
-      if (settings.prod_interval_min !== undefined) {
-        document.getElementById('prod-interval').value = settings.prod_interval_min;
-      }
-      _prodActive = settings.prod_active !== '0';
-      updateProdButton();
-    } catch (e) {}
-  }
-
-  function updateProdButton() {
-    const btn = document.getElementById('btn-toggle-prod');
-    const icon = document.getElementById('prod-status-icon');
-    const label = document.getElementById('prod-status-label');
-    const hint = document.getElementById('prod-status-hint');
-
-    if (_prodActive) {
-      btn.innerHTML = '<span class="material-symbols-rounded">pause_circle</span> Pausieren';
-      btn.style.color = '';
-      btn.style.borderColor = '';
-      if (icon) { icon.textContent = 'check_circle'; icon.style.color = 'var(--md-sys-color-success)'; }
-      if (label) label.textContent = 'Produktion aktiv';
-      if (hint) hint.textContent = 'Videos werden automatisch produziert';
-    } else {
-      btn.innerHTML = '<span class="material-symbols-rounded">play_circle</span> Fortsetzen';
-      btn.style.color = 'var(--md-sys-color-primary)';
-      btn.style.borderColor = 'var(--md-sys-color-primary)';
-      if (icon) { icon.textContent = 'pause_circle'; icon.style.color = 'var(--md-sys-color-warning)'; }
-      if (label) label.textContent = 'Produktion pausiert';
-      if (hint) hint.textContent = 'Klicke Fortsetzen um die Queue wieder zu starten';
+    if(done.length){
+      const{sep,wrap}=mkSep('d-s','Bereits produziert',done.length,'sara_done_col');
+      done.forEach(s=>wrap.appendChild(mkItem(s)));
+      c.appendChild(sep);c.appendChild(wrap);
     }
-  }
 
-  async function toggleProdStatus() {
-    _prodActive = !_prodActive;
-    updateProdButton();
-    try {
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prod_active: _prodActive ? '1' : '0' })
-      });
-      showSnack(_prodActive ? 'Produktion gestartet' : 'Produktion pausiert', 'success');
-    } catch (e) {
-      showSnack('Fehler beim Ändern des Status', 'error');
+    if(pendingSelectStoryId){
+      const s=stories.find(x=>x.id===pendingSelectStoryId);
+      if(s) selectStory(s.id,s.title,s.code);
+      pendingSelectStoryId=null;
     }
-  }
+  }catch(e){c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
+}
 
-  async function saveProdSettings() {
-    const val = document.getElementById('prod-interval').value;
-    try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prod_interval_min: val })
-      });
-      const data = await res.json();
-      if (data.success) showSnack('Intervall gespeichert!', 'success');
-    } catch (e) {
-      showSnack('Fehler beim Speichern', 'error');
-    }
+function selectStory(id,title,code){
+  selectedStoryId=id;
+  document.querySelectorAll('.li[data-id]').forEach(el=>el.classList.toggle('is-sel',parseInt(el.dataset.id)===id));
+  document.getElementById('btn-create-video').disabled=false;
+  document.getElementById('selected-story-info').textContent=title?`"${title}" ausgewählt`:'';
+}
+
+async function createVideo(){
+  if(!selectedStoryId) return;
+  try{
+    const res=await fetch('/api/create-video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_id:selectedStoryId})});
+    const d=await res.json();
+    if(d.error){showSnack(d.error,'error');return}
+    showSnack(`${d.job_ids.length} Job(s) zur Warteschlange hinzugefügt!`,'success');
+    loadQueue();loadStoryList();
+  }catch(e){showSnack('Fehler: '+e.message,'error')}
+}
+
+async function deleteStoryFromVideo(id,title){
+  if(!confirm(`Story "${title}" und alle zugehörigen Daten löschen?`)) return;
+  try{
+    const res=await fetch(`/api/stories/${id}`,{method:'DELETE'});
+    const d=await res.json();
+    if(d.error){showSnack(d.error,'error');return}
+    showSnack('Story gelöscht.','success');
+    if(selectedStoryId===id){selectedStoryId=null;document.getElementById('btn-create-video').disabled=true;document.getElementById('selected-story-info').textContent=''}
+    loadStoryList();
+  }catch(e){showSnack('Fehler: '+e.message,'error')}
+}
+
+async function loadProdSettings(){
+  try{
+    const s=await fetch('/api/settings').then(r=>r.json());
+    if(s.prod_interval_min!==undefined) document.getElementById('prod-interval').value=s.prod_interval_min;
+    _prodActive=s.prod_active!=='0';
+    updateProdBtn();
+  }catch(_){}
+}
+
+function updateProdBtn(){
+  const btn=document.getElementById('btn-toggle-prod');
+  const icon=document.getElementById('prod-status-icon');
+  const lbl=document.getElementById('prod-status-label');
+  const hint=document.getElementById('prod-status-hint');
+  const box=document.getElementById('prod-status-bar');
+  if(_prodActive){
+    box.className='tbox';
+    btn.className='btn btn--outlined btn--sm';
+    btn.removeAttribute('style');
+    btn.innerHTML='<span class="mi">pause_circle</span> Pausieren';
+    if(icon){icon.textContent='check_circle';icon.style.color=''}
+    if(lbl) lbl.textContent='Produktion aktiv';
+    if(hint) hint.textContent='Videos werden automatisch produziert';
+  }else{
+    box.className='tbox tbox--warn';
+    btn.className='btn btn--sm';
+    btn.style.cssText='background:var(--cw);color:#1C1B1F;font-weight:600';
+    btn.innerHTML='<span class="mi">play_circle</span> Fortsetzen';
+    if(icon){icon.textContent='pause_circle';icon.style.color='var(--cw)'}
+    if(lbl) lbl.textContent='Produktion pausiert';
+    if(hint) hint.textContent='Klicke Fortsetzen um die Queue zu starten';
   }
+}
+
+async function toggleProdStatus(){
+  _prodActive=!_prodActive;updateProdBtn();
+  try{
+    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prod_active:_prodActive?'1':'0'})});
+    showSnack(_prodActive?'Produktion gestartet':'Produktion pausiert','success');
+  }catch(e){showSnack('Fehler','error')}
+}
+
+async function saveProdSettings(){
+  const val=document.getElementById('prod-interval').value;
+  try{
+    const res=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prod_interval_min:val})});
+    const d=await res.json();
+    if(d.success) showSnack('Intervall gespeichert!','success');
+  }catch(e){showSnack('Fehler','error')}
+}
 </script>
