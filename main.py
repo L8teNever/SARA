@@ -24,6 +24,7 @@ import subprocess
 import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
+from contextlib import contextmanager
 
 # Globale Liste für aktive Subprozesse (FFmpeg etc.)
 _ACTIVE_SUBPROCESSES = []
