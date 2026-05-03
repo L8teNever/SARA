@@ -10,9 +10,8 @@
         </div>
         <div class="row" id="lib-filter-chips" style="gap:6px">
           <button class="fchip is-on" data-f="all" onclick="setLibFilter('all',this)"><span class="mi">layers</span> Alle</button>
-          <button class="fchip" data-f="no-tiktok" onclick="setLibFilter('no-tiktok',this)"><span class="mi">play_circle</span> Kein TikTok</button>
-          <button class="fchip" data-f="no-instagram" onclick="setLibFilter('no-instagram',this)"><span class="mi">photo_camera</span> Kein Instagram</button>
-          <button class="fchip" data-f="no-youtube" onclick="setLibFilter('no-youtube',this)"><span class="mi">smart_display</span> Kein YouTube</button>
+          <button class="fchip" data-f="no-t1" onclick="setLibFilter('no-t1',this)"><span class="mi">play_circle</span> Kein TikTok 1</button>
+          <button class="fchip" data-f="no-t2" onclick="setLibFilter('no-t2',this)"><span class="mi">play_circle</span> Kein TikTok 2</button>
         </div>
       </div>
       <div id="lib-story-list">
@@ -70,9 +69,8 @@ function _matches(story){
   if(_libFilter==='all') return true;
   return story.parts.some(p=>{
     const u=p.uploads||[];
-    if(_libFilter==='no-tiktok')    return !u.find(x=>x.platform==='tiktok');
-    if(_libFilter==='no-instagram') return !u.find(x=>x.platform==='instagram');
-    if(_libFilter==='no-youtube')   return !u.find(x=>x.platform==='youtube');
+    if(_libFilter==='no-t1') return !u.find(x=>x.platform==='tiktok1');
+    if(_libFilter==='no-t2') return !u.find(x=>x.platform==='tiktok2');
     return true;
   });
 }
@@ -88,9 +86,8 @@ function renderLibraryList(){
   c.innerHTML='';
   filtered.forEach(story=>{
     const ups=story.parts.flatMap(p=>p.uploads||[]);
-    const hasT=ups.some(u=>u.platform==='tiktok');
-    const hasI=ups.some(u=>u.platform==='instagram');
-    const hasY=ups.some(u=>u.platform==='youtube');
+    const hasT1=ups.some(u=>u.platform==='tiktok1');
+    const hasT2=ups.some(u=>u.platform==='tiktok2');
     const row=document.createElement('div');
     row.className='lrow';
     row.innerHTML=`
@@ -99,9 +96,8 @@ function renderLibraryList(){
         <div class="lrow__meta"><span class="badge">${story.code}</span>&nbsp;·&nbsp;${story.parts.length} Teil(e) · ${formatDate(story.created_at)}</div>
       </div>
       <div class="lrow__plat">
-        <div class="pdot${hasT?' pdot--ok':''}" title="TikTok">T</div>
-        <div class="pdot${hasI?' pdot--ok':''}" title="Instagram">I</div>
-        <div class="pdot${hasY?' pdot--ok':''}" title="YouTube">Y</div>
+        <div class="pdot${hasT1?' pdot--ok':''}" title="TikTok 1">T1</div>
+        <div class="pdot${hasT2?' pdot--ok':''}" title="TikTok 2">T2</div>
       </div>
       <button class="btn btn--icon" style="color:var(--ce)" onclick="event.stopPropagation();deleteLibStory(${story.story_id},'${escHtml(story.title).replace(/'/g,"&#39;")}')">
         <span class="mi">delete</span>
@@ -128,7 +124,7 @@ function openLibDetail(story,push=true){
     const card=document.createElement('div');
     card.className='vcard';card.id='lib-card-'+part.id;
     card.innerHTML=`
-      <div class="vcard__thumb" onclick="openVideoModal('/video/${part.video_path}','${escHtml(story.title)} — Teil ${part.part_number}')">
+      <div class="vcard__thumb" onclick="openVideoModal('/video/${part.video_path}','${escHtml(social.video_title||story.title+' — Teil '+part.part_number)}')">
         ${part.cover_path?`<img src="/covers/${part.cover_path.split('/').pop()}" alt="Cover" loading="lazy">`:''}
         <video src="/video/${part.video_path}" preload="metadata" muted style="opacity:0"></video>
         <div class="vcard__pov"><span class="mi">play_circle</span></div>
@@ -174,7 +170,7 @@ function closeLibDetail(push=true){
 function renderPlatChips(partId,uploads){
   const c=document.getElementById('plat-'+partId);
   if(!c) return;
-  const plats=[{id:'tiktok',l:'TikTok',i:'play_circle'},{id:'instagram',l:'Instagram',i:'photo_camera'},{id:'youtube',l:'YouTube',i:'smart_display'}];
+  const plats=[{id:'tiktok1',l:'TikTok 1',i:'play_circle'},{id:'tiktok2',l:'TikTok 2',i:'play_circle'}];
   c.innerHTML='';
   plats.forEach(p=>{
     const ex=uploads.find(u=>u.platform===p.id);
@@ -242,7 +238,7 @@ async function markAllUploaded(story){
   if(!confirm(`Alle Teile von "${story.title}" als hochgeladen markieren?`)) return;
   try{
     for(const part of story.parts){
-      for(const p of['tiktok','instagram','youtube']){
+      for(const p of['tiktok1','tiktok2']){
         if(!(part.uploads||[]).some(u=>u.platform===p)){
           await fetch('/api/uploads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_part_id:part.id,platform:p})});
         }

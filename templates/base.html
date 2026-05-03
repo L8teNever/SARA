@@ -532,7 +532,7 @@ async function deleteJob(id){if(!confirm('Aufgabe wirklich löschen?'))return;tr
 function openVideoModal(src,title){
   document.getElementById('modal-title').textContent=title;
   const v=document.getElementById('modal-video');
-  v.src=src;v.load();
+  v.title=title;v.src=src;v.load();
   document.getElementById('video-modal').classList.add('open');
 }
 function closeModal(){
