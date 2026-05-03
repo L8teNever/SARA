@@ -300,7 +300,7 @@ Stories must be written in English and follow this EXACT JSON format — no text
   "parts": [
     {
       "part_number": 1,
-      "text": "Text of part 1 — MUST be 160 to 200 words...",
+      "text": "Text of part 1 — MUST be 200 to 250 words...",
       "cliffhanger_hint": "brief hint of what comes next",
       "social": {
         "video_title": "Catchy TikTok/Reels title with Part 1/2 — max 80 chars",
@@ -318,7 +318,7 @@ Rules for Content:
 - IMPORTANT: Every part that is not the final one MUST end with a verbal call-to-action integrated into the story text (e.g. "... and as I opened the door, my heart stopped. See what happened next in Part 2.").
 - For Part 2 and beyond, start with a quick 1-sentence recap or continuation that keeps the momentum (e.g. "So, there I was, staring at the person I trusted most...").
 - Be extremely creative and original. Avoid generic or repetitive tropes. Every story should have a unique plot twist or a perspective that haven't been heard a thousand times before. Explore a wide variety of themes: hidden family secrets, mysterious disappearances, complex revenge plots, heartwarming but shocking reunions, or psychological workplace drama.
-- Each part MUST contain exactly 160–200 words (this guarantees at least 75 seconds of audio per part).
+- Each part MUST contain exactly 200–250 words (this guarantees at least 85–100 seconds of audio per part).
 - Write in first person, past tense, raw and emotional style (like r/TIFU or r/relationships).
 - keywords: genau 10 englische Stichwörter, die den Kerninhalt der Geschichte beschreiben. Diese werden für den Duplikat-Check genutzt.
 - social.video_title: punchy and attention-grabbing, include "Part X/Y" for multi-part, max 80 chars.
