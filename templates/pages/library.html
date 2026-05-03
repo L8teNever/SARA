@@ -111,7 +111,7 @@ function renderLibraryList(){
       <span class="mi" style="color:var(--cosv)">chevron_right</span>`;
     row.querySelector('.lrow__check').addEventListener('click',e=>{
       e.stopPropagation();
-      if(!allDone) quickMarkAll(story,row);
+      if(!allDone) markAllUploaded(story);
     });
     row.querySelector('.lrow__del').addEventListener('click',e=>{
       e.stopPropagation();
