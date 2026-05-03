@@ -88,8 +88,11 @@ function renderLibraryList(){
     const ups=story.parts.flatMap(p=>p.uploads||[]);
     const hasT1=ups.some(u=>u.platform==='tiktok1');
     const hasT2=ups.some(u=>u.platform==='tiktok2');
+    const allDone=story.parts.length>0&&story.parts.every(p=>
+      ['tiktok1','tiktok2'].every(pl=>(p.uploads||[]).some(u=>u.platform===pl))
+    );
     const row=document.createElement('div');
-    row.className='lrow';
+    row.className='lrow'+(allDone?' lrow--done':'');
     row.innerHTML=`
       <div class="lrow__info">
         <div class="lrow__title">${escHtml(story.title)}</div>
@@ -99,10 +102,21 @@ function renderLibraryList(){
         <div class="pdot${hasT1?' pdot--ok':''}" title="TikTok 1">T1</div>
         <div class="pdot${hasT2?' pdot--ok':''}" title="TikTok 2">T2</div>
       </div>
-      <button class="btn btn--icon" style="color:var(--ce)" onclick="event.stopPropagation();deleteLibStory(${story.story_id},'${escHtml(story.title).replace(/'/g,"&#39;")}')">
+      <button class="btn btn--icon lrow__check" title="${allDone?'Erledigt':'Alle als hochgeladen markieren'}" style="color:${allDone?'var(--cg)':'var(--cosv)'}">
+        <span class="mi">${allDone?'check_circle':'radio_button_unchecked'}</span>
+      </button>
+      <button class="btn btn--icon lrow__del" style="color:var(--ce)">
         <span class="mi">delete</span>
       </button>
       <span class="mi" style="color:var(--cosv)">chevron_right</span>`;
+    row.querySelector('.lrow__check').addEventListener('click',e=>{
+      e.stopPropagation();
+      if(!allDone) quickMarkAll(story,row);
+    });
+    row.querySelector('.lrow__del').addEventListener('click',e=>{
+      e.stopPropagation();
+      deleteLibStory(story.story_id,story.title);
+    });
     row.addEventListener('click',()=>openLibDetail(story));
     c.appendChild(row);
   });
