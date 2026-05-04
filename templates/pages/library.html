@@ -208,21 +208,30 @@ function renderPlatChips(partId,uploads){
 }
 
 async function toggleUpload(partId,platform,uploadId,btn){
-  if(btn){btn.disabled=true;const oldHtml=btn.innerHTML;btn._oh=oldHtml;btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px;margin-right:4px"></div>'+platform}
+  const oh=btn?btn.innerHTML:null;
+  if(btn){btn.disabled=true;btn.innerHTML='<div class="spinner spinner--sm" style="margin-right:4px"></div>'+platform}
   try{
     if(uploadId){
       await fetch(`/api/uploads/${uploadId}`,{method:'DELETE'});
+      _libDataRemoveUpload(partId,uploadId);
       showSnack(`${platform} entfernt.`,'success');
     }else{
       const res=await fetch('/api/uploads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_part_id:partId,platform})});
       const d=await res.json();
-      if(d.error){showSnack(d.error,'error');if(btn){btn.disabled=false;btn.innerHTML=btn._oh}return}
+      if(d.error){showSnack(d.error,'error');if(btn){btn.disabled=false;btn.innerHTML=oh}return}
+      _libDataAddUpload(partId,{id:d.id,platform,uploaded_at:d.uploaded_at||new Date().toISOString()});
       showSnack(`Als ${platform} markiert!`,'success');
     }
-    await loadLibrary();
     const story=_libData.find(s=>s.parts.some(p=>p.id===partId));
     if(story){const part=story.parts.find(p=>p.id===partId);if(part) renderPlatChips(partId,part.uploads||[])}
-  }catch(e){showSnack('Fehler: '+e.message,'error');if(btn){btn.disabled=false;btn.innerHTML=btn._oh}}
+  }catch(e){showSnack('Fehler: '+e.message,'error');if(btn){btn.disabled=false;btn.innerHTML=oh}}
+}
+
+function _libDataRemoveUpload(partId,uploadId){
+  for(const s of _libData) for(const p of s.parts) if(p.id===partId){p.uploads=(p.uploads||[]).filter(u=>u.id!==uploadId);return}
+}
+function _libDataAddUpload(partId,upload){
+  for(const s of _libData) for(const p of s.parts) if(p.id===partId){(p.uploads=p.uploads||[]).push(upload);return}
 }
 
 function copySocial(partId){
@@ -266,13 +275,15 @@ async function markAllUploaded(story,btn){
   const oldHtml=btn?btn.innerHTML:null;
   if(btn){btn.disabled=true;btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px;margin-right:6px"></div> Markiere…'}
   try{
+    const jobs=[];
     for(const part of story.parts){
       for(const p of['tiktok1','tiktok2']){
         if(!(part.uploads||[]).some(u=>u.platform===p)){
-          await fetch('/api/uploads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_part_id:part.id,platform:p})});
+          jobs.push(fetch('/api/uploads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_part_id:part.id,platform:p})}));
         }
       }
     }
+    await Promise.all(jobs);
     showSnack('Alle als erledigt markiert.','success');
     await loadLibrary();
     const updated=_libData.find(s=>s.story_id===story.story_id);

@@ -55,7 +55,7 @@ async function loadBackgrounds(){
       div.className='bgthumb';
       div.innerHTML=`
         <video src="/backgrounds/${bg.filename}" preload="metadata" muted loop></video>
-        <div class="bgthumb__ov"><span class="bgthumb__name">${escHtml(bg.filename)}</span></div>
+        <div class="bgthumb__ov"><span class="bgthumb__name">${escHtml(bg.original_name||bg.filename)}</span></div>
         <button class="bgthumb__del" onclick="event.stopPropagation();deleteBackground('${escHtml(bg.filename)}',this)" title="Löschen">
           <span class="mi">delete</span>
         </button>`;

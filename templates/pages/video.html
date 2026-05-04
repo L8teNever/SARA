@@ -64,7 +64,6 @@
 
 <script>
 async function loadStoryList(){
-  loadProdSettings();
   const c=document.getElementById('story-list');
   try{
     const stories=await fetch('/api/stories').then(r=>r.json());

@@ -296,6 +296,7 @@ input,textarea{font:inherit;color:inherit}
 .muted{color:var(--cosv);opacity:.7}
 .hidden{display:none !important}
 .spinner{width:24px;height:24px;border:2.5px solid var(--cov);border-top-color:var(--cp);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+.spinner--sm{width:16px;height:16px;border-width:2px}
 .spinner--lg{width:36px;height:36px}
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;gap:8px;color:var(--cosv)}
 .empty .mi{font-size:40px;opacity:.4}
@@ -428,9 +429,10 @@ let pendingSelectStoryId = null;
 let pendingLibraryCode = null;
 let _sseSource = null;
 let _prodActive = true;
+let _prevProcessingCount = 0;
 
 /* ── Utils ───────────────────────────────────────────────── */
-function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function formatDate(s){if(!s)return'–';try{return new Date(s).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}catch{return s}}
 function formatDateShort(s){if(!s)return'–';try{return new Date(s).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}catch{return s}}
 function getDuration(a,b){if(!a)return'–';try{const d=Math.round((new Date(b||Date.now())-new Date(a))/1000);if(d<0)return'Pausiert';const m=Math.floor(d/60),s=d%60;return m?`${m}m ${s}s`:`${s}s`}catch{return'–'}}
@@ -459,7 +461,7 @@ function switchTab(name, push=true){
   });
   if(push) history.pushState({tab:name},'',TAB_URL[name]||'/');
   if(name==='story'  && typeof loadRecentStories==='function') loadRecentStories();
-  if(name==='video'  && typeof loadStoryList==='function'){loadStoryList();loadQueue();}
+  if(name==='video'  && typeof loadStoryList==='function'){loadStoryList();loadQueue();if(typeof loadProdSettings==='function')loadProdSettings();}
   if(name==='library'&& typeof loadLibrary==='function') loadLibrary();
   if(name==='upload' && typeof loadBackgrounds==='function') loadBackgrounds();
 }
@@ -482,6 +484,13 @@ function startSSE(){
         updateQBadge(s);
       }
       if(typeof d.prod_active!=='undefined'){_prodActive=d.prod_active;if(typeof updateProdBtn==='function')updateProdBtn()}
+      const nowProc=d.stats?.processing||0;
+      if(_prevProcessingCount>0&&nowProc<_prevProcessingCount){
+        if(currentTab==='video'&&typeof loadStoryList==='function') loadStoryList();
+        if(currentTab==='story'&&typeof loadRecentStories==='function') loadRecentStories();
+        if(currentTab==='library'&&typeof loadLibrary==='function') loadLibrary();
+      }
+      _prevProcessingCount=nowProc;
     }catch(_){}
   };
   _sseSource.onerror=()=>{
