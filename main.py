@@ -964,6 +964,23 @@ def index(rest=None):
 # Routes — Config
 # ---------------------------------------------------------------------------
 
+@app.route("/favicon.svg")
+def favicon_svg():
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+        '<rect width="32" height="32" rx="6" fill="#4F378B"/>'
+        '<text x="16" y="23" font-family="sans-serif" font-size="19" font-weight="700"'
+        ' text-anchor="middle" fill="#EADDFF">S</text>'
+        "</svg>"
+    )
+    return Response(svg, mimetype="image/svg+xml")
+
+
+@app.route("/favicon.ico")
+def favicon_ico():
+    return "", 204
+
+
 @app.route("/api/config", methods=["GET"])
 def api_config():
     return jsonify({"api_key_configured": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())})

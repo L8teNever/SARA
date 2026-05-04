@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <title>SARA</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..900&display=swap" rel="stylesheet">
@@ -489,7 +490,7 @@ function startSSE(){
         updateQBadge(s);
       }
       if(typeof d.prod_active!=='undefined'){_prodActive=d.prod_active;if(typeof updateProdBtn==='function')updateProdBtn()}
-      const nowProc=d.stats?.processing||0;
+      const nowProc=d.stats?.processing??(d.jobs?.filter(j=>j.status==='processing').length||0);
       if(_prevProcessingCount>0&&nowProc<_prevProcessingCount){
         if(currentTab==='video'&&typeof loadStoryList==='function') loadStoryList();
         if(currentTab==='story'&&typeof loadRecentStories==='function') loadRecentStories();
