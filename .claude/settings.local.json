@@ -10,7 +10,12 @@
       "Bash(python -c \"import ast; ast.parse\\(open\\('main.py', encoding='utf-8'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
       "Bash(curl -s http://localhost:5000/api/stories)",
       "Bash(curl -sv http://localhost:5000/api/stories)",
-      "Bash(curl -sv http://172.26.0.1:5000/api/stories)"
+      "Bash(curl -sv http://172.26.0.1:5000/api/stories)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(curl -s http://localhost:7842/api/stories)",
+      "Bash(python *)",
+      "Bash(curl -s https://sara.l8tenever.com/api/stories)",
+      "Bash(curl -sv https://sara.l8tenever.com/api/stories)"
     ]
   }
 }

@@ -17,6 +17,7 @@ import json
 import uuid
 import random
 import shutil
+import signal
 import string
 import sqlite3
 import asyncio
@@ -147,10 +148,13 @@ def get_db() -> sqlite3.Connection:
     return conn
 
 @contextmanager
-def db_session():
+def db_session(write=True):
     conn = get_db()
     try:
-        conn.execute("BEGIN IMMEDIATE")
+        if write:
+            conn.execute("BEGIN IMMEDIATE")
+        else:
+            conn.execute("BEGIN") # DEFERRED
         yield conn
         conn.execute("COMMIT")
     except Exception:
@@ -164,9 +168,9 @@ def db_session():
 
 
 def init_db():
-    # executescript() auto-commits, so we use get_db() directly here (not db_session)
-    conn = get_db()
-    try:
+    with db_session(write=True) as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS stories (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -229,10 +233,8 @@ def init_db():
         """)
 
         # Reset stuck jobs after a crash/restart
-        conn.execute("BEGIN IMMEDIATE")
         conn.execute("UPDATE queue SET status = 'pending', progress_label = 'Wartend (Restart)...' WHERE status = 'processing'")
         conn.execute("UPDATE story_parts SET status = 'pending' WHERE status = 'processing'")
-        conn.execute("COMMIT")
 
         # Column migrations — each in its own try/except
         for stmt in [
@@ -259,7 +261,7 @@ def generate_story_code() -> str:
     chars = string.ascii_uppercase + string.digits
     while True:
         code = "".join(random.choices(chars, k=6))
-        with db_session() as conn:
+        with db_session(write=False) as conn:
             row = conn.execute("SELECT id FROM stories WHERE code = ?", (code,)).fetchone()
         if row is None:
             return code
@@ -267,7 +269,7 @@ def generate_story_code() -> str:
 
 def check_duplicate(keywords: list) -> dict:
     new_set = set(k.lower() for k in keywords)
-    with db_session() as conn:
+    with db_session(write=False) as conn:
         rows = conn.execute("SELECT id, code, title, keywords_json FROM stories").fetchall()
     for row in rows:
         existing = set(k.lower() for k in json.loads(row["keywords_json"]))
@@ -1090,7 +1092,7 @@ def api_save_story():
 
 @app.route("/api/stories", methods=["GET"])
 def api_get_stories():
-    with db_session() as conn:
+    with db_session(write=False) as conn:
         stories = conn.execute(
             "SELECT id, code, title, total_parts, created_at FROM stories ORDER BY created_at DESC"
         ).fetchall()
@@ -1119,7 +1121,7 @@ def api_get_stories():
 
 @app.route("/api/stories/<int:story_id>", methods=["GET"])
 def api_get_story(story_id: int):
-    with db_session() as conn:
+    with db_session(write=False) as conn:
         story = conn.execute("SELECT * FROM stories WHERE id = ?", (story_id,)).fetchone()
         if not story:
             abort(404)
@@ -1215,14 +1217,14 @@ def api_settings():
                     _kill_active_subs()
         return jsonify({"success": True})
     else:
-        with db_session() as conn:
+        with db_session(write=False) as conn:
             rows = conn.execute("SELECT key, value FROM settings").fetchall()
         return jsonify({r["key"]: r["value"] for r in rows})
 
 
 @app.route("/api/queue", methods=["GET"])
 def api_get_queue():
-    with db_session() as conn:
+    with db_session(write=False) as conn:
         jobs = conn.execute(
             """SELECT q.id, q.status, q.error_msg, q.created_at, q.finished_at,
                       q.progress_pct, q.progress_label,
@@ -1239,7 +1241,7 @@ def api_get_queue():
 
 @app.route("/api/queue/stats", methods=["GET"])
 def api_queue_stats():
-    with db_session() as conn:
+    with db_session(write=False) as conn:
         stats = conn.execute(
             "SELECT status, COUNT(*) as count FROM queue GROUP BY status"
         ).fetchall()
@@ -1343,7 +1345,7 @@ def api_cancel_queue_job(job_id: int):
 
 @app.route("/api/backgrounds", methods=["GET"])
 def api_get_backgrounds():
-    with db_session() as conn:
+    with db_session(write=False) as conn:
         bgs = conn.execute("SELECT * FROM backgrounds ORDER BY uploaded_at DESC").fetchall()
     return jsonify([dict(b) for b in bgs])
 
@@ -1399,7 +1401,7 @@ def serve_cover(filename: str):
 
 @app.route("/api/videos", methods=["GET"])
 def api_get_videos():
-    with db_session() as conn:
+    with db_session(write=False) as conn:
         videos = conn.execute(
             """SELECT sp.id, sp.part_number, sp.video_path, sp.cover_path, sp.status,
                       sp.social_json,
