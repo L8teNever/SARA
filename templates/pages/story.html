@@ -273,7 +273,7 @@ async function loadRecentStories(){
           <button class="btn btn--tonal btn--sm" onclick="event.stopPropagation();switchTab('video');pendingSelectStoryId=${s.id}" title="Zu Videos">
             <span class="mi" style="font-size:16px">movie</span>
           </button>
-          <button class="btn btn--icon" style="color:var(--ce)" onclick="event.stopPropagation();deleteRecentStory(${s.id},'${escHtml(s.title).replace(/'/g,"&#39;")}',this)">
+          <button class="btn btn--icon" data-id="${s.id}" data-title="${escHtml(s.title)}" style="color:var(--ce)" onclick="event.stopPropagation();deleteRecentStory(+this.dataset.id,this.dataset.title,this)">
             <span class="mi">delete</span>
           </button>
         </div>`;

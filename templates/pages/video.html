@@ -95,7 +95,7 @@ async function loadStoryList(){
           </div>
           <div class="li__trail">
             ${trail}
-            <button class="btn btn--icon" style="color:var(--ce);opacity:.7" onclick="event.stopPropagation();deleteStoryFromVideo(${s.id},'${escHtml(s.title).replace(/'/g,"&#39;")}',this)">
+            <button class="btn btn--icon" data-id="${s.id}" data-title="${escHtml(s.title)}" style="color:var(--ce);opacity:.7" onclick="event.stopPropagation();deleteStoryFromVideo(+this.dataset.id,this.dataset.title,this)">
               <span class="mi">delete</span>
             </button>
           </div>
