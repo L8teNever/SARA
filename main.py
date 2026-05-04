@@ -6,6 +6,7 @@ Flask backend: story generation, video creation, queue management
 import os
 import re
 import json
+import time
 import uuid
 import random
 import shutil
@@ -120,19 +121,27 @@ app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB
 # ---------------------------------------------------------------------------
 
 def get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=60, isolation_level=None)
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=30, isolation_level=None)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")
-    conn.execute("PRAGMA busy_timeout=60000")
     return conn
 
 
 @contextmanager
 def db_session(write: bool = True):
     conn = get_db()
+    stmt = "BEGIN IMMEDIATE" if write else "BEGIN"
+    deadline = time.monotonic() + 30
+    while True:
+        try:
+            conn.execute(stmt)
+            break
+        except sqlite3.OperationalError as exc:
+            if "locked" in str(exc).lower() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            else:
+                conn.close()
+                raise
     try:
-        conn.execute("BEGIN IMMEDIATE" if write else "BEGIN")
         yield conn
         conn.execute("COMMIT")
     except Exception:
@@ -148,6 +157,8 @@ def db_session(write: bool = True):
 def init_db():
     conn = get_db()
     try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("BEGIN IMMEDIATE")
 
         conn.execute("""
