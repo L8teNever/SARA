@@ -138,9 +138,9 @@ app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB Upload-Limit
 # ---------------------------------------------------------------------------
 
 def get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=60)
+    # isolation_level=None → autocommit; transactions managed explicitly via BEGIN IMMEDIATE
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=60, isolation_level=None)
     conn.row_factory = sqlite3.Row
-    # WAL-Modus aktivieren für bessere Nebenläufigkeit
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA busy_timeout=60000")
@@ -150,17 +150,23 @@ def get_db() -> sqlite3.Connection:
 def db_session():
     conn = get_db()
     try:
+        conn.execute("BEGIN IMMEDIATE")
         yield conn
-        conn.commit()
+        conn.execute("COMMIT")
     except Exception:
-        conn.rollback()
+        try:
+            conn.execute("ROLLBACK")
+        except Exception:
+            pass
         raise
     finally:
         conn.close()
 
 
 def init_db():
-    with db_session() as conn:
+    # executescript() auto-commits, so we use get_db() directly here (not db_session)
+    conn = get_db()
+    try:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS stories (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -217,40 +223,32 @@ def init_db():
             );
 
             INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_interval_min', '0');
-            INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_slots', ''); 
+            INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_slots', '');
             INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_active_windows', '');
             INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_active', '1');
         """)
-        
-        # NEU: Beim Start alle "processing" Jobs zurücksetzen, falls der Server abgestürzt ist
+
+        # Reset stuck jobs after a crash/restart
+        conn.execute("BEGIN IMMEDIATE")
         conn.execute("UPDATE queue SET status = 'pending', progress_label = 'Wartend (Restart)...' WHERE status = 'processing'")
         conn.execute("UPDATE story_parts SET status = 'pending' WHERE status = 'processing'")
-        
-        # Migration: cover_path Spalte falls noch nicht vorhanden
-        try:
-            conn.execute("ALTER TABLE story_parts ADD COLUMN cover_path TEXT")
-        except Exception:
-            pass
-        try:
-            conn.execute("ALTER TABLE queue ADD COLUMN progress_label TEXT DEFAULT ''")
-        except Exception:
-            pass
-        try:
-            conn.execute("ALTER TABLE queue ADD COLUMN progress_pct INTEGER DEFAULT 0")
-        except Exception:
-            pass
-        try:
-            conn.execute("ALTER TABLE queue ADD COLUMN started_at TEXT")
-        except Exception:
-            pass
-        try:
-            conn.execute("ALTER TABLE queue ADD COLUMN scheduled_at TEXT")
-        except Exception:
-            pass
-        try:
-            conn.execute("ALTER TABLE story_parts ADD COLUMN social_json TEXT")
-        except Exception:
-            pass
+        conn.execute("COMMIT")
+
+        # Column migrations — each in its own try/except
+        for stmt in [
+            "ALTER TABLE story_parts ADD COLUMN cover_path TEXT",
+            "ALTER TABLE queue ADD COLUMN progress_label TEXT DEFAULT ''",
+            "ALTER TABLE queue ADD COLUMN progress_pct INTEGER DEFAULT 0",
+            "ALTER TABLE queue ADD COLUMN started_at TEXT",
+            "ALTER TABLE queue ADD COLUMN scheduled_at TEXT",
+            "ALTER TABLE story_parts ADD COLUMN social_json TEXT",
+        ]:
+            try:
+                conn.execute(stmt)
+            except Exception:
+                pass
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
