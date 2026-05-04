@@ -235,6 +235,11 @@ input,textarea{font:inherit;color:inherit}
 .vcard__tags{font-size:11px;color:var(--cp)}
 .vcard__plat{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px}
 .vcard__acts{display:flex;gap:5px;flex-wrap:wrap}
+.vcard__story{margin-top:4px}
+.vcard__story summary{font-size:11px;font-weight:600;color:var(--cosv);letter-spacing:.04em;cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:4px}
+.vcard__story summary::before{content:'▶';font-size:9px;transition:transform .18s}
+.vcard__story[open] summary::before{transform:rotate(90deg)}
+.vcard__stxt{margin-top:8px;font-size:12px;color:var(--cosv);line-height:1.65;white-space:pre-wrap;background:var(--cs0);border-radius:var(--r1);padding:10px 12px;border:1px solid var(--cov)}
 
 /* ── Platform toggle chips ───────────────────────────────── */
 .pchip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:var(--rf);font-size:11px;font-weight:500;cursor:pointer;border:1.5px solid var(--cov);background:transparent;color:var(--cosv);transition:background .15s,color .15s,border-color .15s}

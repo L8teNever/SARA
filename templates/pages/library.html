@@ -158,6 +158,7 @@ function openLibDetail(story,push=true){
         ${social.video_title?`<div class="vcard__ttl">${escHtml(social.video_title)}</div>`:''}
         ${social.description?`<div class="vcard__desc">${escHtml(social.description)}</div>`:''}
         ${social.hashtags?`<div class="vcard__tags">${escHtml(social.hashtags)}</div>`:''}
+        ${part.text?`<details class="vcard__story"><summary>Story-Text</summary><div class="vcard__stxt">${escHtml(part.text)}</div></details>`:''}
         <div class="vcard__plat" id="plat-${part.id}"></div>
         <div class="vcard__acts">
           <button class="btn btn--tonal btn--sm" onclick="openVideoModal('/video/${part.video_path}','${escHtml(story.title)} — Teil ${part.part_number}')">

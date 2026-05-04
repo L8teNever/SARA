@@ -265,20 +265,23 @@ def generate_story_code() -> str:
                 return code
 
 
-def check_duplicate(keywords: list) -> dict:
-    new_set = {k.lower() for k in keywords}
+def check_duplicate(keywords: list, title: str = "") -> dict:
+    new_set   = {k.lower() for k in keywords}
+    title_cmp = title.lower().strip()
     with db_session(write=False) as conn:
         rows = conn.execute("SELECT id, code, title, keywords_json FROM stories").fetchall()
     for row in rows:
-        existing = {k.lower() for k in json.loads(row["keywords_json"])}
-        overlap = len(new_set & existing)
-        if overlap >= 6:
+        existing  = {k.lower() for k in json.loads(row["keywords_json"])}
+        overlap   = len(new_set & existing)
+        is_exact  = (title_cmp and row["title"].lower().strip() == title_cmp) or overlap == len(new_set)
+        if is_exact or overlap >= 6:
             return {
                 "is_duplicate": True,
+                "is_exact":     is_exact,
                 "similar_story": {"id": row["id"], "code": row["code"], "title": row["title"]},
                 "overlap": overlap,
             }
-    return {"is_duplicate": False, "similar_story": None, "overlap": 0}
+    return {"is_duplicate": False, "is_exact": False, "similar_story": None, "overlap": 0}
 
 
 def allowed_video(filename: str) -> bool:
@@ -1017,7 +1020,7 @@ def api_generate_story():
         story_data = generate_story(prompt, api_key)
     except Exception as e:
         return jsonify({"error": f"AI-Fehler: {e}"}), 500
-    return jsonify({"story": story_data, "duplicate_check": check_duplicate(story_data.get("keywords", []))})
+    return jsonify({"story": story_data, "duplicate_check": check_duplicate(story_data.get("keywords", []), story_data.get("title", ""))})
 
 
 @app.route("/api/save-story", methods=["POST"])
@@ -1318,7 +1321,7 @@ def api_get_videos():
     with db_session(write=False) as conn:
         videos = conn.execute(
             """SELECT sp.id, sp.part_number, sp.video_path, sp.cover_path, sp.status,
-                      sp.social_json,
+                      sp.social_json, sp.text,
                       s.id AS story_id, s.code, s.title, s.created_at
                FROM story_parts sp
                JOIN stories s ON s.id = sp.story_id
@@ -1353,6 +1356,7 @@ def api_get_videos():
             "part_number": v["part_number"],
             "video_path":  v["video_path"],
             "cover_path":  v["cover_path"],
+            "text":        v["text"] or "",
             "social":      social,
             "uploads":     uploads_by_part.get(v["id"], []),
         })
@@ -1482,10 +1486,13 @@ def api_import_story():
         if field not in story:
             return jsonify({"error": f"Feld '{field}' fehlt im JSON."}), 400
 
-    dup_check = check_duplicate(story["keywords"])
+    dup_check = check_duplicate(story["keywords"], story.get("title", ""))
 
     if dry_run:
         return jsonify({"success": True, "duplicate_check": dup_check, "story": story})
+
+    if dup_check["is_exact"] and not data.get("force_exact"):
+        return jsonify({"error": f"Diese Story existiert bereits: \"{dup_check['similar_story']['title']}\" [{dup_check['similar_story']['code']}]"}), 409
 
     code = generate_story_code()
     try:

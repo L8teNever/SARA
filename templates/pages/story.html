@@ -211,6 +211,11 @@ async function importStory(){
     const d1=await res1.json();
     if(d1.error){showSnack(d1.error,'error');return}
     let forceQueue=false;
+    if(d1.duplicate_check?.is_exact){
+      const dup=d1.duplicate_check;
+      showSnack(`Story bereits vorhanden: "${dup.similar_story.title}" [${dup.similar_story.code}]`,'error');
+      return;
+    }
     if(d1.duplicate_check?.is_duplicate){
       const dup=d1.duplicate_check;
       btn.innerHTML='<div class="spinner spinner--sm" style="width:18px;height:18px;border-width:2px;margin-right:8px"></div> Warte…';
