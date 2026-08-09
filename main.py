@@ -153,7 +153,7 @@ YOUTUBE_SCOPES = [
 # ---------------------------------------------------------------------------
 
 def get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=30, isolation_level=None)
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=3, isolation_level=None)
     conn.row_factory = sqlite3.Row
     return conn
 
