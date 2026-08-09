@@ -25,7 +25,6 @@ from flask import (
     session, redirect, url_for,
 )
 from werkzeug.exceptions import HTTPException
-import anthropic
 from google_auth_oauthlib.flow import Flow as GoogleOAuthFlow
 from google.oauth2.credentials import Credentials as GoogleCredentials
 from google.auth.transport.requests import Request as GoogleAuthRequest
@@ -491,26 +490,6 @@ Rules for Content:
 - social.description: emotionally tease the story, never spoil the ending, end with a question or CTA.
 - social.hashtags: 6–8 relevant hashtags as a single space-separated string."""
 
-
-def generate_story(prompt: str, api_key: str = "") -> dict:
-    key = api_key.strip() or os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not key:
-        raise ValueError(
-            "Kein API-Key angegeben. Trage deinen Anthropic-Key in den Einstellungen ein "
-            "oder setze ANTHROPIC_API_KEY."
-        )
-    client = anthropic.Anthropic(api_key=key)
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": f"Create a story about: {prompt}"}],
-    )
-    raw = message.content[0].text.strip()
-    match = re.search(r"\{.*\}", raw, re.DOTALL)
-    if not match:
-        raise ValueError(f"Claude hat kein gültiges JSON zurückgegeben: {raw[:200]}")
-    return json.loads(match.group())
 
 
 # ---------------------------------------------------------------------------
@@ -1287,10 +1266,6 @@ def favicon_ico():
     return "", 204
 
 
-@app.route("/api/config", methods=["GET"])
-def api_config():
-    return jsonify({"api_key_configured": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())})
-
 
 # ---------------------------------------------------------------------------
 # Routes — Stories
@@ -1332,43 +1307,6 @@ def api_get_story(story_id: int):
     return jsonify({"story": dict(story), "parts": [dict(p) for p in parts]})
 
 
-@app.route("/api/generate-story", methods=["POST"])
-def api_generate_story():
-    data    = request.get_json(silent=True) or {}
-    prompt  = (data.get("prompt") or "").strip()
-    api_key = (data.get("api_key") or "").strip()
-    if not prompt:
-        return jsonify({"error": "Bitte einen Prompt eingeben."}), 400
-    try:
-        story_data = generate_story(prompt, api_key)
-    except Exception as e:
-        return jsonify({"error": f"AI-Fehler: {e}"}), 500
-    return jsonify({"story": story_data, "duplicate_check": check_duplicate(story_data.get("keywords", []), story_data.get("title", ""))})
-
-
-@app.route("/api/save-story", methods=["POST"])
-def api_save_story():
-    data  = request.get_json(silent=True) or {}
-    story = data.get("story")
-    if not story:
-        return jsonify({"error": "Keine Story-Daten."}), 400
-    code = generate_story_code()
-    try:
-        with db_session() as conn:
-            cur = conn.execute(
-                "INSERT INTO stories (code, title, keywords_json, total_parts) VALUES (?,?,?,?)",
-                (code, story["title"], json.dumps(story["keywords"]), story["total_parts"]),
-            )
-            story_id = cur.lastrowid
-            for part in story["parts"]:
-                social_json = json.dumps(part["social"]) if part.get("social") else None
-                conn.execute(
-                    "INSERT INTO story_parts (story_id, part_number, text, cliffhanger, social_json) VALUES (?,?,?,?,?)",
-                    (story_id, part["part_number"], part["text"], part.get("cliffhanger_hint", ""), social_json),
-                )
-    except Exception as e:
-        return jsonify({"error": f"Datenbank-Fehler: {e}"}), 500
-    return jsonify({"success": True, "code": code, "story_id": story_id})
 
 
 @app.route("/api/stories/<int:story_id>", methods=["DELETE"])
