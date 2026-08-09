@@ -1,20 +1,19 @@
 # SARA — Story And Reel Automator
 
-SARA generiert vollautomatisch TikTok- & Reels-Videos aus Reddit-Storys.
-Aus einem einzigen Prompt entsteht eine mehrteilige Geschichte mit KI-Stimme, Wort-Highlighting-Untertiteln und Social-Media-Metadaten (Titel, Caption, Hashtags).
+SARA generiert vollautomatisch TikTok- & Reels-Videos aus Reddit-Storys -- komplett lokal, ohne Cloud-API-Zwang.
+Aus einer per Copy-Paste importierten Geschichte entsteht ein Video mit lokaler KI-Stimme, Wort-Highlighting-Untertiteln und Social-Media-Metadaten (Titel, Caption, Hashtags).
 
 ---
 
 ## Features
 
-- **KI-Story-Generator** — Claude AI schreibt authentische Reddit-Storys (160–200 Wörter pro Teil, min. 75 Sek. Audio)
-- **Automatische Untertitel** — Wort-für-Wort-Highlighting: das aktive Wort bleibt immer an derselben Bildschirmposition (gelb, zentriert)
-- **Edge-TTS-Stimme** — natürliche, emotionale Erzählung (en-US-AriaNeural)
+- **Prompt-Builder** — vorgefertigter Prompt für ChatGPT/Gemini/Claude.ai (Copy-Paste, kein API-Key nötig)
+- **Automatische Untertitel** — Wort-für-Wort-Highlighting: das aktive Wort bleibt immer an derselben Bildschirmposition (gelb, zentriert), Worterkennung per lokalem faster-whisper
+- **Lokale KI-Stimme** — Kokoro-82M (ONNX, laeuft komplett offline auf der CPU, kein Cloud-TTS)
 - **Hintergrundvideo-Loop** — zufällige Subway-Surfer/Minecraft-Videos als Hintergrund
 - **Social-Media-Daten** — pro Video-Teil: TikTok-Titel, Caption, Hashtags direkt kopierbar
 - **YouTube-Shorts-Upload** — ein oder mehrere Google-Konten verbinden, fertige Videos werden automatisch (mit einstellbarer Pause zwischen den Uploads, damit es nicht wie automatisiertes Massen-Posting wirkt) als YouTube Shorts hochgeladen — gleichzeitig auf allen aktiven Kanälen
 - **Upload-Tracking** — TikTok / Instagram / YouTube mit Datum abhaken (YouTube-Uploads werden bei automatischem Hochladen selbst eingetragen)
-- **Prompt-Builder** — vorgefertigter Prompt für ChatGPT/Gemini/Claude ohne API-Key
 - **SPA-Routing** — jede Seite hat eine eigene URL (`/story`, `/video`, `/library`, `/upload`, `/channels`, `/prompt`)
 - **Material Design 3** — dunkles Theme, Navigation Rail, flüssige Seitenübergänge
 
@@ -26,7 +25,8 @@ Aus einem einzigen Prompt entsteht eine mehrteilige Geschichte mit KI-Stimme, Wo
 
 ```bash
 cp .env.example .env
-# ANTHROPIC_API_KEY eintragen (nur noetig fuer /api/generate-story, siehe unten)
+# Ohne weitere Eintraege sofort startklar -- API-Keys nur noetig fuer den
+# optionalen YouTube-Auto-Upload, siehe Abschnitt "YouTube-Upload einrichten".
 ```
 
 ### 2. Container starten
@@ -54,7 +54,6 @@ docker compose -f docker-compose.build.yml up -d --build
 ```bash
 pip install -r requirements.txt
 # FFmpeg muss im PATH sein
-export ANTHROPIC_API_KEY=sk-ant-...
 python main.py
 ```
 
@@ -91,8 +90,7 @@ SARA/
 ## Workflow
 
 ```
-1. Story erstellen  →  Prompt kopieren, in einer KI einfügen, JSON-Antwort importieren
-                        (oder: Claude AI generiert direkt über /api/generate-story)
+1. Story erstellen  →  Prompt kopieren, in einer beliebigen KI (ChatGPT/Gemini/Claude.ai) einfügen, JSON-Antwort importieren
 2. Story speichern  →  wird in SQLite gespeichert
 3. Video erstellen  →  Warteschlange + Live-Fortschritt via SSE
 4. YouTube-Upload    →  optional automatisch: fertige Videos gehen zeitversetzt
@@ -125,7 +123,6 @@ Jedes weitere Google-Konto (z.B. ein zweiter Kanal) wird genauso über denselben
 
 | Variable              | Beschreibung                                                              | Pflicht |
 |------------------------|----------------------------------------------------------------------------|---------|
-| `ANTHROPIC_API_KEY`    | Claude AI API-Key — nur für `/api/generate-story`, nicht für den normalen Prompt-Builder-Workflow | Nein |
 | `PORT`                 | Server-Port (Standard: `7842`)                                            | Nein    |
 | `GOOGLE_CLIENT_ID`     | OAuth-Client-ID aus der Google Cloud Console — für YouTube-Upload         | Nein (nur für YouTube-Upload) |
 | `GOOGLE_CLIENT_SECRET` | OAuth-Client-Secret aus der Google Cloud Console                          | Nein (nur für YouTube-Upload) |
@@ -139,8 +136,9 @@ Jedes weitere Google-Konto (z.B. ein zweiter Kanal) wird genauso über denselben
 | Komponente | Technologie |
 |------------|-------------|
 | Backend    | Python 3.11 · Flask |
-| KI         | Anthropic Claude (claude-sonnet-4-6) |
-| TTS        | Edge-TTS (en-US-AriaNeural) · gTTS-Fallback |
+| KI         | beliebige KI per Copy-Paste (ChatGPT/Gemini/Claude.ai) -- kein API-Key |
+| TTS        | Kokoro-82M (ONNX, lokal) |
+| Untertitel | faster-whisper "tiny" (lokal, CPU) |
 | Video      | FFmpeg · ASS-Untertitel |
 | YouTube    | Google API Client · OAuth2 (google-auth-oauthlib) · YouTube Data API v3 |
 | Frontend   | Vanilla JS · Material Design 3 · Material Symbols |
