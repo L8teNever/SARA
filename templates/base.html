@@ -357,6 +357,9 @@ input,textarea{font:inherit;color:inherit}
       <button class="rail__item nav-btn" data-tab="upload" onclick="switchTab('upload')">
         <span class="mi">video_file</span><span>Hintergrund</span>
       </button>
+      <button class="rail__item nav-btn" data-tab="channels" onclick="switchTab('channels')">
+        <span class="mi">smart_display</span><span>YouTube</span>
+      </button>
     </div>
     <div class="rail__queue">
       <div class="qdot" id="rail-qdot"></div>
@@ -396,6 +399,10 @@ input,textarea{font:inherit;color:inherit}
       <button class="botnav__item nav-btn" data-tab="upload" onclick="switchTab('upload')">
         <div class="botnav__pill"></div>
         <span class="mi">video_file</span><span>Hintergrund</span>
+      </button>
+      <button class="botnav__item nav-btn" data-tab="channels" onclick="switchTab('channels')">
+        <div class="botnav__pill"></div>
+        <span class="mi">smart_display</span><span>YouTube</span>
       </button>
     </nav>
   </div>
@@ -455,7 +462,7 @@ function showSnack(msg, type=''){
 }
 
 /* ── Navigation ──────────────────────────────────────────── */
-const TAB_URL={story:'/',video:'/video',library:'/library',upload:'/upload'};
+const TAB_URL={story:'/',video:'/video',library:'/library',upload:'/upload',channels:'/channels'};
 
 function switchTab(name, push=true){
   currentTab=name;
@@ -470,6 +477,7 @@ function switchTab(name, push=true){
   if(name==='video'  && typeof loadStoryList==='function'){loadStoryList();loadQueue();if(typeof loadProdSettings==='function')loadProdSettings();}
   if(name==='library'&& typeof loadLibrary==='function') loadLibrary();
   if(name==='upload' && typeof loadBackgrounds==='function') loadBackgrounds();
+  if(name==='channels' && typeof loadYoutubeChannels==='function') loadYoutubeChannels();
 }
 
 /* ── SSE / Queue ─────────────────────────────────────────── */
@@ -646,6 +654,7 @@ function closeModal(){
     if(code) pendingLibraryCode=code;
   }
   else if(p.startsWith('/upload')) tab='upload';
+  else if(p.startsWith('/channels')) tab='channels';
   window.addEventListener('popstate',e=>switchTab(e.state?.tab||'story',false));
   switchTab(tab,false);
   startSSE();
