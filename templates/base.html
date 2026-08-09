@@ -217,6 +217,10 @@ input,textarea{font:inherit;color:inherit}
 .lrow__title{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lrow__meta{font-size:12px;color:var(--cosv);margin-top:2px}
 .lrow__plat{display:flex;gap:4px;flex-shrink:0}
+.li__head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.li__head .li__title{flex:1;min-width:0}
+.lrow__head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lrow__head .lrow__title{flex:1;min-width:0}
 .pdot{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;background:var(--cs2);color:var(--cosv)}
 .pdot--ok{background:var(--cpc);color:var(--copc)}
 
@@ -260,12 +264,12 @@ input,textarea{font:inherit;color:inherit}
 .bggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px}
 .bgthumb{aspect-ratio:9/16;border-radius:var(--r2);background:var(--cs3);position:relative;overflow:hidden;cursor:pointer}
 .bgthumb video{width:100%;height:100%;object-fit:cover}
-.bgthumb__ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.7),transparent 55%);display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;padding:6px 8px;opacity:0;transition:opacity .2s}
-.bgthumb:hover .bgthumb__ov{opacity:1}
-.bgthumb__name{font-size:10px;color:#fff;font-weight:500;word-break:break-all}
-.bgthumb__del{position:absolute;top:4px;right:4px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;color:var(--ce);opacity:0;transition:opacity .2s}
-.bgthumb:hover .bgthumb__del{opacity:1}
-.bgthumb__del .mi{font-size:15px}
+.bgthumb__ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.78),rgba(0,0,0,.15) 60%,transparent 85%);display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;padding:6px 8px;gap:1px}
+.bgthumb__name{font-size:10.5px;color:#fff;font-weight:600;word-break:break-all;line-height:1.25}
+.bgthumb__date{font-size:9px;color:rgba(255,255,255,.7)}
+.bgthumb__del{position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;color:var(--ce);transition:background .15s}
+.bgthumb__del:hover{background:rgba(0,0,0,.85)}
+.bgthumb__del .mi{font-size:14px}
 
 /* ── Progress ────────────────────────────────────────────── */
 .pbar{height:4px;background:var(--cs3);border-radius:2px;overflow:hidden;flex:1}
@@ -279,6 +283,9 @@ input,textarea{font:inherit;color:inherit}
 .impres__body{font-size:13px;color:var(--cosv)}
 
 /* ── Modal ───────────────────────────────────────────────── */
+.ai-badge{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:40;display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;background:var(--cs2);border:1px solid rgba(255,255,255,.08);color:var(--cosv);font-size:11px;font-weight:600;letter-spacing:.02em;box-shadow:var(--e2);pointer-events:none}
+.ai-badge .mi{font-size:15px;color:var(--cp)}
+@media(max-width:899px){.ai-badge{bottom:calc(var(--botnav) + 16px + env(safe-area-inset-bottom))}}
 .mback{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.76);display:none;align-items:center;justify-content:center;padding:24px}
 .mback.open{display:flex}
 .modal{background:var(--cs1);border-radius:var(--r4);padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;animation:mIn .28s cubic-bezier(.2,0,0,1);box-shadow:var(--e3);border:1px solid rgba(73,69,79,.4)}
@@ -439,6 +446,8 @@ input,textarea{font:inherit;color:inherit}
 
 <div id="snack-wrap" style="position:fixed;bottom:96px;left:50%;transform:translateX(-50%);z-index:600;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(460px,90vw)"></div>
 
+<div class="ai-badge"><span class="mi">auto_awesome</span>KI-generiert</div>
+
 <script>
 /* ── State ───────────────────────────────────────────────── */
 let currentTab = 'story';
@@ -554,9 +563,10 @@ function renderQueueList(jobs){
         <div class="jcard__hdr">
           <div class="jcard__ico"><span class="mi ${isP?'spin':''}">${ico[job.status]||'help'}</span></div>
           <div class="jcard__title">${escHtml(job.title)} — Teil ${job.part_number}</div>
+          <span class="badge">${job.code}</span>
           <span class="chip chip--${job.status}">${statusLabel(job.status)}</span>
         </div>
-        <div class="jcard__meta">${job.code} · ${formatDate(job.created_at)}${job.started_at?` · ⏱ ${getDuration(job.started_at,job.finished_at)}`:''}</div>
+        <div class="jcard__meta">${formatDate(job.created_at)}${job.started_at?` · ⏱ ${getDuration(job.started_at,job.finished_at)}`:''}</div>
         ${isP?`<div class="jcard__bar"><div class="jcard__track"><div class="jcard__fill" style="width:${pct}%"></div></div><span class="jcard__pct">${pct}%</span></div>${lbl?`<div class="jcard__plbl">${escHtml(lbl)}</div>`:''}`:
           (job.status==='done'&&lbl)?`<div class="jcard__plbl" style="color:var(--cg)">${escHtml(lbl)}</div>`:''}
         ${job.status==='error'?`<div class="jcard__err">${escHtml(job.error_msg||'Fehler')}</div>`:''}
