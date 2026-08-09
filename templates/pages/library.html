@@ -37,9 +37,9 @@
         <button class="btn btn--tonal btn--sm" onclick="closeLibDetail()">
           <span class="mi">arrow_back</span> Zurück
         </button>
-        <span class="badge" id="lib-detail-code"></span>
         <span style="font-size:16px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="lib-detail-title"></span>
         <span style="font-size:12px;color:var(--cosv)" id="lib-detail-date"></span>
+        <span class="badge" id="lib-detail-code"></span>
         <button class="btn btn--outlined btn--sm" id="lib-mark-all-btn" style="display:none">
           <span class="mi">done_all</span> Alle erledigt
         </button>
@@ -105,8 +105,11 @@ function renderLibraryList(){
     row.className='lrow'+(allDone?' lrow--done':'');
     row.innerHTML=`
       <div class="lrow__info">
-        <div class="lrow__title">${escHtml(story.title)}</div>
-        <div class="lrow__meta"><span class="badge">${story.code}</span>&nbsp;·&nbsp;${story.parts.length} Teil(e) · ${formatDate(story.created_at)}</div>
+        <div class="lrow__head">
+          <div class="lrow__title">${escHtml(story.title)}</div>
+          <span class="badge">${story.code}</span>
+        </div>
+        <div class="lrow__meta">${story.parts.length} Teil(e) · ${formatDate(story.created_at)}</div>
       </div>
       <div class="lrow__plat">
         <div class="pdot${hasT1?' pdot--ok':''}" title="TikTok 1">T1</div>
