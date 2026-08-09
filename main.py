@@ -22,8 +22,14 @@ from contextlib import contextmanager
 from flask import (
     Flask, request, jsonify, render_template,
     send_from_directory, abort, Response, stream_with_context,
+    session, redirect, url_for,
 )
 import anthropic
+from google_auth_oauthlib.flow import Flow as GoogleOAuthFlow
+from google.oauth2.credentials import Credentials as GoogleCredentials
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from googleapiclient.discovery import build as yt_build
+from googleapiclient.http import MediaFileUpload
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +120,18 @@ DRAWTEXT_FONT = _find_font()
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB
+app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
+
+# ---------------------------------------------------------------------------
+# YouTube / Google OAuth
+# ---------------------------------------------------------------------------
+GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+OAUTH_REDIRECT_BASE  = os.environ.get("OAUTH_REDIRECT_BASE", "").strip().rstrip("/")
+YOUTUBE_SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.readonly",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -222,9 +240,40 @@ def init_db():
                 value TEXT
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS youtube_accounts (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel_id     TEXT    NOT NULL UNIQUE,
+                channel_title  TEXT    NOT NULL,
+                email          TEXT,
+                refresh_token  TEXT    NOT NULL,
+                is_active      INTEGER NOT NULL DEFAULT 1,
+                added_at       TEXT    NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS youtube_queue (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                story_part_id       INTEGER NOT NULL REFERENCES story_parts(id),
+                youtube_account_id  INTEGER NOT NULL REFERENCES youtube_accounts(id),
+                status              TEXT    NOT NULL DEFAULT 'pending',
+                video_id            TEXT,
+                error_msg           TEXT,
+                scheduled_at        TEXT,
+                created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
+                started_at          TEXT,
+                finished_at         TEXT
+            )
+        """)
 
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_interval_min', '0')")
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_slots', '')")
+        # YouTube-Upload-Einstellungen: 5 Minuten Pause zwischen Uploads (wirkt
+        # weniger nach Bot als Uploads im Sekundentakt), automatischer Upload an,
+        # Videos standardmaessig oeffentlich.
+        conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('yt_upload_interval_min', '5')")
+        conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('yt_auto_upload', '1')")
+        conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('yt_privacy_status', 'public')")
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_active_windows', '')")
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_active', '1')")
 
@@ -349,6 +398,43 @@ def _enqueue_parts(conn: sqlite3.Connection, part_ids: list, interval_min: int) 
         job_ids.append(cur.lastrowid)
         conn.execute("UPDATE story_parts SET status='pending' WHERE id=?", (part_id,))
 
+    return job_ids
+
+
+def _enqueue_youtube(conn: sqlite3.Connection, story_part_id: int, account_ids: list, interval_min: float) -> list:
+    """
+    Reiht ein fertiges Video fuer einen oder mehrere verbundene YouTube-Kanaele
+    zum Hochladen ein. Spannt die Uploads zeitlich auseinander (Kette ab dem
+    zuletzt geplanten Job in der youtube_queue), damit nicht mehrere Uploads
+    gleichzeitig/im Sekundentakt rausgehen -- das wuerde nach Bot aussehen.
+    """
+    row = conn.execute("SELECT MAX(scheduled_at) AS m FROM youtube_queue").fetchone()
+    last = row["m"] if row and row["m"] else None
+    if last:
+        try:
+            ref_time = datetime.strptime(last, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            ref_time = datetime.now()
+    else:
+        ref_time = datetime.now()
+    ref_time = max(ref_time, datetime.now())
+
+    job_ids = []
+    for account_id in account_ids:
+        existing = conn.execute(
+            "SELECT id FROM youtube_queue WHERE story_part_id=? AND youtube_account_id=? "
+            "AND status IN ('pending','processing')",
+            (story_part_id, account_id),
+        ).fetchone()
+        if existing:
+            job_ids.append(existing["id"])
+            continue
+        ref_time += timedelta(minutes=max(interval_min, 0.25))
+        cur = conn.execute(
+            "INSERT INTO youtube_queue (story_part_id, youtube_account_id, scheduled_at) VALUES (?,?,?)",
+            (story_part_id, account_id, ref_time.strftime("%Y-%m-%d %H:%M:%S")),
+        )
+        job_ids.append(cur.lastrowid)
     return job_ids
 
 
@@ -937,6 +1023,24 @@ def queue_worker():
                         "UPDATE story_parts SET status='done', video_path=? WHERE id=?",
                         (rel_path, story_part_id),
                     )
+                    # Automatischer YouTube-Upload: nur wenn eingeschaltet (Standard: an)
+                    # und mindestens ein aktiver Kanal verbunden ist. Ohne verbundenen
+                    # Kanal passiert hier bewusst nichts (kein Fehler).
+                    auto_row = conn.execute(
+                        "SELECT value FROM settings WHERE key='yt_auto_upload'"
+                    ).fetchone()
+                    if not auto_row or auto_row["value"] != "0":
+                        active_accounts = [
+                            r["id"] for r in conn.execute(
+                                "SELECT id FROM youtube_accounts WHERE is_active=1"
+                            ).fetchall()
+                        ]
+                        if active_accounts:
+                            iv_row = conn.execute(
+                                "SELECT value FROM settings WHERE key='yt_upload_interval_min'"
+                            ).fetchone()
+                            iv_min = float(iv_row["value"]) if iv_row and iv_row["value"] else 5.0
+                            _enqueue_youtube(conn, story_part_id, active_accounts, iv_min)
             except Exception as e:
                 with db_session() as conn:
                     conn.execute(
@@ -958,6 +1062,180 @@ def start_queue_worker():
 
 
 # ---------------------------------------------------------------------------
+# YouTube-Upload
+# ---------------------------------------------------------------------------
+
+def _oauth_redirect_uri() -> str:
+    if OAUTH_REDIRECT_BASE:
+        return f"{OAUTH_REDIRECT_BASE}/auth/youtube/callback"
+    return url_for("auth_youtube_callback", _external=True)
+
+
+def _build_google_flow(redirect_uri: str, state: str = None) -> GoogleOAuthFlow:
+    client_config = {
+        "web": {
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [redirect_uri],
+        }
+    }
+    return GoogleOAuthFlow.from_client_config(
+        client_config, scopes=YOUTUBE_SCOPES, redirect_uri=redirect_uri, state=state
+    )
+
+
+def _yt_privacy_status() -> str:
+    with db_session(write=False) as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key='yt_privacy_status'").fetchone()
+    val = (row["value"] if row and row["value"] else "public").strip().lower()
+    return val if val in ("public", "unlisted", "private") else "public"
+
+
+def upload_to_youtube(story_part_id: int, youtube_account_id: int) -> str:
+    """
+    Laedt ein fertiges Story-Teil-Video auf den angegebenen, per OAuth
+    verbundenen YouTube-Kanal hoch (Resumable Upload, YouTube Data API v3).
+    Nutzt Titel/Beschreibung/Hashtags aus den bereits vorhandenen Social-Daten
+    des Teils und haengt #Shorts an, damit YouTube das Video als Short
+    einordnet (vertikal + kurz reicht dafuer eigentlich schon, das Tag hilft
+    zusaetzlich). Gibt die neue YouTube-Video-ID zurueck.
+    """
+    with db_session(write=False) as conn:
+        part = conn.execute(
+            "SELECT sp.*, s.title AS story_title FROM story_parts sp "
+            "JOIN stories s ON s.id = sp.story_id WHERE sp.id=?",
+            (story_part_id,),
+        ).fetchone()
+        account = conn.execute(
+            "SELECT * FROM youtube_accounts WHERE id=?", (youtube_account_id,)
+        ).fetchone()
+
+    if not part or not part["video_path"]:
+        raise ValueError("Video nicht gefunden oder noch nicht fertig produziert.")
+    if not account:
+        raise ValueError("YouTube-Konto nicht gefunden (evtl. entfernt).")
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise ValueError("GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET nicht konfiguriert.")
+
+    creds = GoogleCredentials(
+        None,
+        refresh_token=account["refresh_token"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=YOUTUBE_SCOPES,
+    )
+    creds.refresh(GoogleAuthRequest())
+
+    social = json.loads(part["social_json"]) if part["social_json"] else {}
+    title = (social.get("video_title") or f'{part["story_title"]} — Teil {part["part_number"]}').strip()
+    if "#shorts" not in title.lower():
+        title = (title + " #Shorts")[:100]
+    else:
+        title = title[:100]
+    description = (social.get("description") or "").strip()
+    hashtags = (social.get("hashtags") or "").strip()
+    if "#shorts" not in hashtags.lower():
+        hashtags = (hashtags + " #Shorts").strip()
+    full_description = "\n\n".join([p for p in [description, hashtags] if p])[:4900]
+
+    video_path = BASE_DIR / part["video_path"]
+    if not video_path.exists():
+        raise ValueError(f"Videodatei nicht gefunden: {video_path}")
+
+    youtube = yt_build("youtube", "v3", credentials=creds, cache_discovery=False)
+    body = {
+        "snippet": {
+            "title": title,
+            "description": full_description,
+            "categoryId": "24",  # Entertainment
+        },
+        "status": {
+            "privacyStatus": _yt_privacy_status(),
+            "selfDeclaredMadeForKids": False,
+        },
+    }
+    media = MediaFileUpload(str(video_path), chunksize=-1, resumable=True, mimetype="video/mp4")
+    req = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
+    response = None
+    while response is None:
+        _status, response = req.next_chunk()
+    return response["id"]
+
+
+def youtube_worker():
+    """
+    Spiegelt genau das Muster von queue_worker(): pollt youtube_queue,
+    verarbeitet immer nur EINEN faelligen Job gleichzeitig (nie mehrere
+    parallel), respektiert scheduled_at fuer den zeitlichen Abstand zwischen
+    Uploads. Laeuft komplett unabhaengig von der Video-Produktions-Queue.
+    """
+    import time as _time
+
+    while True:
+        try:
+            with db_session() as conn:
+                row = conn.execute("""
+                    UPDATE youtube_queue SET
+                        status     = 'processing',
+                        started_at = datetime('now')
+                    WHERE id = (
+                        SELECT id FROM youtube_queue
+                        WHERE  status = 'pending'
+                          AND  (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
+                          AND  NOT EXISTS (SELECT 1 FROM youtube_queue WHERE status = 'processing')
+                        ORDER BY id ASC LIMIT 1
+                    )
+                    RETURNING id, story_part_id, youtube_account_id
+                """).fetchone()
+
+                if row is None:
+                    _time.sleep(QUEUE_POLL_INTERVAL)
+                    continue
+
+                job_id     = row["id"]
+                part_id    = row["story_part_id"]
+                account_id = row["youtube_account_id"]
+
+            try:
+                video_id = upload_to_youtube(part_id, account_id)
+                with db_session() as conn:
+                    conn.execute(
+                        "UPDATE youtube_queue SET status='done', video_id=?, finished_at=datetime('now') "
+                        "WHERE id=?",
+                        (video_id, job_id),
+                    )
+                    acc = conn.execute(
+                        "SELECT channel_title FROM youtube_accounts WHERE id=?", (account_id,)
+                    ).fetchone()
+                    ch_title = acc["channel_title"] if acc else "?"
+                    conn.execute(
+                        "INSERT INTO video_uploads (story_part_id, platform, notes) VALUES (?,?,?)",
+                        (
+                            part_id,
+                            "youtube",
+                            f"{ch_title} · https://youtube.com/watch?v={video_id}",
+                        ),
+                    )
+            except Exception as e:
+                with db_session() as conn:
+                    conn.execute(
+                        "UPDATE youtube_queue SET status='error', error_msg=?, finished_at=datetime('now') "
+                        "WHERE id=?",
+                        (str(e), job_id),
+                    )
+
+        except Exception:
+            _time.sleep(QUEUE_POLL_INTERVAL)
+
+
+def start_youtube_worker():
+    threading.Thread(target=youtube_worker, daemon=True, name="YouTubeWorker").start()
+
+
+# ---------------------------------------------------------------------------
 # Routes — Pages
 # ---------------------------------------------------------------------------
 
@@ -967,6 +1245,7 @@ def start_queue_worker():
 @app.route("/library")
 @app.route("/library/<path:rest>")
 @app.route("/upload")
+@app.route("/channels")
 def index(rest=None):
     return render_template("index.html")
 
@@ -1559,6 +1838,148 @@ def api_import_story():
 
 
 # ---------------------------------------------------------------------------
+# Routes — YouTube-Konten & Upload
+# ---------------------------------------------------------------------------
+
+@app.route("/auth/youtube/login")
+def auth_youtube_login():
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        return jsonify({
+            "error": "GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET nicht gesetzt. "
+                     "Siehe README, Abschnitt YouTube-Upload."
+        }), 500
+    redirect_uri = _oauth_redirect_uri()
+    flow = _build_google_flow(redirect_uri)
+    auth_url, state = flow.authorization_url(
+        access_type="offline", include_granted_scopes="true", prompt="consent"
+    )
+    session["yt_oauth_state"] = state
+    return redirect(auth_url)
+
+
+@app.route("/auth/youtube/callback")
+def auth_youtube_callback():
+    error = request.args.get("error")
+    if error:
+        return f"Google-Anmeldung abgebrochen oder fehlgeschlagen: {error}", 400
+    state = session.get("yt_oauth_state")
+    redirect_uri = _oauth_redirect_uri()
+    flow = _build_google_flow(redirect_uri, state=state)
+    try:
+        flow.fetch_token(authorization_response=request.url)
+    except Exception as e:
+        return f"OAuth-Fehler: {e}", 400
+    creds = flow.credentials
+
+    youtube = yt_build("youtube", "v3", credentials=creds, cache_discovery=False)
+    resp = youtube.channels().list(part="snippet", mine=True).execute()
+    items = resp.get("items", [])
+    if not items:
+        return (
+            "Auf diesem Google-Konto wurde kein YouTube-Kanal gefunden. "
+            "Erst einen Kanal anlegen, dann erneut verbinden.",
+            400,
+        )
+    ch = items[0]
+    channel_id = ch["id"]
+    channel_title = ch["snippet"]["title"]
+
+    if not creds.refresh_token:
+        return (
+            "Google hat keinen Refresh-Token geliefert (Konto war vermutlich schon "
+            "einmal verbunden). Zugriff bei myaccount.google.com/permissions fuer "
+            "diese App entfernen und erneut verbinden.",
+            400,
+        )
+
+    with db_session() as conn:
+        conn.execute(
+            "INSERT INTO youtube_accounts (channel_id, channel_title, refresh_token, is_active) "
+            "VALUES (?,?,?,1) "
+            "ON CONFLICT(channel_id) DO UPDATE SET "
+            "channel_title=excluded.channel_title, refresh_token=excluded.refresh_token, is_active=1",
+            (channel_id, channel_title, creds.refresh_token),
+        )
+    return redirect("/channels")
+
+
+@app.route("/api/youtube/accounts", methods=["GET"])
+def api_youtube_accounts():
+    with db_session(write=False) as conn:
+        rows = conn.execute(
+            "SELECT id, channel_id, channel_title, is_active, added_at "
+            "FROM youtube_accounts ORDER BY added_at"
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/youtube/accounts/<int:account_id>/toggle", methods=["POST"])
+def api_youtube_account_toggle(account_id: int):
+    data = request.get_json(silent=True) or {}
+    active = 1 if data.get("is_active") else 0
+    with db_session() as conn:
+        conn.execute("UPDATE youtube_accounts SET is_active=? WHERE id=?", (active, account_id))
+    return jsonify({"success": True})
+
+
+@app.route("/api/youtube/accounts/<int:account_id>", methods=["DELETE"])
+def api_youtube_account_delete(account_id: int):
+    with db_session() as conn:
+        conn.execute("DELETE FROM youtube_accounts WHERE id=?", (account_id,))
+    return jsonify({"success": True})
+
+
+@app.route("/api/youtube/upload", methods=["POST"])
+def api_youtube_upload():
+    """Manuelles Einreihen eines fertigen Videos fuer den YouTube-Upload --
+    ohne account_ids werden alle aktiven verbundenen Kanaele gleichzeitig
+    beliefert (jeweils zeitversetzt um das eingestellte Intervall)."""
+    data = request.get_json(silent=True) or {}
+    story_part_id = data.get("story_part_id")
+    account_ids = data.get("account_ids") or None
+    if not story_part_id:
+        return jsonify({"error": "story_part_id fehlt."}), 400
+    with db_session() as conn:
+        if not account_ids:
+            account_ids = [
+                r["id"] for r in conn.execute(
+                    "SELECT id FROM youtube_accounts WHERE is_active=1"
+                ).fetchall()
+            ]
+        if not account_ids:
+            return jsonify({"error": "Kein aktiver YouTube-Kanal verbunden."}), 400
+        iv_row = conn.execute(
+            "SELECT value FROM settings WHERE key='yt_upload_interval_min'"
+        ).fetchone()
+        iv_min = float(iv_row["value"]) if iv_row and iv_row["value"] else 5.0
+        job_ids = _enqueue_youtube(conn, story_part_id, account_ids, iv_min)
+    return jsonify({"success": True, "job_ids": job_ids})
+
+
+@app.route("/api/youtube/queue", methods=["GET"])
+def api_youtube_queue():
+    with db_session(write=False) as conn:
+        rows = conn.execute("""
+            SELECT q.*, a.channel_title, sp.part_number, s.title AS story_title, s.code AS story_code
+            FROM youtube_queue q
+            JOIN youtube_accounts a ON a.id = q.youtube_account_id
+            JOIN story_parts sp     ON sp.id = q.story_part_id
+            JOIN stories s          ON s.id = sp.story_id
+            ORDER BY q.id DESC LIMIT 50
+        """).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/youtube/queue/<int:job_id>", methods=["DELETE"])
+def api_youtube_queue_delete(job_id: int):
+    with db_session() as conn:
+        conn.execute(
+            "DELETE FROM youtube_queue WHERE id=? AND status IN ('pending','error')", (job_id,)
+        )
+    return jsonify({"success": True})
+
+
+# ---------------------------------------------------------------------------
 # App startup
 # ---------------------------------------------------------------------------
 
@@ -1568,6 +1989,7 @@ if __name__ == "__main__":
 
     init_db()
     start_queue_worker()
+    start_youtube_worker()
 
     port = int(os.environ.get("PORT", 7842))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
