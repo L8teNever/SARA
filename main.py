@@ -25,6 +25,7 @@ from flask import (
     session, redirect, url_for,
 )
 from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.proxy_fix import ProxyFix
 from google_auth_oauthlib.flow import Flow as GoogleOAuthFlow
 from google.oauth2.credentials import Credentials as GoogleCredentials
 from google.auth.transport.requests import Request as GoogleAuthRequest
@@ -121,6 +122,9 @@ DRAWTEXT_FONT = _find_font()
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
+# Hinter Cloudflare Tunnel: X-Forwarded-Proto/-Host vertrauen, damit
+# request.url korrekt https:// zeigt (sonst schlaegt der OAuth-Callback fehl).
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 
 @app.errorhandler(Exception)
