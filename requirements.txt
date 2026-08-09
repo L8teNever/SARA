@@ -1,5 +1,4 @@
 flask>=3.0
-anthropic>=0.25
 kokoro-onnx>=0.3.0
 soundfile>=0.12.0
 pillow>=10.0
