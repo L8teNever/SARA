@@ -23,15 +23,16 @@
 
   <!-- Interval -->
   <div class="card--el" style="margin-bottom:20px">
-    <div class="row" style="gap:10px;align-items:center">
-      <span class="mi" style="color:var(--cosv);font-size:20px">timer</span>
-      <span style="font-size:13px;color:var(--cosv);flex:1">Pause zwischen Videos</span>
-      <input type="number" id="prod-interval" class="inp" value="0" min="0"
-             style="width:70px;height:36px;font-size:14px;text-align:center">
-      <span style="font-size:13px;color:var(--cosv)">Min.</span>
-      <button class="btn btn--tonal btn--sm" onclick="saveProdSettings()">
-        <span class="mi">save</span> Speichern
-      </button>
+    <div class="field" style="margin-bottom:0">
+      <label class="flabel" for="prod-interval">
+        <span class="mi" style="font-size:13px;vertical-align:-2px;margin-right:2px">timer</span>Pause zwischen Videos (Minuten)
+      </label>
+      <div class="row" style="gap:10px;flex-wrap:nowrap">
+        <input type="number" id="prod-interval" class="inp" value="0" min="0" style="flex:1;min-width:0;text-align:center">
+        <button class="btn btn--tonal" style="flex-shrink:0" onclick="saveProdSettings()">
+          <span class="mi">save</span> Speichern
+        </button>
+      </div>
     </div>
   </div>
 
