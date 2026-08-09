@@ -1,0 +1,211 @@
+<section class="page" data-tab="channels">
+<div class="wrap">
+
+  <div class="page-hdr">
+    <div class="page-hdr__ico"><span class="mi">smart_display</span></div>
+    <div>
+      <div class="page-hdr__title">YouTube-Kanäle</div>
+      <div class="page-hdr__sub">Fertige Videos automatisch als YouTube Shorts hochladen</div>
+    </div>
+  </div>
+
+  <!-- Konten -->
+  <div class="step-card">
+    <div class="step-card__hdr">
+      <div class="step-card__num"><span class="mi" style="font-size:18px">account_circle</span></div>
+      <div>
+        <div class="step-card__title">Verbundene Google-Konten</div>
+        <div class="step-card__sub">Ein oder mehrere Kanäle gleichzeitig — jeder erhält eine eigene Kopie des Videos</div>
+      </div>
+    </div>
+    <div class="step-card__body">
+      <div id="yt-accounts-list">
+        <div style="display:flex;justify-content:center;padding:20px"><div class="spinner"></div></div>
+      </div>
+      <a class="btn btn--filled btn--lg" href="/auth/youtube/login" style="margin-top:14px">
+        <span class="mi">add_circle</span> Google-Konto verbinden
+      </a>
+      <div class="tbox tbox--surface" style="margin-top:14px">
+        <span class="mi" style="flex-shrink:0">info</span>
+        <span style="font-size:12.5px;line-height:1.5">Öffnet die Google-Anmeldung. Es wird nur Zugriff zum Hochladen von Videos angefragt (kein Lese-/Löschzugriff auf bestehende Videos). Voraussetzung: GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET sind auf dem Server gesetzt.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Einstellungen -->
+  <div class="step-card">
+    <div class="step-card__hdr">
+      <div class="step-card__num"><span class="mi" style="font-size:18px">tune</span></div>
+      <div>
+        <div class="step-card__title">Upload-Einstellungen</div>
+        <div class="step-card__sub">Gilt für alle verbundenen Kanäle</div>
+      </div>
+    </div>
+    <div class="step-card__body">
+      <div class="li" style="cursor:default;margin-bottom:14px" onclick="event.stopPropagation()">
+        <div class="li__lead"><span class="mi" id="yt-auto-ico" style="color:var(--cosv)">toggle_off</span></div>
+        <div class="li__body">
+          <div class="li__title">Automatischer Upload</div>
+          <div class="li__sub">Neu fertiggestellte Videos werden ohne weiteres Zutun eingereiht</div>
+        </div>
+        <button class="btn btn--tonal btn--sm" id="yt-auto-btn" onclick="toggleYtAuto()">…</button>
+      </div>
+
+      <div class="field">
+        <label class="flabel" for="yt-interval">Pause zwischen Uploads (Minuten)</label>
+        <input id="yt-interval" class="inp" type="number" min="0.5" step="0.5" value="5"
+               placeholder="5" onchange="saveYtSettings()">
+        <div style="font-size:11.5px;color:var(--cosv);margin-top:2px">
+          Größerer Abstand wirkt weniger nach automatisiertem Massen-Posting. Bei mehreren Videos/Kanälen werden alle Uploads nacheinander in diesem Abstand eingeplant, nie gleichzeitig.
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="flabel" for="yt-privacy">Sichtbarkeit neuer Videos</label>
+        <select id="yt-privacy" class="inp" onchange="saveYtSettings()">
+          <option value="public">Öffentlich</option>
+          <option value="unlisted">Nicht gelistet</option>
+          <option value="private">Privat</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Warteschlange -->
+  <div class="lbl" style="margin-top:28px"><span class="mi">upload</span> Upload-Warteschlange</div>
+  <div id="yt-queue-list">
+    <div class="empty" style="padding:28px 0"><span class="mi">cloud_upload</span><span class="empty__ttl">Noch keine Uploads</span></div>
+  </div>
+
+</div>
+</section>
+
+<script>
+let _ytAutoActive = true;
+
+async function loadYoutubeChannels(){
+  await Promise.all([loadYtAccounts(), loadYtSettings(), loadYtQueue()]);
+}
+
+async function loadYtAccounts(){
+  const c=document.getElementById('yt-accounts-list');
+  try{
+    const accs=await fetch('/api/youtube/accounts').then(r=>r.json());
+    if(!accs.length){
+      c.innerHTML='<div class="empty" style="padding:20px 0"><span class="mi">smart_display</span><span class="empty__ttl">Noch kein Kanal verbunden</span></div>';
+      return;
+    }
+    c.innerHTML='';
+    accs.forEach(a=>{
+      const row=document.createElement('div');
+      row.className='li';
+      row.style.cursor='default';
+      row.innerHTML=`
+        <div class="li__lead"><div class="sdot ${a.is_active?'sdot--ok':''}"></div></div>
+        <div class="li__body">
+          <div class="li__title">${escHtml(a.channel_title)}</div>
+          <div class="li__sub">Verbunden seit ${formatDateShort(a.added_at)} · ${a.is_active?'aktiv':'pausiert'}</div>
+        </div>
+        <div class="li__trail">
+          <button class="btn btn--tonal btn--sm" data-id="${a.id}" data-active="${a.is_active}" onclick="toggleYtAccount(this)">
+            ${a.is_active?'Pausieren':'Aktivieren'}
+          </button>
+          <button class="btn btn--icon" style="color:var(--ce)" onclick="deleteYtAccount(${a.id},'${escHtml(a.channel_title)}',this)">
+            <span class="mi">delete</span>
+          </button>
+        </div>`;
+      c.appendChild(row);
+    });
+  }catch(e){c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
+}
+
+async function toggleYtAccount(btn){
+  const id=btn.dataset.id;
+  const nowActive=btn.dataset.active==='1'||btn.dataset.active==='true';
+  btn.disabled=true;
+  try{
+    await fetch(`/api/youtube/accounts/${id}/toggle`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_active:!nowActive})});
+    showSnack(nowActive?'Kanal pausiert.':'Kanal aktiviert.','success');
+    loadYtAccounts();
+  }catch(e){showSnack('Fehler: '+e.message,'error');btn.disabled=false}
+}
+
+async function deleteYtAccount(id,title,btn){
+  if(!await showConfirm('Kanal entfernen',`"${title}" wirklich entfernen? Zukünftige Videos werden dann nicht mehr an diesen Kanal hochgeladen.`,{confirmLabel:'Entfernen',destructive:true}))return;
+  btn.disabled=true;
+  try{
+    await fetch(`/api/youtube/accounts/${id}`,{method:'DELETE'});
+    showSnack('Kanal entfernt.','success');
+    loadYtAccounts();
+  }catch(e){showSnack('Fehler: '+e.message,'error');btn.disabled=false}
+}
+
+async function loadYtSettings(){
+  try{
+    const s=await fetch('/api/settings').then(r=>r.json());
+    _ytAutoActive = s.yt_auto_upload !== '0';
+    updateYtAutoBtn();
+    document.getElementById('yt-interval').value = s.yt_upload_interval_min || '5';
+    document.getElementById('yt-privacy').value = s.yt_privacy_status || 'public';
+  }catch(e){}
+}
+
+function updateYtAutoBtn(){
+  const ico=document.getElementById('yt-auto-ico');
+  const btn=document.getElementById('yt-auto-btn');
+  ico.textContent = _ytAutoActive ? 'toggle_on' : 'toggle_off';
+  ico.style.color = _ytAutoActive ? 'var(--cg)' : 'var(--cosv)';
+  btn.textContent = _ytAutoActive ? 'An' : 'Aus';
+}
+
+async function toggleYtAuto(){
+  _ytAutoActive = !_ytAutoActive;
+  updateYtAutoBtn();
+  await saveYtSettings();
+}
+
+async function saveYtSettings(){
+  const interval = parseFloat(document.getElementById('yt-interval').value) || 5;
+  const privacy = document.getElementById('yt-privacy').value;
+  try{
+    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      yt_auto_upload: _ytAutoActive ? '1' : '0',
+      yt_upload_interval_min: interval,
+      yt_privacy_status: privacy,
+    })});
+    showSnack('Einstellungen gespeichert.','success');
+  }catch(e){showSnack('Fehler: '+e.message,'error')}
+}
+
+async function loadYtQueue(){
+  const c=document.getElementById('yt-queue-list');
+  try{
+    const jobs=await fetch('/api/youtube/queue').then(r=>r.json());
+    if(!jobs.length){
+      c.innerHTML='<div class="empty" style="padding:28px 0"><span class="mi">cloud_upload</span><span class="empty__ttl">Noch keine Uploads</span></div>';
+      return;
+    }
+    c.innerHTML='';
+    const ico={pending:'hourglass_empty',processing:'cloud_upload',done:'check_circle',error:'error'};
+    jobs.forEach(j=>{
+      const el=document.createElement('div');
+      el.className='jcard'+(j.status==='processing'?' jcard--on':'');
+      el.innerHTML=`
+        <div class="jcard__hdr">
+          <div class="jcard__ico"><span class="mi ${j.status==='processing'?'spin':''}">${ico[j.status]||'help'}</span></div>
+          <div class="jcard__title">${escHtml(j.story_title)} — Teil ${j.part_number} → ${escHtml(j.channel_title)}</div>
+          <span class="chip chip--${j.status}">${statusLabel(j.status)}</span>
+        </div>
+        <div class="jcard__meta">${j.story_code} · geplant ${formatDate(j.scheduled_at||j.created_at)}</div>
+        ${j.status==='done'&&j.video_id?`<div class="jcard__plbl" style="color:var(--cg)"><a href="https://youtube.com/watch?v=${j.video_id}" target="_blank" rel="noopener" style="text-decoration:underline">youtube.com/watch?v=${j.video_id}</a></div>`:''}
+        ${j.status==='error'?`<div class="jcard__err">${escHtml(j.error_msg||'Fehler')}</div>`:''}
+        ${(j.status==='pending'||j.status==='error')?`<div class="jcard__acts"><button class="btn btn--danger btn--sm" onclick="deleteYtQueueJob(${j.id})"><span class="mi">delete</span>Entfernen</button></div>`:''}`;
+      c.appendChild(el);
+    });
+  }catch(e){c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
+}
+
+async function deleteYtQueueJob(id){
+  try{await fetch(`/api/youtube/queue/${id}`,{method:'DELETE'});loadYtQueue()}catch(e){showSnack('Fehler: '+e.message,'error')}
+}
+</script>
