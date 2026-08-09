@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>SARA</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -67,7 +67,7 @@ input,textarea{font:inherit;color:inherit}
 .topbar__qbadge{display:flex;align-items:center;gap:6px;background:var(--cs2);padding:6px 12px;border-radius:var(--rf);font-size:12px;font-weight:500;color:var(--cosv)}
 
 /* ── Bottom Nav (mobile) ─────────────────────────────────── */
-.botnav{display:none;height:var(--botnav);background:var(--cs0);border-top:1px solid rgba(73,69,79,.4);flex-shrink:0}
+.botnav{display:none;height:calc(var(--botnav) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--cs0);border-top:1px solid rgba(73,69,79,.4);flex-shrink:0}
 .botnav__item{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10px;font-weight:500;color:var(--cosv);transition:color .2s;padding:8px 0;cursor:pointer}
 .botnav__pill{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:56px;height:32px;border-radius:var(--rf);background:transparent;transition:background .2s;pointer-events:none}
 .botnav__item.is-active .botnav__pill{background:var(--csc)}
@@ -324,7 +324,11 @@ input,textarea{font:inherit;color:inherit}
   .rail{display:none}
   .topbar{display:flex}
   .botnav{display:flex}
-  .wrap{padding:16px 16px calc(16px + var(--botnav))}
+  .wrap{padding:16px 16px calc(16px + var(--botnav) + env(safe-area-inset-bottom))}
+}
+@media(max-width:400px){
+  .botnav__item{font-size:9px;gap:3px;letter-spacing:.01em;padding:8px 2px}
+  .botnav__item .mi{font-size:20px}
 }
 @media(min-width:900px){
   .rail{display:flex}
@@ -394,11 +398,11 @@ input,textarea{font:inherit;color:inherit}
       </button>
       <button class="botnav__item nav-btn" data-tab="library" onclick="switchTab('library')">
         <div class="botnav__pill"></div>
-        <span class="mi">video_library</span><span>Bibliothek</span>
+        <span class="mi">video_library</span><span>Videos</span>
       </button>
       <button class="botnav__item nav-btn" data-tab="upload" onclick="switchTab('upload')">
         <div class="botnav__pill"></div>
-        <span class="mi">video_file</span><span>Hintergrund</span>
+        <span class="mi">video_file</span><span>Medien</span>
       </button>
       <button class="botnav__item nav-btn" data-tab="channels" onclick="switchTab('channels')">
         <div class="botnav__pill"></div>
