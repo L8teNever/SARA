@@ -24,6 +24,7 @@ from flask import (
     send_from_directory, abort, Response, stream_with_context,
     session, redirect, url_for,
 )
+from werkzeug.exceptions import HTTPException
 import anthropic
 from google_auth_oauthlib.flow import Flow as GoogleOAuthFlow
 from google.oauth2.credentials import Credentials as GoogleCredentials
@@ -121,6 +122,19 @@ DRAWTEXT_FONT = _find_font()
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(e):
+    """Sorgt dafuer, dass /api/-Routen bei einer unerwarteten Exception immer
+    JSON zurueckgeben statt Flasks HTML-Fehlerseite (die im Frontend beim
+    res.json()-Parsing mit "Unexpected token '<'" abstuerzt)."""
+    if isinstance(e, HTTPException) and not request.path.startswith("/api/"):
+        return e
+    code = e.code if isinstance(e, HTTPException) else 500
+    if not isinstance(e, HTTPException):
+        traceback.print_exc()
+    return jsonify({"error": str(e) or e.__class__.__name__}), code
 
 # ---------------------------------------------------------------------------
 # YouTube / Google OAuth
