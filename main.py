@@ -988,41 +988,42 @@ def queue_worker():
 
     while True:
         try:
+            job_id = None
+            story_part_id = None
             with db_session() as conn:
                 is_active = conn.execute(
                     "SELECT value FROM settings WHERE key='prod_active'"
                 ).fetchone()
-                if is_active and is_active["value"] == "0":
-                    time.sleep(QUEUE_POLL_INTERVAL)
-                    continue
+                if not (is_active and is_active["value"] == "0"):
+                    # Atomic UPDATE+RETURNING: picks next pending job only if none is processing
+                    row = conn.execute("""
+                        UPDATE queue SET
+                            status         = 'processing',
+                            progress_pct   = 0,
+                            progress_label = 'Starte…',
+                            started_at     = datetime('now')
+                        WHERE id = (
+                            SELECT id FROM queue
+                            WHERE  status = 'pending'
+                              AND  (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
+                              AND  NOT EXISTS (SELECT 1 FROM queue WHERE status = 'processing')
+                            ORDER BY id ASC LIMIT 1
+                        )
+                        RETURNING id, story_part_id
+                    """).fetchone()
 
-                # Atomic UPDATE+RETURNING: picks next pending job only if none is processing
-                row = conn.execute("""
-                    UPDATE queue SET
-                        status         = 'processing',
-                        progress_pct   = 0,
-                        progress_label = 'Starte…',
-                        started_at     = datetime('now')
-                    WHERE id = (
-                        SELECT id FROM queue
-                        WHERE  status = 'pending'
-                          AND  (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
-                          AND  NOT EXISTS (SELECT 1 FROM queue WHERE status = 'processing')
-                        ORDER BY id ASC LIMIT 1
-                    )
-                    RETURNING id, story_part_id
-                """).fetchone()
+                    if row is not None:
+                        job_id        = row["id"]
+                        story_part_id = row["story_part_id"]
+                        conn.execute(
+                            "UPDATE story_parts SET status='processing' WHERE id=?",
+                            (story_part_id,),
+                        )
 
-                if row is None:
-                    time.sleep(QUEUE_POLL_INTERVAL)
-                    continue
-
-                job_id        = row["id"]
-                story_part_id = row["story_part_id"]
-                conn.execute(
-                    "UPDATE story_parts SET status='processing' WHERE id=?",
-                    (story_part_id,),
-                )
+            # Sleep NACH dem "with"-Block -- die Schreibsperre ist da laengst wieder frei.
+            if job_id is None:
+                time.sleep(QUEUE_POLL_INTERVAL)
+                continue
 
             try:
                 output_path = create_video_for_part(story_part_id, job_id)
@@ -1205,13 +1206,14 @@ def youtube_worker():
                     RETURNING id, story_part_id, youtube_account_id
                 """).fetchone()
 
-                if row is None:
-                    _time.sleep(QUEUE_POLL_INTERVAL)
-                    continue
+            # Sleep NACH dem "with"-Block -- die Schreibsperre ist da laengst wieder frei.
+            if row is None:
+                _time.sleep(QUEUE_POLL_INTERVAL)
+                continue
 
-                job_id     = row["id"]
-                part_id    = row["story_part_id"]
-                account_id = row["youtube_account_id"]
+            job_id     = row["id"]
+            part_id    = row["story_part_id"]
+            account_id = row["youtube_account_id"]
 
             try:
                 video_id = upload_to_youtube(part_id, account_id)
