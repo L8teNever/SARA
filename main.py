@@ -1078,7 +1078,7 @@ def _oauth_redirect_uri() -> str:
     return url_for("auth_youtube_callback", _external=True)
 
 
-def _build_google_flow(redirect_uri: str, state: str = None) -> GoogleOAuthFlow:
+def _build_google_flow(redirect_uri: str, state: str = None, code_verifier: str = None) -> GoogleOAuthFlow:
     client_config = {
         "web": {
             "client_id": GOOGLE_CLIENT_ID,
@@ -1088,9 +1088,14 @@ def _build_google_flow(redirect_uri: str, state: str = None) -> GoogleOAuthFlow:
             "redirect_uris": [redirect_uri],
         }
     }
-    return GoogleOAuthFlow.from_client_config(
+    flow = GoogleOAuthFlow.from_client_config(
         client_config, scopes=YOUTUBE_SCOPES, redirect_uri=redirect_uri, state=state
     )
+    if code_verifier:
+        # PKCE: denselben Verifier wie beim urspruenglichen authorization_url()-Aufruf
+        # setzen, sonst lehnt Google den Token-Tausch mit invalid_grant ab.
+        flow.code_verifier = code_verifier
+    return flow
 
 
 def _yt_privacy_status() -> str:
@@ -1821,6 +1826,7 @@ def auth_youtube_login():
         access_type="offline", include_granted_scopes="true", prompt="consent"
     )
     session["yt_oauth_state"] = state
+    session["yt_oauth_code_verifier"] = flow.code_verifier
     return redirect(auth_url)
 
 
@@ -1830,8 +1836,9 @@ def auth_youtube_callback():
     if error:
         return f"Google-Anmeldung abgebrochen oder fehlgeschlagen: {error}", 400
     state = session.get("yt_oauth_state")
+    code_verifier = session.get("yt_oauth_code_verifier")
     redirect_uri = _oauth_redirect_uri()
-    flow = _build_google_flow(redirect_uri, state=state)
+    flow = _build_google_flow(redirect_uri, state=state, code_verifier=code_verifier)
     try:
         flow.fetch_token(authorization_response=request.url)
     except Exception as e:
