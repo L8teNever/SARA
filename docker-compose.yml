@@ -10,10 +10,6 @@ services:
     ports:
       - "7842:7842"
     environment:
-      # Anthropic API Key — optional, nur fuer /api/generate-story (Prompt-Builder-Workflow braucht ihn nicht)
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      # ElevenLabs API Key — optional, aktuell ungenutzt (TTS laeuft ueber lokales Kokoro-82M)
-      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
       # Optionaler Port-Override
       - PORT=7842
       # YouTube-Upload (optional) — siehe README, Abschnitt "YouTube-Upload einrichten"
@@ -25,7 +21,7 @@ services:
       # Persistente Daten: Videos, Datenbank, TTS-Temp
       - ./data:/app/data
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('"http://localhost:7842/"')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7842/')"]
       interval: 30s
       timeout: 10s
       retries: 3
