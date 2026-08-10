@@ -198,13 +198,13 @@ const SARA_DEFAULT_PROMPT=
 `You are a writer creating authentic Reddit-style first-person stories for TikTok/Reels.
 
 STEP 0 — THIS story's assigned variation. Follow every line exactly. Do not substitute your own preferences:
-- Category: {{CATEGORY}}
-- Narrator: {{NARRATOR}}
-- Setting: {{SETTING}}
-- Opening hook style: {{HOOK}}
-- Twist: {{TWIST}}
-- Tone: {{TONE}}
-- Variation seed: {{SEED}} — treat this as a fingerprint. Two stories with different seeds must not share the same names, jobs, objects, or turning points.
+- Category: [[CATEGORY]]
+- Narrator: [[NARRATOR]]
+- Setting: [[SETTING]]
+- Opening hook style: [[HOOK]]
+- Twist: [[TWIST]]
+- Tone: [[TONE]]
+- Variation seed: [[SEED]] — treat this as a fingerprint. Two stories with different seeds must not share the same names, jobs, objects, or turning points.
 
 STEP 1 — THE FIRST LINE IS THE WHOLE JOB.
 Roughly half of viewers decide within two seconds. The first sentence must do ALL of this:
@@ -224,10 +224,10 @@ STEP 3 — RETENTION STRUCTURE:
 - Sentences stay short. Every 2–3 sentences must deliver a new piece of information — no paragraph is allowed to just describe
 - Escalate in visible steps: bad → worse → unrecoverable
 - Plant one small detail early that pays off later. The viewer should feel it click, not have it explained
-{{PART_STRUCTURE}}
+[[PART_STRUCTURE]]
 
 Output ONLY this JSON — no text before or after:
-{{JSON_SHAPE}}
+[[JSON_SHAPE]]
 
 Hard rules:
 - Each part: exactly 200–250 words — count carefully, never under 200
@@ -289,15 +289,15 @@ ${items.join(',\n')}
 
 function buildSaraPrompt(template,parts){
   return template
-    .replace(/\{\{CATEGORY\}\}/g,_saraPick(SARA_POOLS.category))
-    .replace(/\{\{NARRATOR\}\}/g,_saraPick(SARA_POOLS.narrator))
-    .replace(/\{\{SETTING\}\}/g,_saraPick(SARA_POOLS.setting))
-    .replace(/\{\{HOOK\}\}/g,_saraPick(SARA_POOLS.hook))
-    .replace(/\{\{TWIST\}\}/g,_saraPick(SARA_POOLS.twist))
-    .replace(/\{\{TONE\}\}/g,_saraPick(SARA_POOLS.tone))
-    .replace(/\{\{SEED\}\}/g,Math.random().toString(36).slice(2,10).toUpperCase())
-    .replace(/\{\{PART_STRUCTURE\}\}/g,_saraPartStructure(parts))
-    .replace(/\{\{JSON_SHAPE\}\}/g,_saraJsonShape(parts));
+    .replace(/\[\[CATEGORY\]\]/g,_saraPick(SARA_POOLS.category))
+    .replace(/\[\[NARRATOR\]\]/g,_saraPick(SARA_POOLS.narrator))
+    .replace(/\[\[SETTING\]\]/g,_saraPick(SARA_POOLS.setting))
+    .replace(/\[\[HOOK\]\]/g,_saraPick(SARA_POOLS.hook))
+    .replace(/\[\[TWIST\]\]/g,_saraPick(SARA_POOLS.twist))
+    .replace(/\[\[TONE\]\]/g,_saraPick(SARA_POOLS.tone))
+    .replace(/\[\[SEED\]\]/g,Math.random().toString(36).slice(2,10).toUpperCase())
+    .replace(/\[\[PART_STRUCTURE\]\]/g,_saraPartStructure(parts))
+    .replace(/\[\[JSON_SHAPE\]\]/g,_saraJsonShape(parts));
 }
 
 async function copyFullPrompt(){
