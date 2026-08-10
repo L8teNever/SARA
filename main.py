@@ -2100,10 +2100,23 @@ def api_youtube_analytics_views():
                 totals[day] = totals.get(day, 0) + views
         except Exception as e:
             print(f"[YouTube] Analytics fuer Konto {acc['id']} fehlgeschlagen: {e}")
-            errors.append({"channel_title": acc["channel_title"], "message": str(e)})
+            msg = str(e)
+            api_disabled = "accessNotConfigured" in msg or "has not been used in project" in msg
+            errors.append({"channel_title": acc["channel_title"], "message": msg, "api_disabled": api_disabled})
     days_list = [(start + timedelta(days=i)).isoformat() for i in range(days)]
     series = [{"date": d, "views": totals.get(d, 0)} for d in days_list]
-    return jsonify({"series": series, "errors": errors, "needs_reconnect": bool(errors) and not totals})
+    api_disabled_url = next(
+        (re.search(r"https://console\.developers\.google\.com/apis/api/youtubeanalytics[^\s\"']*", e["message"]).group(0)
+         for e in errors if e.get("api_disabled") and re.search(r"https://console\.developers\.google\.com/apis/api/youtubeanalytics[^\s\"']*", e["message"])),
+        None,
+    )
+    return jsonify({
+        "series": series,
+        "errors": errors,
+        "needs_reconnect": bool(errors) and not totals and not api_disabled_url,
+        "needs_api_enable": bool(api_disabled_url),
+        "api_enable_url": api_disabled_url,
+    })
 
 
 @app.route("/api/youtube/queue", methods=["GET"])

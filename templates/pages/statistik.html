@@ -130,6 +130,18 @@ async function loadViewsChart(){
   body.innerHTML='<div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>';
   try{
     const d=await fetch('/api/youtube/analytics/views?days=7').then(r=>r.json());
+    if(d.needs_api_enable){
+      body.innerHTML=`
+        <div class="empty" style="padding:20px 0">
+          <span class="mi">build</span>
+          <span class="empty__ttl">YouTube Analytics API nicht aktiviert</span>
+          <span class="empty__sub">Diese API muss einmalig in der Google Cloud Console fürs Projekt freigeschaltet werden — danach ein paar Minuten warten.</span>
+          <a href="${d.api_enable_url||'https://console.cloud.google.com/apis/library/youtubeanalytics.googleapis.com'}" target="_blank" rel="noopener" class="btn btn--filled btn--sm" style="margin-top:14px">
+            <span class="mi">open_in_new</span> API aktivieren
+          </a>
+        </div>`;
+      return;
+    }
     if(d.needs_reconnect){
       body.innerHTML=`
         <div class="empty" style="padding:20px 0">
