@@ -1105,6 +1105,26 @@ def _yt_privacy_status() -> str:
     return val if val in ("public", "unlisted", "private") else "public"
 
 
+def _any_youtube_credentials() -> "GoogleCredentials | None":
+    """Liefert authentifizierte Credentials von irgendeinem verbundenen Kanal --
+    fuer oeffentlich lesbare Daten wie Aufrufzahlen reicht ein beliebiger
+    verbundener Kanal, es muss nicht der hochladende Kanal sein."""
+    with db_session(write=False) as conn:
+        acc = conn.execute("SELECT * FROM youtube_accounts LIMIT 1").fetchone()
+    if not acc:
+        return None
+    creds = GoogleCredentials(
+        None,
+        refresh_token=acc["refresh_token"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=YOUTUBE_SCOPES,
+    )
+    creds.refresh(GoogleAuthRequest())
+    return creds
+
+
 def upload_to_youtube(story_part_id: int, youtube_account_id: int) -> str:
     """
     Laedt ein fertiges Story-Teil-Video auf den angegebenen, per OAuth
@@ -1183,11 +1203,12 @@ def upload_to_youtube(story_part_id: int, youtube_account_id: int) -> str:
                 videoId=video_id,
                 media_body=MediaFileUpload(str(cover_path), mimetype="image/jpeg"),
             ).execute()
-        except Exception:
+        except Exception as e:
             # Eigene Thumbnails brauchen ein telefonisch verifiziertes YouTube-Konto --
-            # ohne das schlaegt dieser Aufruf fehl. Der Video-Upload selbst ist davon
-            # unabhaengig schon erfolgreich, deshalb hier nur stillschweigend weiter.
-            pass
+            # ohne das schlaegt dieser Aufruf fehl (z.B. 403 "doesn't have permissions
+            # to upload and set custom video thumbnails"). Der Video-Upload selbst ist
+            # davon unabhaengig schon erfolgreich -- Fehler nur ins Log, nicht abbrechen.
+            print(f"[YouTube] Thumbnail fuer {video_id} konnte nicht gesetzt werden: {e}")
 
     return video_id
 
@@ -1943,6 +1964,31 @@ def api_youtube_upload():
         iv_min = float(iv_row["value"]) if iv_row and iv_row["value"] else 5.0
         job_ids = _enqueue_youtube(conn, story_part_id, account_ids, iv_min)
     return jsonify({"success": True, "job_ids": job_ids})
+
+
+@app.route("/api/youtube/stats", methods=["GET"])
+def api_youtube_stats():
+    """Aufrufzahlen/Likes/Kommentare fuer eine Liste von YouTube-Video-IDs --
+    oeffentliche Daten, jeder verbundene Kanal darf sie abfragen."""
+    ids = [v.strip() for v in (request.args.get("video_ids") or "").split(",") if v.strip()]
+    if not ids:
+        return jsonify({})
+    creds = _any_youtube_credentials()
+    if not creds:
+        return jsonify({})
+    youtube = yt_build("youtube", "v3", credentials=creds, cache_discovery=False)
+    result = {}
+    for i in range(0, len(ids), 50):
+        chunk = ids[i:i + 50]
+        resp = youtube.videos().list(part="statistics", id=",".join(chunk)).execute()
+        for item in resp.get("items", []):
+            st = item.get("statistics", {})
+            result[item["id"]] = {
+                "views": int(st.get("viewCount", 0)),
+                "likes": int(st["likeCount"]) if "likeCount" in st else None,
+                "comments": int(st["commentCount"]) if "commentCount" in st else None,
+            }
+    return jsonify(result)
 
 
 @app.route("/api/youtube/queue", methods=["GET"])

@@ -202,6 +202,7 @@ function openLibDetail(story,push=true){
     renderPlatChips(part.id,part.uploads||[]);
     card.dataset.social=JSON.stringify(social);
   });
+  loadYtStats(story);
 }
 
 function closeLibDetail(push=true){
@@ -213,17 +214,58 @@ function closeLibDetail(push=true){
 function renderPlatChips(partId,uploads){
   const c=document.getElementById('plat-'+partId);
   if(!c) return;
-  const plats=_ytAccounts.map((acc,i)=>({id:_ytPlatform(acc),l:_ytLabel(i),i:'smart_display'}));
+  const plats=_ytAccounts.map((acc,i)=>({id:_ytPlatform(acc),accId:acc.id,l:_ytLabel(i)}));
   c.innerHTML='';
   plats.forEach(p=>{
     const ex=uploads.find(u=>u.platform===p.id);
     const btn=document.createElement('button');
-    btn.className='pchip'+(ex?' pchip--ok':'');
-    btn.title=ex?`Hochgeladen ${formatDateShort(ex.uploaded_at)} — Klicken zum Entfernen`:`Als ${p.l} markieren`;
-    btn.innerHTML=`<span class="mi">${ex?'check_circle':p.i}</span>${p.l}${ex?` · ${formatDateShort(ex.uploaded_at)}`:''}`;
-    btn.addEventListener('click',()=>toggleUpload(partId,p.id,ex?ex.id:null,btn));
+    if(ex){
+      const m=(ex.notes||'').match(/v=([\w-]+)/);
+      const vid=m?m[1]:null;
+      btn.className='pchip pchip--ok';
+      btn.dataset.vid=vid||'';
+      btn.title=vid?`Hochgeladen ${formatDateShort(ex.uploaded_at)} — Video öffnen`:`Hochgeladen ${formatDateShort(ex.uploaded_at)}`;
+      btn.innerHTML=`<span class="mi">check_circle</span>${p.l} · ${formatDateShort(ex.uploaded_at)}<span data-stat></span>`;
+      if(vid) btn.addEventListener('click',()=>window.open(`https://youtube.com/watch?v=${vid}`,'_blank'));
+    }else{
+      btn.className='pchip';
+      btn.title=`Jetzt auf ${p.l} hochladen`;
+      btn.innerHTML=`<span class="mi">upload</span>${p.l} hochladen`;
+      btn.addEventListener('click',()=>triggerYoutubeUpload(partId,p.accId,btn));
+    }
     c.appendChild(btn);
   });
+}
+
+async function triggerYoutubeUpload(partId,accountId,btn){
+  const oh=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML='<div class="spinner spinner--sm" style="width:12px;height:12px;border-width:2px;margin-right:4px;display:inline-block;vertical-align:-2px"></div>Wird eingereiht…';
+  try{
+    const res=await fetch('/api/youtube/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_part_id:partId,account_ids:[accountId]})});
+    const d=await res.json();
+    if(d.error){showSnack(d.error,'error');btn.disabled=false;btn.innerHTML=oh;return}
+    showSnack('Upload eingereiht — läuft in Kürze automatisch.','success');
+    btn.innerHTML='<span class="mi">schedule</span>Eingereiht…';
+  }catch(e){showSnack('Fehler: '+e.message,'error');btn.disabled=false;btn.innerHTML=oh}
+}
+
+async function loadYtStats(story){
+  const ids=[];
+  story.parts.forEach(part=>(part.uploads||[]).forEach(u=>{
+    if(!u.platform||!u.platform.startsWith('youtube:'))return;
+    const m=(u.notes||'').match(/v=([\w-]+)/);
+    if(m)ids.push(m[1]);
+  }));
+  if(!ids.length)return;
+  try{
+    const stats=await fetch('/api/youtube/stats?video_ids='+ids.join(',')).then(r=>r.json());
+    document.querySelectorAll('.pchip[data-vid]').forEach(btn=>{
+      const s=stats[btn.dataset.vid];
+      const statEl=btn.querySelector('[data-stat]');
+      if(s&&statEl)statEl.textContent=` · ${Number(s.views).toLocaleString('de-DE')} Aufrufe`;
+    });
+  }catch(_){}
 }
 
 async function toggleUpload(partId,platform,uploadId,btn){
