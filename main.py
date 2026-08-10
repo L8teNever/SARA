@@ -423,53 +423,84 @@ def _enqueue_parts(conn: sqlite3.Connection, part_ids: list, interval_min: int) 
 
 
 YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY = 10  # YouTubes eigenes Anti-Spam-Limit, erfahrungsgemaess ca. 10/Tag/Kanal
+YOUTUBE_DAILY_TIMES = ["08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30", "20:00", "21:30"]
+YOUTUBE_RETRY_BUFFER_TIME = "22:30"  # Abend-Puffer-Slot fuer fehlgeschlagene Uploads, damit das Tagesziel trotzdem erreicht wird
 
 
-def _next_youtube_slot(conn: sqlite3.Connection, account_id: int, interval_min: float) -> datetime:
+def _next_youtube_slot(conn: sqlite3.Connection, account_id: int) -> datetime:
     """
-    Naechster freier Zeitpunkt fuer einen Upload auf `account_id`: mindestens
-    `interval_min` nach dem zuletzt fuer DIESEN Kanal geplanten Job, aber nie
-    mehr als YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY Uploads (geplant oder
-    fertig) an ein und demselben Kalendertag fuer diesen Kanal -- weicht dann
-    automatisch auf den naechsten Tag aus, statt die Warteschlange nachtraeglich
-    per Hand verschieben zu muessen, sobald YouTube uploadLimitExceeded meldet.
+    Naechster freier fester Uhrzeit-Slot (siehe YOUTUBE_DAILY_TIMES) fuer
+    `account_id`: waehlt den naechsten noch nicht belegten und noch nicht
+    vergangenen Slot des heutigen Tages, weicht auf den naechsten Tag aus,
+    sobald alle Slots eines Tages belegt sind -- nie mehr als
+    YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY Uploads (geplant oder fertig) an
+    ein und demselben Kalendertag fuer diesen Kanal.
     """
-    row = conn.execute(
-        "SELECT MAX(scheduled_at) AS m FROM youtube_queue "
-        "WHERE youtube_account_id=? AND status IN ('pending','processing')",
-        (account_id,),
-    ).fetchone()
-    last = row["m"] if row and row["m"] else None
-    if last:
-        try:
-            candidate = datetime.strptime(last, "%Y-%m-%d %H:%M:%S") + timedelta(minutes=max(interval_min, 0.25))
-        except Exception:
-            candidate = datetime.now()
-    else:
-        candidate = datetime.now()
-    candidate = max(candidate, datetime.now() + timedelta(minutes=max(interval_min, 0.25)))
-
+    day = datetime.now().date()
     for _ in range(60):  # Sicherheitsgrenze: hoechstens 60 Tage vorausschauen
-        day_start = candidate.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_start = datetime.combine(day, datetime.min.time())
         day_end = day_start + timedelta(days=1)
-        count = conn.execute(
-            "SELECT COUNT(*) AS c FROM youtube_queue WHERE youtube_account_id=? "
-            "AND status IN ('pending','processing','done') "
-            "AND scheduled_at >= ? AND scheduled_at < ?",
-            (account_id, day_start.strftime("%Y-%m-%d %H:%M:%S"), day_end.strftime("%Y-%m-%d %H:%M:%S")),
-        ).fetchone()["c"]
-        if count < YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY:
-            return candidate
-        candidate = day_start + timedelta(days=1, hours=candidate.hour, minutes=candidate.minute, seconds=candidate.second)
+        used = {
+            row["scheduled_at"] for row in conn.execute(
+                "SELECT scheduled_at FROM youtube_queue WHERE youtube_account_id=? "
+                "AND status IN ('pending','processing','done') "
+                "AND scheduled_at >= ? AND scheduled_at < ?",
+                (account_id, day_start.strftime("%Y-%m-%d %H:%M:%S"), day_end.strftime("%Y-%m-%d %H:%M:%S")),
+            )
+        }
+        if len(used) < YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY:
+            for t in YOUTUBE_DAILY_TIMES:
+                candidate = datetime.combine(day, datetime.strptime(t, "%H:%M").time())
+                candidate_str = candidate.strftime("%Y-%m-%d %H:%M:%S")
+                if candidate_str in used:
+                    continue
+                if candidate <= datetime.now():
+                    continue
+                return candidate
+        day = day + timedelta(days=1)
+    return datetime.now() + timedelta(days=60)
+
+
+def _retry_youtube_slot(conn: sqlite3.Connection, account_id: int):
+    """
+    Slot fuer einen Wiederholungsversuch NOCH AM SELBEN TAG: wird genutzt,
+    wenn ein Upload an einem der festen Zeitpunkte fehlschlaegt (z.B. ein
+    transienter API-Fehler), damit trotzdem versucht wird, das Tagesziel von
+    YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY zu erreichen. Gibt None zurueck,
+    wenn heute entweder das Tageslimit schon voll ist (z.B. echtes YouTube-
+    uploadLimitExceeded) oder kein sinnvoller Puffer-Zeitpunkt mehr uebrig
+    ist -- dann greift beim naechsten regulaeren Lauf ganz normal wieder
+    _next_youtube_slot() mit dem naechsten freien Tag.
+    """
+    now = datetime.now()
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + timedelta(days=1)
+    count = conn.execute(
+        "SELECT COUNT(*) AS c FROM youtube_queue WHERE youtube_account_id=? "
+        "AND status IN ('pending','processing','done') "
+        "AND scheduled_at >= ? AND scheduled_at < ?",
+        (account_id, day_start.strftime("%Y-%m-%d %H:%M:%S"), day_end.strftime("%Y-%m-%d %H:%M:%S")),
+    ).fetchone()["c"]
+    if count >= YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY:
+        return None
+    buffer_dt = datetime.combine(now.date(), datetime.strptime(YOUTUBE_RETRY_BUFFER_TIME, "%H:%M").time())
+    candidate = buffer_dt if buffer_dt > now else now + timedelta(minutes=15)
+    while conn.execute(
+        "SELECT 1 FROM youtube_queue WHERE youtube_account_id=? AND scheduled_at=? "
+        "AND status IN ('pending','processing')",
+        (account_id, candidate.strftime("%Y-%m-%d %H:%M:%S")),
+    ).fetchone():
+        candidate += timedelta(minutes=5)
     return candidate
 
 
-def _enqueue_youtube(conn: sqlite3.Connection, story_part_id: int, account_ids: list, interval_min: float) -> list:
+def _enqueue_youtube(conn: sqlite3.Connection, story_part_id: int, account_ids: list) -> list:
     """
     Reiht ein fertiges Video fuer einen oder mehrere verbundene YouTube-Kanaele
-    zum Hochladen ein. Jeder Kanal bekommt seine eigene Zeitkette (nicht mehr
-    eine gemeinsame globale) und weicht selbstaendig auf den naechsten Tag aus,
-    sobald sein Tageslimit erreicht ist -- siehe _next_youtube_slot().
+    zum Hochladen ein. Jeder Kanal bekommt seine eigene Kette aus festen
+    Tageszeiten (siehe YOUTUBE_DAILY_TIMES) und weicht selbstaendig auf den
+    naechsten Tag aus, sobald sein Tageslimit erreicht ist -- siehe
+    _next_youtube_slot().
     """
     job_ids = []
     for account_id in account_ids:
@@ -481,7 +512,7 @@ def _enqueue_youtube(conn: sqlite3.Connection, story_part_id: int, account_ids: 
         if existing:
             job_ids.append(existing["id"])
             continue
-        slot = _next_youtube_slot(conn, account_id, interval_min)
+        slot = _next_youtube_slot(conn, account_id)
         cur = conn.execute(
             "INSERT INTO youtube_queue (story_part_id, youtube_account_id, scheduled_at) VALUES (?,?,?)",
             (story_part_id, account_id, slot.strftime("%Y-%m-%d %H:%M:%S")),
@@ -1084,11 +1115,7 @@ def queue_worker():
                             ).fetchall()
                         ]
                         if active_accounts:
-                            iv_row = conn.execute(
-                                "SELECT value FROM settings WHERE key='yt_upload_interval_min'"
-                            ).fetchone()
-                            iv_min = float(iv_row["value"]) if iv_row and iv_row["value"] else 5.0
-                            _enqueue_youtube(conn, story_part_id, active_accounts, iv_min)
+                            _enqueue_youtube(conn, story_part_id, active_accounts)
             except Exception as e:
                 with db_session() as conn:
                     conn.execute(
@@ -1324,12 +1351,24 @@ def youtube_worker():
                         ),
                     )
             except Exception as e:
+                err_str = str(e)
                 with db_session() as conn:
                     conn.execute(
                         "UPDATE youtube_queue SET status='error', error_msg=?, finished_at=datetime('now') "
                         "WHERE id=?",
-                        (str(e), job_id),
+                        (err_str, job_id),
                     )
+                    # Echtes YouTube-Tageslimit (uploadLimitExceeded) macht einen Retry
+                    # am selben Tag sinnlos -- alles andere (transiente Fehler) wird noch
+                    # am Abend im Puffer-Slot erneut versucht, siehe _retry_youtube_slot().
+                    if "uploadLimitExceeded" not in err_str:
+                        retry_slot = _retry_youtube_slot(conn, account_id)
+                        if retry_slot:
+                            conn.execute(
+                                "INSERT INTO youtube_queue (story_part_id, youtube_account_id, scheduled_at) "
+                                "VALUES (?,?,?)",
+                                (part_id, account_id, retry_slot.strftime("%Y-%m-%d %H:%M:%S")),
+                            )
 
         except Exception:
             _time.sleep(QUEUE_POLL_INTERVAL)
@@ -2030,12 +2069,8 @@ def auth_youtube_callback():
                          AND NOT EXISTS (SELECT 1 FROM video_uploads vu WHERE vu.story_part_id = sp.id)"""
                 ).fetchall()
                 if open_parts:
-                    iv_row = conn.execute(
-                        "SELECT value FROM settings WHERE key='yt_upload_interval_min'"
-                    ).fetchone()
-                    iv_min = float(iv_row["value"]) if iv_row and iv_row["value"] else 5.0
                     for row in open_parts:
-                        _enqueue_youtube(conn, row["id"], [new_account_id], iv_min)
+                        _enqueue_youtube(conn, row["id"], [new_account_id])
                     print(f"[YouTube] Neuer Kanal '{channel_title}': {len(open_parts)} noch unveroeffentlichte Videos nachtraeglich eingereiht")
     return redirect("/channels")
 
@@ -2085,11 +2120,7 @@ def api_youtube_upload():
             ]
         if not account_ids:
             return jsonify({"error": "Kein aktiver YouTube-Kanal verbunden."}), 400
-        iv_row = conn.execute(
-            "SELECT value FROM settings WHERE key='yt_upload_interval_min'"
-        ).fetchone()
-        iv_min = float(iv_row["value"]) if iv_row and iv_row["value"] else 5.0
-        job_ids = _enqueue_youtube(conn, story_part_id, account_ids, iv_min)
+        job_ids = _enqueue_youtube(conn, story_part_id, account_ids)
     return jsonify({"success": True, "job_ids": job_ids})
 
 
