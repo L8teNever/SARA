@@ -1997,6 +1997,10 @@ def auth_youtube_callback():
         )
 
     with db_session() as conn:
+        is_new_channel = conn.execute(
+            "SELECT 1 FROM youtube_accounts WHERE channel_id=?", (channel_id,)
+        ).fetchone() is None
+
         conn.execute(
             "INSERT INTO youtube_accounts (channel_id, channel_title, refresh_token, is_active) "
             "VALUES (?,?,?,1) "
@@ -2004,6 +2008,35 @@ def auth_youtube_callback():
             "channel_title=excluded.channel_title, refresh_token=excluded.refresh_token, is_active=1",
             (channel_id, channel_title, creds.refresh_token),
         )
+
+        # Neu verbundener Kanal (kein Reconnect eines bestehenden): Videos,
+        # die noch komplett unveroeffentlicht sind (nirgendwo hochgeladen),
+        # bekommen automatisch auch einen Job fuer diesen Kanal dazu -- schon
+        # TEILWEISE gepostete Videos werden bewusst NICHT rueckwirkend
+        # nachgetragen (dafuer gibt es den manuellen Upload-Button je Kanal
+        # in der Bibliothek). Gilt nur, wenn Auto-Upload eingeschaltet ist.
+        if is_new_channel:
+            account_row = conn.execute(
+                "SELECT id FROM youtube_accounts WHERE channel_id=?", (channel_id,)
+            ).fetchone()
+            auto_row = conn.execute(
+                "SELECT value FROM settings WHERE key='yt_auto_upload'"
+            ).fetchone()
+            if account_row and (not auto_row or auto_row["value"] != "0"):
+                new_account_id = account_row["id"]
+                open_parts = conn.execute(
+                    """SELECT sp.id FROM story_parts sp
+                       WHERE sp.status='done' AND sp.video_path IS NOT NULL
+                         AND NOT EXISTS (SELECT 1 FROM video_uploads vu WHERE vu.story_part_id = sp.id)"""
+                ).fetchall()
+                if open_parts:
+                    iv_row = conn.execute(
+                        "SELECT value FROM settings WHERE key='yt_upload_interval_min'"
+                    ).fetchone()
+                    iv_min = float(iv_row["value"]) if iv_row and iv_row["value"] else 5.0
+                    for row in open_parts:
+                        _enqueue_youtube(conn, row["id"], [new_account_id], iv_min)
+                    print(f"[YouTube] Neuer Kanal '{channel_title}': {len(open_parts)} noch unveroeffentlichte Videos nachtraeglich eingereiht")
     return redirect("/channels")
 
 
