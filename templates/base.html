@@ -45,10 +45,19 @@ input,textarea,select{font:inherit;color:inherit}
 .mono{font-family:'JetBrains Mono',monospace}
 
 /* ── App shell ───────────────────────────────────────────── */
-.appshell{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+/* 100dvh statt (nur) 100vh: auf mobilen Browsern OHNE PWA-Installation
+   veraendert sich die sichtbare Hoehe, wenn die Adressleiste ein-/ausblendet;
+   100vh rechnet immer mit der GROESSTEN moeglichen Hoehe, wodurch am
+   unteren Rand fixierte Elemente hinter der Browser-Toolbar verschwinden
+   koennen. 100dvh verfolgt die tatsaechlich sichtbare Hoehe live mit. */
+.appshell{height:100vh;height:100dvh;position:relative;overflow:hidden}
 
 /* ── Glass floating header ───────────────────────────────── */
-.ghead{flex-shrink:0;margin:14px 16px 0;padding:10px 10px 10px 22px;border-radius:var(--rf);
+/* position:fixed statt normaler Flex-Reihe: der Seiteninhalt scrollt
+   dadurch WIRKLICH hinter Header und Bottom-Nav durch (sichtbar durch
+   den Weichzeichner), statt dass beide nur fest oben/unten eingerahmten
+   Platz belegen. */
+.ghead{position:fixed;top:14px;left:16px;right:16px;z-index:40;padding:10px 10px 10px 22px;border-radius:var(--rf);
   background:rgba(32,34,44,.72);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);
   border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:12px;box-shadow:var(--e2)}
 .ghead__logo{font-size:17px;font-weight:800;letter-spacing:.04em}
@@ -57,13 +66,15 @@ input,textarea,select{font:inherit;color:inherit}
 .ghead__badge.is-idle{background:var(--cs2);color:var(--cosv);border-color:transparent}
 
 /* ── Shell row (sidebar + content) ──────────────────────── */
-.shell{flex:1;display:flex;min-height:0;overflow:hidden;padding:14px 16px 16px}
-.content{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
-.pages{flex:1;overflow-y:auto;overflow-x:hidden}
+/* padding-top raeumt Platz fuer den fixierten Header frei; Inhalt selbst
+   scrollt in .pages darunter und laeuft dabei visuell hinter Header/Nav. */
+.shell{height:100%;display:flex;overflow:hidden;padding:86px 16px 16px}
+.content{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;height:100%}
+.pages{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
 
 /* ── Sidebar (desktop) ──────────────────────────────────── */
 .rail{width:var(--rail);flex-shrink:0;margin-right:16px;background:var(--cs0);border-radius:var(--r5);
-  border:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;padding:20px 14px;box-shadow:var(--e1)}
+  border:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;padding:20px 14px;box-shadow:var(--e1);overflow-y:auto}
 .rail__eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--co);padding:0 12px;margin-bottom:12px}
 .rail__item{position:relative;display:flex;align-items:center;gap:12px;width:100%;padding:11px 16px;border-radius:var(--rf);
   color:var(--cosv);font-size:13.5px;font-weight:500;transition:background .18s,color .18s;cursor:pointer;margin-bottom:2px}
@@ -71,10 +82,10 @@ input,textarea,select{font:inherit;color:inherit}
 .rail__item.is-active{background:var(--csc);color:var(--cosc)}
 .rail__item .mi{font-size:21px;flex-shrink:0}
 .rail__item.is-active .mi{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24}
-.rail__queue{margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--r3);background:var(--cs1);font-size:11.5px;color:var(--cosv)}
+.rail__queue{margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--r3);background:var(--cs1);font-size:11.5px;color:var(--cosv);flex-shrink:0}
 
-/* ── Bottom nav (mobile) — floating pill ────────────────── */
-.botnav{display:none;flex-shrink:0;justify-content:center;padding:10px 0 calc(10px + env(safe-area-inset-bottom))}
+/* ── Bottom nav (mobile) — floating pill, ueberlagert Inhalt ────── */
+.botnav{display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;justify-content:center;padding:10px 0 calc(10px + env(safe-area-inset-bottom))}
 .botnav__pill{display:flex;align-items:center;gap:2px;background:rgba(32,34,44,.82);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);
   border:1px solid rgba(255,255,255,.07);border-radius:var(--rf);padding:6px;box-shadow:var(--e2)}
 .botnav__item{position:relative;display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;color:var(--cosv);transition:background .18s,color .18s}
@@ -171,12 +182,12 @@ input,textarea,select{font:inherit;color:inherit}
 .sdot--ok{background:var(--cg)}
 
 /* ── Chips ───────────────────────────────────────────────── */
-.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 11px;border-radius:var(--rf);font-size:11px;font-weight:700;white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 11px;border-radius:var(--rf);font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0}
 .chip--pend{background:var(--cs3);color:var(--cosv)}
 .chip--proc{background:var(--cpc);color:var(--copc)}
 .chip--done{background:var(--cgc);color:var(--cg)}
 .chip--err{background:var(--cec);color:var(--ce)}
-.fchip{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:var(--rf);font-size:13px;font-weight:500;cursor:pointer;border:1.5px solid var(--cov);background:transparent;color:var(--cosv);transition:background .15s,color .15s,border-color .15s}
+.fchip{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:var(--rf);font-size:13px;font-weight:500;cursor:pointer;border:1.5px solid var(--cov);background:transparent;color:var(--cosv);transition:background .15s,color .15s,border-color .15s;flex-shrink:0}
 .fchip:hover{background:rgba(208,188,255,.08);color:var(--cos)}
 .fchip.is-on{background:var(--csc);color:var(--cosc);border-color:transparent}
 .fchip .mi{font-size:15px}
@@ -253,7 +264,7 @@ input,textarea,select{font:inherit;color:inherit}
 .vcard__stxt{margin-top:8px;font-size:12px;color:var(--cosv);line-height:1.65;white-space:pre-wrap;background:var(--cs0);border-radius:var(--r1);padding:10px 12px;border:1px solid var(--covv)}
 
 /* ── Platform toggle chips ───────────────────────────────── */
-.pchip{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--rf);font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid var(--cov);background:transparent;color:var(--cosv);transition:background .15s,color .15s,border-color .15s}
+.pchip{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--rf);font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid var(--cov);background:transparent;color:var(--cosv);transition:background .15s,color .15s,border-color .15s;flex-shrink:0}
 .pchip:hover{border-color:var(--co);color:var(--cos)}
 .pchip--ok{background:var(--cgc);color:var(--cg);border-color:transparent}
 .pchip .mi{font-size:14px}
@@ -333,9 +344,9 @@ input,textarea,select{font:inherit;color:inherit}
 @media(max-width:899px){
   .rail{display:none}
   .botnav{display:flex}
-  .shell{padding:12px 0 0}
+  .shell{padding:78px 0 0}
   .wrap{padding:14px 16px calc(14px + var(--botnav) + env(safe-area-inset-bottom))}
-  .ghead{margin:12px 12px 0}
+  .ghead{top:12px;left:12px;right:12px}
 }
 @media(min-width:900px){
   .rail{display:flex}
@@ -348,6 +359,21 @@ input,textarea,select{font:inherit;color:inherit}
   .page-hdr__title{font-size:19px}
   .ghead__logo{font-size:15px}
   .ghead__badge{padding:7px 13px;font-size:11.5px}
+}
+/* Kurze Viewports (z.B. Handy im Querformat) -- weniger vertikaler
+   Leerraum in Header/Nav, damit fuer den eigentlichen Inhalt mehr
+   Platz bleibt statt dass er zusammengequetscht wird */
+@media(max-height:430px){
+  .ghead{top:8px;padding-top:7px;padding-bottom:7px}
+  .shell{padding-top:60px}
+  .botnav{padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+  .wrap{padding-top:10px}
+  .page-hdr{margin-bottom:14px}
+}
+/* Sehr breite Fenster: Inhalt bleibt lesbar zentriert, Sidebar darf
+   etwas mehr Luft bekommen statt gequetscht am Content zu kleben */
+@media(min-width:1400px){
+  .rail{margin-right:20px}
 }
   </style>
 </head>
