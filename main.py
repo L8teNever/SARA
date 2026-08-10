@@ -1129,7 +1129,6 @@ def _any_youtube_credentials() -> "GoogleCredentials | None":
         token_uri="https://oauth2.googleapis.com/token",
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
-        scopes=YOUTUBE_SCOPES,
     )
     creds.refresh(GoogleAuthRequest())
     return creds
@@ -1146,7 +1145,6 @@ def _creds_for_account(account) -> "GoogleCredentials":
         token_uri="https://oauth2.googleapis.com/token",
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
-        scopes=YOUTUBE_SCOPES,
     )
     creds.refresh(GoogleAuthRequest())
     return creds
@@ -1184,7 +1182,6 @@ def upload_to_youtube(story_part_id: int, youtube_account_id: int) -> str:
         token_uri="https://oauth2.googleapis.com/token",
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
-        scopes=YOUTUBE_SCOPES,
     )
     creds.refresh(GoogleAuthRequest())
 
