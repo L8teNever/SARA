@@ -44,6 +44,10 @@
         <div style="font-size:12px;color:var(--cosv);margin-top:2px">Warten auf Upload</div>
       </div>
     </div>
+    <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--covv)">
+      <div style="font-size:22px;font-weight:800;color:var(--cp)" id="stat-days-left">–</div>
+      <div style="font-size:12px;color:var(--cosv);margin-top:2px">Content reicht noch, bei ca. 10 Uploads pro Kanal und Tag</div>
+    </div>
   </div>
 
   <div class="lbl" id="stat-channels-lbl"><span class="mi">smart_display</span> Verknüpfte YouTube-Kanäle</div>
@@ -77,6 +81,12 @@ function _fmtCompact(n){
   return n.toLocaleString('de-DE');
 }
 
+/* YouTubes eigenes Anti-Spam-Limit liegt erfahrungsgemaess bei ca. 10
+   Uploads pro Kanal und Tag (kein offiziell dokumentierter fester Wert,
+   siehe uploadLimitExceeded-Vorfall) -- Grundlage fuer die
+   "reicht noch X Tage"-Schaetzung. */
+const EST_UPLOADS_PER_CHANNEL_PER_DAY = 10;
+
 async function loadProductionOverview(){
   try{
     const [videos,accounts]=await Promise.all([
@@ -84,10 +94,11 @@ async function loadProductionOverview(){
       fetch('/api/youtube/accounts').then(r=>r.json()).catch(()=>[]),
     ]);
     const parts=videos.flatMap(s=>s.parts||[]);
-    let full=0,partial=0,none=0;
+    let full=0,partial=0,none=0,remainingSlots=0;
     parts.forEach(p=>{
       const platforms=new Set((p.uploads||[]).map(u=>u.platform));
       const uploadedTo=accounts.filter(acc=>platforms.has(`youtube:${acc.id}`)).length;
+      remainingSlots+=Math.max(0,accounts.length-uploadedTo);
       if(accounts.length>0 && uploadedTo>=accounts.length) full++;
       else if(uploadedTo>0) partial++;
       else none++;
@@ -95,6 +106,16 @@ async function loadProductionOverview(){
     document.getElementById('stat-total-videos').textContent=parts.length.toLocaleString('de-DE');
     document.getElementById('stat-full-uploaded').textContent=full.toLocaleString('de-DE');
     document.getElementById('stat-partial-uploaded').textContent=partial.toLocaleString('de-DE');
+    const daysLeftEl=document.getElementById('stat-days-left');
+    if(daysLeftEl){
+      const dailyCapacity=accounts.length*EST_UPLOADS_PER_CHANNEL_PER_DAY;
+      if(remainingSlots<=0) daysLeftEl.textContent='Alles hochgeladen';
+      else if(dailyCapacity<=0) daysLeftEl.textContent='–';
+      else{
+        const days=remainingSlots/dailyCapacity;
+        daysLeftEl.textContent=days<1?'Weniger als 1 Tag':`Ca. ${days.toFixed(1).replace('.0','')} Tage`;
+      }
+    }
     document.getElementById('stat-not-uploaded').textContent=none.toLocaleString('de-DE');
   }catch(e){}
 }
