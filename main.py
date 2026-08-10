@@ -1351,11 +1351,12 @@ def start_youtube_worker():
 @app.route("/library")
 @app.route("/library/<path:rest>")
 @app.route("/statistik")
+@app.route("/statistik/<path:rest5>")
 @app.route("/medien")
 @app.route("/medien/<path:rest2>")
 @app.route("/upload")
 @app.route("/channels")
-def index(rest=None, rest2=None, rest3=None, rest4=None):
+def index(rest=None, rest2=None, rest3=None, rest4=None, rest5=None):
     return render_template("index.html")
 
 

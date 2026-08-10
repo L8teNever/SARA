@@ -515,7 +515,7 @@ const TAB_URL={story:'/',video:'/video',library:'/library',statistik:'/statistik
    auf einer Unterseite verlassen hat, beim naechsten Mal wieder mit
    seiner Hauptansicht startet statt mit der stehengebliebenen
    Unterseite (die dann falsche/keine Daten zeigte). */
-const SUBVIEW_CLOSERS=['closeStorySettings','closeVideoSettings','closeLibDetail','closeMedienSettings','closeMedienAccounts','closeBackgroundsView'];
+const SUBVIEW_CLOSERS=['closeStorySettings','closeVideoSettings','closeLibDetail','closeMedienSettings','closeMedienAccounts','closeBackgroundsView','closeStatistikChannels'];
 function _closeAllSubviews(){
   SUBVIEW_CLOSERS.forEach(fn=>{ if(typeof window[fn]==='function') window[fn](false); });
 }
@@ -547,6 +547,8 @@ function updateGheadActions(name){
     el.innerHTML='<button class="btn btn--icon" onclick="openVideoSettings()" title="Einstellungen"><span class="mi">tune</span></button>';
   }else if(name==='library'){
     el.innerHTML='<button class="btn btn--icon" id="lib-search-toggle" onclick="expandLibSearch()" title="Suchen"><span class="mi">search</span></button>';
+  }else if(name==='statistik'){
+    el.innerHTML='<button class="btn btn--icon" onclick="openStatistikChannels()" title="YouTube-Kanäle"><span class="mi">smart_display</span></button>';
   }else if(name==='medien'){
     el.innerHTML=`
       <button class="btn btn--icon" onclick="openMedienSettings()" title="Upload-Einstellungen"><span class="mi">tune</span></button>
@@ -785,6 +787,7 @@ function closeModal(){
   let pendingStorySettings=false;
   let pendingVideoSettings=false;
   let pendingMedienView=null;
+  let pendingStatistikChannels=false;
   if(p.startsWith('/story/einstellungen')) pendingStorySettings=true;
   if(p.startsWith('/video')){
     tab='video';
@@ -795,7 +798,10 @@ function closeModal(){
     const code=p.split('/library/')[1];
     if(code) pendingLibraryCode=code;
   }
-  else if(p.startsWith('/statistik')) tab='statistik';
+  else if(p.startsWith('/statistik')){
+    tab='statistik';
+    if(p.startsWith('/statistik/kanaele')) pendingStatistikChannels=true;
+  }
   else if(p.startsWith('/medien') || p.startsWith('/upload') || p.startsWith('/channels')){
     tab='medien';
     if(p.startsWith('/medien/hintergrund')) pendingMedienView='backgrounds';
@@ -812,6 +818,7 @@ function closeModal(){
   if(pendingMedienView==='backgrounds' && typeof openBackgroundsView==='function') openBackgroundsView(false);
   if(pendingMedienView==='settings' && typeof openMedienSettings==='function') openMedienSettings(false);
   if(pendingMedienView==='accounts' && typeof openMedienAccounts==='function') openMedienAccounts(false);
+  if(pendingStatistikChannels && typeof openStatistikChannels==='function') openStatistikChannels(false);
   startSSE();
 })();
 </script>

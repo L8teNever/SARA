@@ -1,4 +1,6 @@
 <section class="page" data-tab="statistik">
+
+<div id="statistik-main">
 <div class="wrap">
 
   <div class="card card--hero" style="margin-top:4px">
@@ -53,12 +55,19 @@
     </div>
   </div>
 
-  <div class="lbl" id="stat-channels-lbl"><span class="mi">smart_display</span> Verknüpfte YouTube-Kanäle</div>
-  <div id="stat-channels">
-    <div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>
-  </div>
-
 </div>
+</div>
+
+<!-- Verknuepfte YouTube-Kanaele (Unterseite) -->
+<div id="statistik-channels" style="display:none">
+  <div class="wrap">
+    <div class="lbl" id="stat-channels-lbl" style="margin-top:4px"><span class="mi">smart_display</span> Verknüpfte YouTube-Kanäle</div>
+    <div id="stat-channels">
+      <div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
 </section>
 
 <!-- Chart Modal -->
@@ -196,31 +205,40 @@ async function loadStatistik(){
     }
     c.innerHTML='';
     chans.forEach(ch=>{
-      const card=document.createElement('div');
-      card.className='card';
-      card.style.padding='0';
-      card.style.overflow='hidden';
       const chViews=viewsData.byAccount[String(ch.account_id)]||0;
       const bannerStyle=ch.banner_url
         ? `background-image:url('${ch.banner_url}');background-size:cover;background-position:center`
         : `background:linear-gradient(135deg,var(--cpc),#2E2359)`;
-      card.innerHTML=`
-        <div style="height:84px;position:relative;${bannerStyle}">
-          <span class="chip ${ch.is_active?'chip--done':'chip--pend'}" style="position:absolute;top:10px;right:10px">${ch.is_active?'Aktiv':'Pausiert'}</span>
-        </div>
-        <div style="padding:16px 18px 18px">
-          <div style="font-size:15px;font-weight:700;margin-bottom:${ch.error?'4px':'12px'}">${escHtml(ch.channel_title)}</div>
-          ${ch.error
-            ? `<div style="font-size:12px;color:var(--ce)">Statistik nicht abrufbar — Kanal ggf. neu verbinden</div>`
-            : `<div style="display:flex;flex-wrap:wrap;gap:16px 24px">
-                <div style="flex-shrink:0"><div style="font-size:17px;font-weight:800">${ch.subscriber_count!=null?_fmtCompact(ch.subscriber_count):'verborgen'}</div><div style="font-size:11px;color:var(--cosv)">Abonnenten</div></div>
-                <div style="flex-shrink:0"><div style="font-size:17px;font-weight:800;color:var(--cg)">${(ch.video_count||0).toLocaleString('de-DE')}</div><div style="font-size:11px;color:var(--cosv)">Videos</div></div>
-                <div style="flex-shrink:0"><div style="font-size:17px;font-weight:800;color:var(--cp)">${_fmtCompact(chViews)}</div><div style="font-size:11px;color:var(--cosv)">Aufrufe</div></div>
-              </div>`}
+      const row=document.createElement('div');
+      row.className='lrow';
+      row.style.cursor='default';
+      row.innerHTML=`
+        <div style="width:44px;height:44px;border-radius:var(--r2);flex-shrink:0;${bannerStyle}"></div>
+        <div class="lrow__info">
+          <div class="lrow__head">
+            <div class="lrow__title">${escHtml(ch.channel_title)}</div>
+            <span class="chip ${ch.is_active?'chip--done':'chip--pend'}">${ch.is_active?'Aktiv':'Pausiert'}</span>
+          </div>
+          <div class="lrow__meta">${ch.error
+            ? `<span style="color:var(--ce)">Statistik nicht abrufbar — Kanal ggf. neu verbinden</span>`
+            : `${ch.subscriber_count!=null?_fmtCompact(ch.subscriber_count):'verborgen'} Abonnenten · ${(ch.video_count||0).toLocaleString('de-DE')} Videos · <span style="color:var(--cp)">${_fmtCompact(chViews)} Aufrufe</span>`}</div>
         </div>`;
-      c.appendChild(card);
+      c.appendChild(row);
     });
   }catch(e){c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
+}
+
+function openStatistikChannels(push=true){
+  document.getElementById('statistik-main').style.display='none';
+  document.getElementById('statistik-channels').style.display='block';
+  if(push) history.pushState({tab:'statistik',view:'channels'},'','/statistik/kanaele');
+  enterSubpage('YouTube-Kanäle', closeStatistikChannels);
+}
+function closeStatistikChannels(push=true){
+  document.getElementById('statistik-channels').style.display='none';
+  document.getElementById('statistik-main').style.display='block';
+  if(push) history.pushState({tab:'statistik'},'','/statistik');
+  exitSubpage();
 }
 
 function _weekdayDE(dateStr){
