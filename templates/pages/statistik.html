@@ -120,24 +120,48 @@ async function loadProductionOverview(){
   }catch(e){}
 }
 
+/* channels().list().statistics.viewCount bleibt bei kleinen/neuen
+   Kanaelen oft laenger bei 0 haengen (Propagations-Verzoegerung),
+   waehrend die Aufrufzahlen der einzelnen Videos (videos().list())
+   zuverlaessig sofort stimmen -- Gesamtaufrufe deshalb aus der Summe
+   der einzelnen hochgeladenen Videos berechnen statt aus der
+   Kanal-Statistik. */
+async function loadRealViewsTotal(){
+  try{
+    const videos=await fetch('/api/videos').then(r=>r.json());
+    const ids=[];
+    videos.forEach(s=>(s.parts||[]).forEach(p=>(p.uploads||[]).forEach(u=>{
+      if(!u.platform||!u.platform.startsWith('youtube:'))return;
+      const m=(u.notes||'').match(/v=([\w-]+)/);
+      if(m) ids.push(m[1]);
+    })));
+    const el=document.getElementById('stat-views');
+    if(!el) return;
+    if(!ids.length){ el.textContent='0'; return; }
+    const stats=await fetch('/api/youtube/stats?video_ids='+ids.join(',')).then(r=>r.json());
+    let total=0;
+    ids.forEach(id=>{ if(stats[id]) total+=stats[id].views||0; });
+    el.textContent=_fmtCompact(total);
+  }catch(e){}
+}
+
 async function loadStatistik(){
   loadProductionOverview();
+  loadRealViewsTotal();
   const c=document.getElementById('stat-channels');
   try{
     const chans=await fetch('/api/youtube/channel-stats').then(r=>r.json());
     _statChannels=chans;
 
-    let subs=0,vids=0,views=0,anyHidden=false,anyOk=false;
+    let subs=0,vids=0,anyHidden=false,anyOk=false;
     chans.forEach(ch=>{
       if(ch.error) return;
       anyOk=true;
       if(ch.subscriber_count!=null) subs+=ch.subscriber_count; else anyHidden=true;
       vids+=ch.video_count||0;
-      views+=ch.view_count||0;
     });
     document.getElementById('stat-subs').textContent=anyOk?(_fmtCompact(subs)+(anyHidden?'+':'')):'–';
     document.getElementById('stat-videos').textContent=anyOk?vids.toLocaleString('de-DE'):'–';
-    document.getElementById('stat-views').textContent=anyOk?_fmtCompact(views):'–';
 
     document.getElementById('stat-channels-lbl').innerHTML=`<span class="mi">smart_display</span> Verknüpfte YouTube-Kanäle (${chans.length})`;
 

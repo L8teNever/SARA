@@ -422,24 +422,55 @@ def _enqueue_parts(conn: sqlite3.Connection, part_ids: list, interval_min: int) 
     return job_ids
 
 
-def _enqueue_youtube(conn: sqlite3.Connection, story_part_id: int, account_ids: list, interval_min: float) -> list:
+YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY = 10  # YouTubes eigenes Anti-Spam-Limit, erfahrungsgemaess ca. 10/Tag/Kanal
+
+
+def _next_youtube_slot(conn: sqlite3.Connection, account_id: int, interval_min: float) -> datetime:
     """
-    Reiht ein fertiges Video fuer einen oder mehrere verbundene YouTube-Kanaele
-    zum Hochladen ein. Spannt die Uploads zeitlich auseinander (Kette ab dem
-    zuletzt geplanten Job in der youtube_queue), damit nicht mehrere Uploads
-    gleichzeitig/im Sekundentakt rausgehen -- das wuerde nach Bot aussehen.
+    Naechster freier Zeitpunkt fuer einen Upload auf `account_id`: mindestens
+    `interval_min` nach dem zuletzt fuer DIESEN Kanal geplanten Job, aber nie
+    mehr als YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY Uploads (geplant oder
+    fertig) an ein und demselben Kalendertag fuer diesen Kanal -- weicht dann
+    automatisch auf den naechsten Tag aus, statt die Warteschlange nachtraeglich
+    per Hand verschieben zu muessen, sobald YouTube uploadLimitExceeded meldet.
     """
-    row = conn.execute("SELECT MAX(scheduled_at) AS m FROM youtube_queue").fetchone()
+    row = conn.execute(
+        "SELECT MAX(scheduled_at) AS m FROM youtube_queue "
+        "WHERE youtube_account_id=? AND status IN ('pending','processing')",
+        (account_id,),
+    ).fetchone()
     last = row["m"] if row and row["m"] else None
     if last:
         try:
-            ref_time = datetime.strptime(last, "%Y-%m-%d %H:%M:%S")
+            candidate = datetime.strptime(last, "%Y-%m-%d %H:%M:%S") + timedelta(minutes=max(interval_min, 0.25))
         except Exception:
-            ref_time = datetime.now()
+            candidate = datetime.now()
     else:
-        ref_time = datetime.now()
-    ref_time = max(ref_time, datetime.now())
+        candidate = datetime.now()
+    candidate = max(candidate, datetime.now() + timedelta(minutes=max(interval_min, 0.25)))
 
+    for _ in range(60):  # Sicherheitsgrenze: hoechstens 60 Tage vorausschauen
+        day_start = candidate.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+        count = conn.execute(
+            "SELECT COUNT(*) AS c FROM youtube_queue WHERE youtube_account_id=? "
+            "AND status IN ('pending','processing','done') "
+            "AND scheduled_at >= ? AND scheduled_at < ?",
+            (account_id, day_start.strftime("%Y-%m-%d %H:%M:%S"), day_end.strftime("%Y-%m-%d %H:%M:%S")),
+        ).fetchone()["c"]
+        if count < YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY:
+            return candidate
+        candidate = day_start + timedelta(days=1, hours=candidate.hour, minutes=candidate.minute, seconds=candidate.second)
+    return candidate
+
+
+def _enqueue_youtube(conn: sqlite3.Connection, story_part_id: int, account_ids: list, interval_min: float) -> list:
+    """
+    Reiht ein fertiges Video fuer einen oder mehrere verbundene YouTube-Kanaele
+    zum Hochladen ein. Jeder Kanal bekommt seine eigene Zeitkette (nicht mehr
+    eine gemeinsame globale) und weicht selbstaendig auf den naechsten Tag aus,
+    sobald sein Tageslimit erreicht ist -- siehe _next_youtube_slot().
+    """
     job_ids = []
     for account_id in account_ids:
         existing = conn.execute(
@@ -450,10 +481,10 @@ def _enqueue_youtube(conn: sqlite3.Connection, story_part_id: int, account_ids: 
         if existing:
             job_ids.append(existing["id"])
             continue
-        ref_time += timedelta(minutes=max(interval_min, 0.25))
+        slot = _next_youtube_slot(conn, account_id, interval_min)
         cur = conn.execute(
             "INSERT INTO youtube_queue (story_part_id, youtube_account_id, scheduled_at) VALUES (?,?,?)",
-            (story_part_id, account_id, ref_time.strftime("%Y-%m-%d %H:%M:%S")),
+            (story_part_id, account_id, slot.strftime("%Y-%m-%d %H:%M:%S")),
         )
         job_ids.append(cur.lastrowid)
     return job_ids
