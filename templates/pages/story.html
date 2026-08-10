@@ -68,6 +68,14 @@
   "parts": [...]
 }'></textarea>
       </div>
+      <div class="li" style="cursor:default;margin-bottom:14px" onclick="event.stopPropagation()">
+        <div class="li__lead"><span class="mi" id="auto-queue-ico" style="color:var(--cosv)">toggle_off</span></div>
+        <div class="li__body">
+          <div class="li__title">Video automatisch erstellen</div>
+          <div class="li__sub" style="white-space:normal;overflow:visible;text-overflow:clip;line-height:1.4">Importierte Storys werden direkt zur Produktion eingereiht, ohne manuelle Auswahl im Video-Tab</div>
+        </div>
+        <button class="btn btn--tonal btn--sm" id="auto-queue-btn" onclick="toggleAutoQueue()">…</button>
+      </div>
       <div class="row">
         <button class="btn btn--filled" id="btn-import-story" onclick="importStory()" style="flex:1">
           <span class="mi">check_circle</span> Story importieren
@@ -231,7 +239,7 @@ async function importStory(){
     const res2=await fetch('/api/import-story',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({json_text:txt,dry_run:false,auto_queue:forceQueue})
+      body:JSON.stringify({json_text:txt,dry_run:false,auto_queue:forceQueue||_autoQueueActive})
     });
     const d2=await res2.json();
     if(d2.error){showSnack(d2.error,'error');return}
@@ -292,5 +300,34 @@ async function deleteRecentStory(id,title,btn){
   catch(e){showSnack('Fehler.','error');if(btn){btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>'}}
 }
 
+let _autoQueueActive=false;
+
+async function loadImportSettings(){
+  try{
+    const s=await fetch('/api/settings').then(r=>r.json());
+    _autoQueueActive = s.auto_queue_on_import === '1';
+    updateAutoQueueBtn();
+  }catch(e){}
+}
+
+function updateAutoQueueBtn(){
+  const ico=document.getElementById('auto-queue-ico');
+  const btn=document.getElementById('auto-queue-btn');
+  if(!ico||!btn)return;
+  ico.textContent = _autoQueueActive ? 'toggle_on' : 'toggle_off';
+  ico.style.color = _autoQueueActive ? 'var(--cg)' : 'var(--cosv)';
+  btn.textContent = _autoQueueActive ? 'An' : 'Aus';
+}
+
+async function toggleAutoQueue(){
+  _autoQueueActive = !_autoQueueActive;
+  updateAutoQueueBtn();
+  try{
+    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({auto_queue_on_import:_autoQueueActive?'1':'0'})});
+    showSnack(_autoQueueActive?'Wird ab jetzt automatisch erstellt.':'Automatische Erstellung deaktiviert.','success');
+  }catch(e){showSnack('Fehler: '+e.message,'error')}
+}
+
+loadImportSettings();
 loadRecentStories();
 </script>

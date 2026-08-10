@@ -285,6 +285,9 @@ def init_db():
 
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_interval_min', '0')")
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_slots', '')")
+        # Aus = Standard: importierte Storys muessen im Video-Tab manuell zur
+        # Produktion ausgewaehlt werden (bisheriges Verhalten unveraendert).
+        conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('auto_queue_on_import', '0')")
         # YouTube-Upload-Einstellungen: 5 Minuten Pause zwischen Uploads (wirkt
         # weniger nach Bot als Uploads im Sekundentakt), automatischer Upload an,
         # Videos standardmaessig oeffentlich.
@@ -1826,6 +1829,12 @@ def api_import_story():
                 )
                 part_ids.append(pc.lastrowid)
 
+            if not auto_queue:
+                setting_row = conn.execute(
+                    "SELECT value FROM settings WHERE key='auto_queue_on_import'"
+                ).fetchone()
+                auto_queue = bool(setting_row and setting_row["value"] == "1")
+
             if auto_queue:
                 interval_min = int(
                     conn.execute("SELECT value FROM settings WHERE key='prod_interval_min'").fetchone()["value"] or 0
@@ -1841,7 +1850,7 @@ def api_import_story():
         "story_id":        story_id,
         "title":           story["title"],
         "duplicate_check": dup_check,
-        "auto_queued":     auto_queue,
+        "auto_queued":     bool(auto_queue),
     })
 
 
