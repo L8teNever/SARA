@@ -19,8 +19,6 @@
         </div>
         <div class="row" id="lib-filter-chips" style="gap:6px">
           <button class="fchip is-on" data-f="all" onclick="setLibFilter('all',this)"><span class="mi">layers</span> Alle</button>
-          <button class="fchip" data-f="no-t1" onclick="setLibFilter('no-t1',this)"><span class="mi">play_circle</span> Kein TikTok 1</button>
-          <button class="fchip" data-f="no-t2" onclick="setLibFilter('no-t2',this)"><span class="mi">play_circle</span> Kein TikTok 2</button>
         </div>
       </div>
 
@@ -53,18 +51,34 @@
 <script>
 let _libData=[];
 let _libFilter='all';
+let _ytAccounts=[];
 
 async function loadLibrary(){
   const c=document.getElementById('lib-story-list');
   c.innerHTML='<div style="display:flex;justify-content:center;padding:40px"><div class="spinner spinner--lg"></div></div>';
   try{
-    _libData=await fetch('/api/videos').then(r=>r.json());
+    [_libData,_ytAccounts]=await Promise.all([
+      fetch('/api/videos').then(r=>r.json()),
+      fetch('/api/youtube/accounts').then(r=>r.json()).catch(()=>[]),
+    ]);
+    renderLibFilterChips();
     renderLibraryList();
     if(pendingLibraryCode){
       const s=_libData.find(x=>x.code===pendingLibraryCode);
       if(s){pendingLibraryCode=null;openLibDetail(s,false)}
     }
   }catch(e){c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
+}
+
+function _ytLabel(i){return `YouTube ${i+1}`}
+function _ytPlatform(acc){return `youtube:${acc.id}`}
+
+function renderLibFilterChips(){
+  const wrap=document.getElementById('lib-filter-chips');
+  const extra=_ytAccounts.map((acc,i)=>
+    `<button class="fchip" data-f="no-yt-${acc.id}" onclick="setLibFilter('no-yt-${acc.id}',this)"><span class="mi">smart_display</span> Kein ${_ytLabel(i)}</button>`
+  ).join('');
+  wrap.innerHTML='<button class="fchip is-on" data-f="all" onclick="setLibFilter(\'all\',this)"><span class="mi">layers</span> Alle</button>'+extra;
 }
 
 function setLibFilter(f,el){
@@ -77,12 +91,11 @@ function filterLibrary(){renderLibraryList()}
 
 function _matches(story){
   if(_libFilter==='all') return true;
-  return story.parts.some(p=>{
-    const u=p.uploads||[];
-    if(_libFilter==='no-t1') return !u.find(x=>x.platform==='tiktok1');
-    if(_libFilter==='no-t2') return !u.find(x=>x.platform==='tiktok2');
-    return true;
-  });
+  if(_libFilter.startsWith('no-yt-')){
+    const platform='youtube:'+_libFilter.slice(6);
+    return story.parts.some(p=>!(p.uploads||[]).find(x=>x.platform===platform));
+  }
+  return true;
 }
 
 function renderLibraryList(){
@@ -96,10 +109,13 @@ function renderLibraryList(){
   c.innerHTML='';
   filtered.forEach(story=>{
     const ups=story.parts.flatMap(p=>p.uploads||[]);
-    const hasT1=ups.some(u=>u.platform==='tiktok1');
-    const hasT2=ups.some(u=>u.platform==='tiktok2');
-    const allDone=story.parts.length>0&&story.parts.every(p=>
-      ['tiktok1','tiktok2'].every(pl=>(p.uploads||[]).some(u=>u.platform===pl))
+    const ytDots=_ytAccounts.map((acc,i)=>({
+      ok: ups.some(u=>u.platform===_ytPlatform(acc)),
+      label: `Y${i+1}`,
+      title: _ytLabel(i),
+    }));
+    const allDone=story.parts.length>0&&_ytAccounts.length>0&&story.parts.every(p=>
+      _ytAccounts.every(acc=>(p.uploads||[]).some(u=>u.platform===_ytPlatform(acc)))
     );
     const row=document.createElement('div');
     row.className='lrow'+(allDone?' lrow--done':'');
@@ -112,8 +128,7 @@ function renderLibraryList(){
         <div class="lrow__meta">${story.parts.length} Teil(e) · ${formatDate(story.created_at)}</div>
       </div>
       <div class="lrow__plat">
-        <div class="pdot${hasT1?' pdot--ok':''}" title="TikTok 1">T1</div>
-        <div class="pdot${hasT2?' pdot--ok':''}" title="TikTok 2">T2</div>
+        ${ytDots.map(d=>`<div class="pdot${d.ok?' pdot--ok':''}" title="${d.title}">${d.label}</div>`).join('')}
       </div>
       <button class="btn btn--icon lrow__check" title="${allDone?'Erledigt':'Alle als hochgeladen markieren'}" style="color:${allDone?'var(--cg)':'var(--cosv)'}">
         <span class="mi">${allDone?'check_circle':'radio_button_unchecked'}</span>
@@ -198,7 +213,7 @@ function closeLibDetail(push=true){
 function renderPlatChips(partId,uploads){
   const c=document.getElementById('plat-'+partId);
   if(!c) return;
-  const plats=[{id:'tiktok1',l:'TikTok 1',i:'play_circle'},{id:'tiktok2',l:'TikTok 2',i:'play_circle'}];
+  const plats=_ytAccounts.map((acc,i)=>({id:_ytPlatform(acc),l:_ytLabel(i),i:'smart_display'}));
   c.innerHTML='';
   plats.forEach(p=>{
     const ex=uploads.find(u=>u.platform===p.id);
@@ -281,7 +296,8 @@ async function markAllUploaded(story,btn){
   try{
     const jobs=[];
     for(const part of story.parts){
-      for(const p of['tiktok1','tiktok2']){
+      for(const acc of _ytAccounts){
+        const p=_ytPlatform(acc);
         if(!(part.uploads||[]).some(u=>u.platform===p)){
           jobs.push(fetch('/api/uploads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_part_id:part.id,platform:p})}));
         }
