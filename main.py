@@ -1150,7 +1150,7 @@ def upload_to_youtube(story_part_id: int, youtube_account_id: int) -> str:
     description = (social.get("description") or "").strip()
     hashtags = (social.get("hashtags") or "").strip()
     if "#shorts" not in hashtags.lower():
-        hashtags = (hashtags + " #Shorts").strip()
+        hashtags = ("#Shorts " + hashtags).strip()
     full_description = "\n\n".join([p for p in [description, hashtags] if p])[:4900]
 
     video_path = BASE_DIR / part["video_path"]
@@ -1243,7 +1243,7 @@ def youtube_worker():
                         "INSERT INTO video_uploads (story_part_id, platform, notes) VALUES (?,?,?)",
                         (
                             part_id,
-                            "youtube",
+                            f"youtube:{account_id}",
                             f"{ch_title} · https://youtube.com/watch?v={video_id}",
                         ),
                     )
