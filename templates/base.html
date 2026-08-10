@@ -455,8 +455,16 @@ let _prevProcessingCount = 0;
 
 /* ── Utils ───────────────────────────────────────────────── */
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-function formatDate(s){if(!s)return'–';try{return new Date(s).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}catch{return s}}
-function formatDateShort(s){if(!s)return'–';try{return new Date(s).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}catch{return s}}
+function _parseDbDate(s){
+  // SQLite liefert UTC ohne Zeitzonen-Angabe ("YYYY-MM-DD HH:MM:SS") --
+  // explizit als UTC kennzeichnen, sonst rechnet der Browser faelschlich
+  // mit lokaler Zeit und zeigt alles um die eigene Zeitzonen-Differenz
+  // in der Vergangenheit an.
+  const iso=String(s).includes('T')?s:String(s).replace(' ','T');
+  return new Date(iso.endsWith('Z')?iso:iso+'Z');
+}
+function formatDate(s){if(!s)return'–';try{return _parseDbDate(s).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}catch{return s}}
+function formatDateShort(s){if(!s)return'–';try{return _parseDbDate(s).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}catch{return s}}
 function getDuration(a,b){if(!a)return'–';try{const d=Math.round((new Date(b||Date.now())-new Date(a))/1000);if(d<0)return'Pausiert';const m=Math.floor(d/60),s=d%60;return m?`${m}m ${s}s`:`${s}s`}catch{return'–'}}
 function statusLabel(s){return{pending:'Wartend',processing:'Läuft…',done:'Fertig',error:'Fehler'}[s]||s}
 
