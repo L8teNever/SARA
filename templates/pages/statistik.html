@@ -24,6 +24,28 @@
     </div>
   </div>
 
+  <div class="lbl" style="margin-top:24px"><span class="mi">movie</span> Produktions-Überblick</div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px 12px">
+      <div>
+        <div style="font-size:26px;font-weight:800" id="stat-total-videos">–</div>
+        <div style="font-size:12px;color:var(--cosv);margin-top:2px">Videos erstellt</div>
+      </div>
+      <div>
+        <div style="font-size:26px;font-weight:800;color:var(--cg)" id="stat-full-uploaded">–</div>
+        <div style="font-size:12px;color:var(--cosv);margin-top:2px">Vollständig hochgeladen</div>
+      </div>
+      <div>
+        <div style="font-size:26px;font-weight:800;color:var(--cw)" id="stat-partial-uploaded">–</div>
+        <div style="font-size:12px;color:var(--cosv);margin-top:2px">Teilweise hochgeladen</div>
+      </div>
+      <div>
+        <div style="font-size:26px;font-weight:800;color:var(--cosv)" id="stat-not-uploaded">–</div>
+        <div style="font-size:12px;color:var(--cosv);margin-top:2px">Warten auf Upload</div>
+      </div>
+    </div>
+  </div>
+
   <div class="lbl" id="stat-channels-lbl"><span class="mi">smart_display</span> Verknüpfte YouTube-Kanäle</div>
   <div id="stat-channels">
     <div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>
@@ -55,7 +77,30 @@ function _fmtCompact(n){
   return n.toLocaleString('de-DE');
 }
 
+async function loadProductionOverview(){
+  try{
+    const [videos,accounts]=await Promise.all([
+      fetch('/api/videos').then(r=>r.json()),
+      fetch('/api/youtube/accounts').then(r=>r.json()).catch(()=>[]),
+    ]);
+    const parts=videos.flatMap(s=>s.parts||[]);
+    let full=0,partial=0,none=0;
+    parts.forEach(p=>{
+      const platforms=new Set((p.uploads||[]).map(u=>u.platform));
+      const uploadedTo=accounts.filter(acc=>platforms.has(`youtube:${acc.id}`)).length;
+      if(accounts.length>0 && uploadedTo>=accounts.length) full++;
+      else if(uploadedTo>0) partial++;
+      else none++;
+    });
+    document.getElementById('stat-total-videos').textContent=parts.length.toLocaleString('de-DE');
+    document.getElementById('stat-full-uploaded').textContent=full.toLocaleString('de-DE');
+    document.getElementById('stat-partial-uploaded').textContent=partial.toLocaleString('de-DE');
+    document.getElementById('stat-not-uploaded').textContent=none.toLocaleString('de-DE');
+  }catch(e){}
+}
+
 async function loadStatistik(){
+  loadProductionOverview();
   const c=document.getElementById('stat-channels');
   try{
     const chans=await fetch('/api/youtube/channel-stats').then(r=>r.json());
