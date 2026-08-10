@@ -2,18 +2,15 @@
 <div class="wrap">
 
   <div class="page-hdr">
-    <div class="page-hdr__ico"><span class="mi">movie</span></div>
-    <div>
-      <div class="page-hdr__title">Video produzieren</div>
-      <div class="page-hdr__sub">Story auswählen und Videos automatisch erstellen lassen</div>
-    </div>
+    <div class="page-hdr__title">Video produzieren</div>
+    <div class="page-hdr__sub">Story auswählen und Videos automatisch erstellen lassen</div>
   </div>
 
   <!-- Production status -->
   <div class="tbox" id="prod-status-bar">
     <span class="mi" id="prod-status-icon" style="font-size:22px">check_circle</span>
     <div style="flex:1;min-width:0">
-      <div style="font-size:14px;font-weight:600" id="prod-status-label">Produktion aktiv</div>
+      <div style="font-size:14px;font-weight:700" id="prod-status-label">Produktion aktiv</div>
       <div style="font-size:12px;opacity:.8" id="prod-status-hint">Videos werden automatisch produziert</div>
     </div>
     <button class="btn btn--outlined btn--sm" id="btn-toggle-prod" onclick="toggleProdStatus()">
@@ -47,12 +44,12 @@
     <button class="btn btn--filled btn--lg" id="btn-create-video" onclick="createVideo()" disabled>
       <span class="mi">video_settings</span> <span id="btn-create-video-text">Video-Produktion starten</span>
     </button>
-    <div id="selected-story-info" style="font-size:12px;color:var(--cg);text-align:center;min-height:16px;font-weight:500"></div>
+    <div id="selected-story-info" style="font-size:12px;color:var(--cg);text-align:center;min-height:16px;font-weight:600"></div>
   </div>
 
   <!-- Queue -->
   <div class="lbl" style="margin-top:32px">
-    <span class="mi">queue</span> Warteschlange & Status
+    <span class="mi">bolt</span> Aktuell in Produktion &amp; Warteschlange
     <span id="sse-status" style="font-size:11px;text-transform:none;letter-spacing:0;font-weight:400;opacity:.7;margin-left:-4px"></span>
   </div>
   <div id="queue-stats" class="row" style="margin-bottom:12px;padding:0 4px"></div>
@@ -215,7 +212,7 @@ function updateProdBtn(){
   }else{
     box.className='tbox tbox--warn';
     btn.className='btn btn--sm';
-    btn.style.cssText='background:var(--cw);color:#1C1B1F;font-weight:600';
+    btn.style.cssText='background:var(--cw);color:#1C1B1F;font-weight:700';
     btn.innerHTML='<span class="mi">play_circle</span> Fortsetzen';
     if(icon){icon.textContent='pause_circle';icon.style.color='var(--cw)'}
     if(lbl) lbl.textContent='Produktion pausiert';

@@ -1,0 +1,209 @@
+<section class="page" data-tab="statistik">
+<div class="wrap">
+
+  <div class="page-hdr">
+    <div class="page-hdr__title">Kanal-Statistiken</div>
+    <div class="page-hdr__sub">Netzwerk-Übersicht und verknüpfte YouTube-Kanäle</div>
+  </div>
+
+  <div class="card card--hero">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px">
+      <div class="flabel" style="color:rgba(255,255,255,.65)">Netzwerk Gesamt-Performance</div>
+      <button class="btn btn--text btn--sm" style="color:#fff" onclick="openChartModal()">
+        Grafen anzeigen <span class="mi" style="font-size:16px">chevron_right</span>
+      </button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px 12px">
+      <div>
+        <div style="font-size:26px;font-weight:800" id="stat-subs">–</div>
+        <div style="font-size:12px;opacity:.75;margin-top:2px">Abonnenten Gesamt</div>
+      </div>
+      <div>
+        <div style="font-size:26px;font-weight:800;color:var(--cg)" id="stat-videos">–</div>
+        <div style="font-size:12px;opacity:.75;margin-top:2px">Videos Hochgeladen</div>
+      </div>
+      <div>
+        <div style="font-size:26px;font-weight:800;color:var(--cp)" id="stat-views">–</div>
+        <div style="font-size:12px;opacity:.75;margin-top:2px">Gesamtaufrufe</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lbl" id="stat-channels-lbl"><span class="mi">smart_display</span> Verknüpfte YouTube-Kanäle</div>
+  <div id="stat-channels">
+    <div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>
+  </div>
+
+</div>
+</section>
+
+<!-- Chart Modal -->
+<div class="mback" id="chart-modal" onclick="if(event.target===this)closeChartModal()">
+  <div class="modal" style="max-width:520px">
+    <div class="modal__hdr">
+      <span class="modal__ttl" id="chart-modal-title">Aufruf-Wachstum (Letzte 7 Tage)</span>
+      <button class="btn btn--icon" onclick="closeChartModal()"><span class="mi">close</span></button>
+    </div>
+    <div id="chart-modal-body">
+      <div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let _statChannels=[];
+
+function _fmtCompact(n){
+  n=Number(n)||0;
+  if(n>=1000000) return (n/1000000).toFixed(1).replace(/\.0$/,'')+'M';
+  if(n>=1000) return (n/1000).toFixed(1).replace(/\.0$/,'')+'k';
+  return n.toLocaleString('de-DE');
+}
+
+async function loadStatistik(){
+  const c=document.getElementById('stat-channels');
+  try{
+    const chans=await fetch('/api/youtube/channel-stats').then(r=>r.json());
+    _statChannels=chans;
+
+    let subs=0,vids=0,views=0,anyHidden=false,anyOk=false;
+    chans.forEach(ch=>{
+      if(ch.error) return;
+      anyOk=true;
+      if(ch.subscriber_count!=null) subs+=ch.subscriber_count; else anyHidden=true;
+      vids+=ch.video_count||0;
+      views+=ch.view_count||0;
+    });
+    document.getElementById('stat-subs').textContent=anyOk?(_fmtCompact(subs)+(anyHidden?'+':'')):'–';
+    document.getElementById('stat-videos').textContent=anyOk?vids.toLocaleString('de-DE'):'–';
+    document.getElementById('stat-views').textContent=anyOk?_fmtCompact(views):'–';
+
+    document.getElementById('stat-channels-lbl').innerHTML=`<span class="mi">smart_display</span> Verknüpfte YouTube-Kanäle (${chans.length})`;
+
+    if(!chans.length){
+      c.innerHTML='<div class="empty"><span class="mi">smart_display</span><span class="empty__ttl">Noch kein Kanal verbunden</span><span class="empty__sub">Verbinde einen Kanal im Tab „Medien &amp; YouTube"</span></div>';
+      return;
+    }
+    c.innerHTML='';
+    chans.forEach(ch=>{
+      const card=document.createElement('div');
+      card.className='card';
+      card.style.padding='0';
+      card.style.overflow='hidden';
+      const bannerStyle=ch.banner_url
+        ? `background-image:url('${ch.banner_url}');background-size:cover;background-position:center`
+        : `background:linear-gradient(135deg,var(--cpc),#2E2359)`;
+      card.innerHTML=`
+        <div style="height:84px;position:relative;${bannerStyle}">
+          <span class="chip ${ch.is_active?'chip--done':'chip--pend'}" style="position:absolute;top:10px;right:10px">${ch.is_active?'Aktiv':'Pausiert'}</span>
+        </div>
+        <div style="padding:16px 18px 18px">
+          <div style="font-size:15px;font-weight:700;margin-bottom:${ch.error?'4px':'12px'}">${escHtml(ch.channel_title)}</div>
+          ${ch.error
+            ? `<div style="font-size:12px;color:var(--ce)">Statistik nicht abrufbar — Kanal ggf. neu verbinden</div>`
+            : `<div style="display:flex;gap:24px">
+                <div><div style="font-size:17px;font-weight:800">${ch.subscriber_count!=null?_fmtCompact(ch.subscriber_count):'verborgen'}</div><div style="font-size:11px;color:var(--cosv)">Abonnenten</div></div>
+                <div><div style="font-size:17px;font-weight:800;color:var(--cg)">${(ch.video_count||0).toLocaleString('de-DE')}</div><div style="font-size:11px;color:var(--cosv)">Videos</div></div>
+                <div><div style="font-size:17px;font-weight:800;color:var(--cp)">${_fmtCompact(ch.view_count||0)}</div><div style="font-size:11px;color:var(--cosv)">Aufrufe</div></div>
+              </div>`}
+        </div>`;
+      c.appendChild(card);
+    });
+  }catch(e){c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
+}
+
+function _weekdayDE(dateStr){
+  const days=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  return days[new Date(dateStr+'T00:00:00Z').getUTCDay()];
+}
+
+function openChartModal(){
+  document.getElementById('chart-modal').classList.add('open');
+  loadViewsChart();
+}
+function closeChartModal(){
+  document.getElementById('chart-modal').classList.remove('open');
+}
+
+async function loadViewsChart(){
+  const body=document.getElementById('chart-modal-body');
+  body.innerHTML='<div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>';
+  try{
+    const d=await fetch('/api/youtube/analytics/views?days=7').then(r=>r.json());
+    if(d.needs_reconnect){
+      body.innerHTML=`
+        <div class="empty" style="padding:20px 0">
+          <span class="mi">link_off</span>
+          <span class="empty__ttl">Graph noch nicht verfügbar</span>
+          <span class="empty__sub">Deine Kanäle wurden verbunden, bevor Analytics-Zugriff hinzugefügt wurde.<br>Einmal neu verbinden, um Verlaufsdaten freizuschalten.</span>
+          <a href="/auth/youtube/login" class="btn btn--filled btn--sm" style="margin-top:14px">
+            <span class="mi">refresh</span> Kanal neu verbinden
+          </a>
+        </div>`;
+      return;
+    }
+    const series=d.series||[];
+    body.innerHTML=`
+      <div style="position:relative"><canvas id="views-chart-canvas" style="width:100%;display:block"></canvas></div>
+      <div style="display:flex;justify-content:space-between;margin-top:10px">
+        ${series.map((s,i)=>`<span style="font-size:11px;color:${i===series.length-1?'var(--cg)':'var(--cosv)'};font-weight:${i===series.length-1?700:400}">${_weekdayDE(s.date)}</span>`).join('')}
+      </div>
+      ${d.errors&&d.errors.length?`<div style="font-size:11px;color:var(--cosv);margin-top:12px">Hinweis: ${d.errors.length} Kanal/Kanäle konnten nicht abgefragt werden.</div>`:''}
+    `;
+    drawViewsChart(series);
+  }catch(e){
+    body.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`;
+  }
+}
+
+function drawViewsChart(series){
+  const canvas=document.getElementById('views-chart-canvas');
+  if(!canvas||!series.length) return;
+  const wrap=canvas.parentElement;
+  const dpr=window.devicePixelRatio||1;
+  const w=wrap.clientWidth||440, h=170;
+  canvas.width=w*dpr; canvas.height=h*dpr;
+  canvas.style.width=w+'px'; canvas.style.height=h+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  const pad={l:6,r:6,t:14,b:6};
+  const values=series.map(s=>s.views);
+  const max=Math.max(1,...values);
+  const stepX=series.length>1?(w-pad.l-pad.r)/(series.length-1):0;
+  const pts=series.map((s,i)=>({
+    x: pad.l+i*stepX,
+    y: pad.t+(h-pad.t-pad.b)*(1-(s.views/max))
+  }));
+  ctx.strokeStyle='rgba(255,255,255,.08)';
+  ctx.lineWidth=1;
+  for(let i=0;i<=2;i++){
+    const y=pad.t+(h-pad.t-pad.b)*i/2;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();
+  }
+  if(pts.length>1){
+    const grad=ctx.createLinearGradient(0,pad.t,0,h-pad.b);
+    grad.addColorStop(0,'rgba(208,188,255,.35)');
+    grad.addColorStop(1,'rgba(208,188,255,0)');
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x,h-pad.b);
+    pts.forEach(p=>ctx.lineTo(p.x,p.y));
+    ctx.lineTo(pts[pts.length-1].x,h-pad.b);
+    ctx.closePath();
+    ctx.fillStyle=grad;
+    ctx.fill();
+  }
+  ctx.beginPath();
+  pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle='#D0BCFF';
+  ctx.lineWidth=2.5;
+  ctx.lineJoin='round';
+  ctx.lineCap='round';
+  ctx.stroke();
+  if(pts.length){
+    const last=pts[pts.length-1];
+    ctx.beginPath();ctx.arc(last.x,last.y,4,0,Math.PI*2);
+    ctx.fillStyle='#D0BCFF';ctx.fill();
+  }
+}
+</script>

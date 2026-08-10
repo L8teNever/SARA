@@ -148,6 +148,7 @@ OAUTH_REDIRECT_BASE  = os.environ.get("OAUTH_REDIRECT_BASE", "").strip().rstrip(
 YOUTUBE_SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/yt-analytics.readonly",
 ]
 
 
@@ -1134,6 +1135,23 @@ def _any_youtube_credentials() -> "GoogleCredentials | None":
     return creds
 
 
+def _creds_for_account(account) -> "GoogleCredentials":
+    """Credentials fuer GENAU den Kanal von `account` (eigener Refresh-Token) --
+    fuer kanal-spezifische Daten wie Analytics/Statistiken, im Unterschied zu
+    _any_youtube_credentials() das nur EINEN beliebigen Kanal fuer oeffentliche
+    Daten nutzt."""
+    creds = GoogleCredentials(
+        None,
+        refresh_token=account["refresh_token"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=YOUTUBE_SCOPES,
+    )
+    creds.refresh(GoogleAuthRequest())
+    return creds
+
+
 def upload_to_youtube(story_part_id: int, youtube_account_id: int) -> str:
     """
     Laedt ein fertiges Story-Teil-Video auf den angegebenen, per OAuth
@@ -1302,9 +1320,12 @@ def start_youtube_worker():
 @app.route("/video")
 @app.route("/library")
 @app.route("/library/<path:rest>")
+@app.route("/statistik")
+@app.route("/medien")
+@app.route("/medien/<path:rest2>")
 @app.route("/upload")
 @app.route("/channels")
-def index(rest=None):
+def index(rest=None, rest2=None):
     return render_template("index.html")
 
 
@@ -2004,6 +2025,88 @@ def api_youtube_stats():
                 "comments": int(st["commentCount"]) if "commentCount" in st else None,
             }
     return jsonify(result)
+
+
+@app.route("/api/youtube/channel-stats", methods=["GET"])
+def api_youtube_channel_stats():
+    """Abonnenten/Video-/Aufrufzahlen + Banner pro verbundenem Kanal, fuer die
+    Statistik-Seite. Jeder Kanal wird mit seinen EIGENEN Credentials
+    abgefragt (channels().list(mine=True)), nicht mit denen eines anderen."""
+    with db_session(write=False) as conn:
+        accounts = conn.execute(
+            "SELECT * FROM youtube_accounts ORDER BY added_at"
+        ).fetchall()
+    result = []
+    for acc in accounts:
+        entry = {
+            "account_id": acc["id"],
+            "channel_id": acc["channel_id"],
+            "channel_title": acc["channel_title"],
+            "is_active": bool(acc["is_active"]),
+        }
+        try:
+            creds = _creds_for_account(acc)
+            youtube = yt_build("youtube", "v3", credentials=creds, cache_discovery=False)
+            resp = youtube.channels().list(
+                part="snippet,statistics,brandingSettings", mine=True
+            ).execute()
+            items = resp.get("items", [])
+            if items:
+                ch = items[0]
+                stats = ch.get("statistics", {})
+                snippet = ch.get("snippet", {})
+                branding_img = ch.get("brandingSettings", {}).get("image", {}) or {}
+                thumbs = snippet.get("thumbnails", {}) or {}
+                entry.update({
+                    "channel_title": snippet.get("title") or acc["channel_title"],
+                    "subscriber_count": None if stats.get("hiddenSubscriberCount") else int(stats.get("subscriberCount", 0)),
+                    "video_count": int(stats.get("videoCount", 0)),
+                    "view_count": int(stats.get("viewCount", 0)),
+                    "banner_url": branding_img.get("bannerExternalUrl"),
+                    "thumbnail_url": (thumbs.get("default", {}) or {}).get("url"),
+                })
+        except Exception as e:
+            print(f"[YouTube] Channel-Stats fuer Konto {acc['id']} fehlgeschlagen: {e}")
+            entry["error"] = str(e)
+        result.append(entry)
+    return jsonify(result)
+
+
+@app.route("/api/youtube/analytics/views", methods=["GET"])
+def api_youtube_analytics_views():
+    """Aufrufe pro Tag der letzten N Tage (Default 7), aufsummiert ueber alle
+    verbundenen Kanaele -- fuer den Verlaufs-Graphen auf der Statistik-Seite.
+    Braucht das yt-analytics.readonly Scope: Kanaele, die vor dessen
+    Einfuehrung verbunden wurden, muessen einmal neu verbunden werden, sonst
+    landet ihr Kanal in `errors` statt in der Zeitreihe."""
+    days = max(1, min(90, int(request.args.get("days", 7))))
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=days - 1)
+    with db_session(write=False) as conn:
+        accounts = conn.execute("SELECT * FROM youtube_accounts").fetchall()
+    totals = {}
+    errors = []
+    for acc in accounts:
+        try:
+            creds = _creds_for_account(acc)
+            yta = yt_build("youtubeAnalytics", "v2", credentials=creds, cache_discovery=False)
+            resp = yta.reports().query(
+                ids=f"channel=={acc['channel_id']}",
+                startDate=start.isoformat(),
+                endDate=end.isoformat(),
+                metrics="views",
+                dimensions="day",
+                sort="day",
+            ).execute()
+            for row in resp.get("rows", []):
+                day, views = row[0], int(row[1])
+                totals[day] = totals.get(day, 0) + views
+        except Exception as e:
+            print(f"[YouTube] Analytics fuer Konto {acc['id']} fehlgeschlagen: {e}")
+            errors.append({"channel_title": acc["channel_title"], "message": str(e)})
+    days_list = [(start + timedelta(days=i)).isoformat() for i in range(days)]
+    series = [{"date": d, "views": totals.get(d, 0)} for d in days_list]
+    return jsonify({"series": series, "errors": errors, "needs_reconnect": bool(errors) and not totals})
 
 
 @app.route("/api/youtube/queue", methods=["GET"])

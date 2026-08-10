@@ -1,0 +1,342 @@
+<section class="page" data-tab="medien">
+
+  <!-- Main -->
+  <div id="medien-main">
+    <div class="wrap">
+
+      <div class="page-hdr">
+        <div class="page-hdr__title">Hintergrundvideos &amp; YouTube</div>
+        <div class="page-hdr__sub">Verwalte ASMR-Clips und die YouTube-Automatisierungsintervalle</div>
+      </div>
+
+      <div class="card card--hero" style="cursor:pointer;display:flex;align-items:center;gap:16px" onclick="openBackgroundsView()">
+        <div style="flex:1;min-width:0">
+          <div class="flabel" style="color:rgba(255,255,255,.65)">ASMR &amp; Gameplay Bibliothek</div>
+          <div style="font-size:18px;font-weight:800;margin-top:6px">Hintergrundvideos verwalten</div>
+          <div style="font-size:12.5px;opacity:.75;margin-top:4px"><span id="medien-bg-navcount">0</span> Clips hochgeladen · Zufällige Rotation aktiv</div>
+        </div>
+        <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <span class="mi">chevron_right</span>
+        </div>
+      </div>
+
+      <div class="lbl" style="margin-top:28px"><span class="mi">account_circle</span> Verbundene Google-Konten</div>
+      <div id="yt-accounts-list">
+        <div style="display:flex;justify-content:center;padding:20px"><div class="spinner"></div></div>
+      </div>
+      <a class="btn btn--outlined btn--lg" href="/auth/youtube/login" style="margin-top:4px;margin-bottom:8px">
+        <span class="mi">add_circle</span> Weiteres Google-Konto verbinden
+      </a>
+
+      <div class="lbl"><span class="mi">tune</span> YouTube Upload-Einstellungen</div>
+      <div class="card">
+        <div class="li" style="cursor:default;margin-bottom:14px" onclick="event.stopPropagation()">
+          <div class="li__lead"><span class="mi" id="yt-auto-ico" style="color:var(--cosv)">toggle_off</span></div>
+          <div class="li__body">
+            <div class="li__title">Automatischer Upload nach Render</div>
+            <div class="li__sub" style="white-space:normal;overflow:visible;text-overflow:clip;line-height:1.4">Neu fertiggestellte Videos werden ohne weiteres Zutun eingereiht</div>
+          </div>
+          <button class="btn btn--tonal btn--sm" id="yt-auto-btn" onclick="toggleYtAuto()">…</button>
+        </div>
+
+        <div class="field">
+          <label class="flabel" for="yt-interval">Pause zwischen Uploads (Minuten)</label>
+          <input id="yt-interval" class="inp" type="number" min="0.5" step="0.5" value="5"
+                 placeholder="5" onchange="saveYtSettings()">
+          <div style="font-size:11.5px;color:var(--cosv);margin-top:2px">
+            Größerer Abstand wirkt weniger nach automatisiertem Massen-Posting. Bei mehreren Videos/Kanälen werden alle Uploads nacheinander in diesem Abstand eingeplant, nie gleichzeitig.
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="flabel" for="yt-privacy">Sichtbarkeit neuer Videos</label>
+          <select id="yt-privacy" class="inp" onchange="saveYtSettings()">
+            <option value="public">Öffentlich</option>
+            <option value="unlisted">Nicht gelistet</option>
+            <option value="private">Privat</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="tbox tbox--surface">
+        <span class="mi" style="flex-shrink:0">info</span>
+        <span style="font-size:12.5px;line-height:1.5">Beim Verbinden öffnet sich die Google-Anmeldung. Es wird nur Zugriff zum Hochladen von Videos sowie Lesen öffentlicher Kanaldaten angefragt.</span>
+      </div>
+
+      <div class="lbl" style="margin-top:28px"><span class="mi">upload</span> Upload-Warteschlange</div>
+      <div id="yt-queue-list">
+        <div class="empty" style="padding:28px 0"><span class="mi">cloud_upload</span><span class="empty__ttl">Noch keine Uploads</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Hintergrundvideos (Detail) -->
+  <div id="medien-backgrounds" style="display:none">
+    <div class="wrap">
+      <button class="btn btn--tonal btn--sm" onclick="closeBackgroundsView()" style="margin-bottom:18px">
+        <span class="mi">arrow_back</span> Zurück
+      </button>
+
+      <div class="page-hdr">
+        <div class="page-hdr__title">Hintergrundvideos</div>
+        <div class="page-hdr__sub">Videos hochladen, die als Hintergrund für Stories verwendet werden</div>
+      </div>
+
+      <div class="dropzone" id="upload-zone"
+        onclick="document.getElementById('file-input').click()"
+        ondragover="handleDragOver(event)"
+        ondragleave="handleDragLeave()"
+        ondrop="handleDrop(event)">
+        <span class="mi">cloud_upload</span>
+        <div class="dropzone__ttl">Video hierher ziehen oder klicken zum Hochladen</div>
+        <div class="dropzone__hint">mp4 · mov · avi · max 500 MB</div>
+      </div>
+      <input type="file" id="file-input" accept=".mp4,.mov,.avi" style="display:none" onchange="uploadFile(this.files[0])">
+
+      <div id="upload-progress-wrap" class="hidden">
+        <div class="prow">
+          <span style="font-size:13px;color:var(--cosv);flex:0 0 auto;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="upload-filename"></span>
+          <div class="pbar"><div class="pbar__fill" id="upload-bar" style="width:0%"></div></div>
+          <span style="font-size:13px;font-weight:700;color:var(--cp);min-width:36px;text-align:right" id="upload-percent">0%</span>
+        </div>
+      </div>
+
+      <div class="lbl"><span class="mi">photo_library</span> Hochgeladene Clips (<span id="bg-count">0</span>)</div>
+      <div id="bg-grid" class="bggrid">
+        <div class="empty" style="grid-column:1/-1;padding:28px 0">
+          <span class="mi">video_library</span>
+          <span class="empty__ttl">Keine Hintergrundvideos</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<script>
+let _ytAutoActive = true;
+
+function openBackgroundsView(push=true){
+  document.getElementById('medien-main').style.display='none';
+  document.getElementById('medien-backgrounds').style.display='block';
+  if(push) history.pushState({tab:'medien',view:'backgrounds'},'','/medien/hintergrund');
+}
+function closeBackgroundsView(push=true){
+  document.getElementById('medien-backgrounds').style.display='none';
+  document.getElementById('medien-main').style.display='block';
+  if(push) history.pushState({tab:'medien'},'','/medien');
+}
+
+async function loadYoutubeChannels(){
+  await Promise.all([loadYtAccounts(), loadYtSettings(), loadYtQueue()]);
+}
+
+async function loadYtAccounts(){
+  const c=document.getElementById('yt-accounts-list');
+  try{
+    const accs=await fetch('/api/youtube/accounts').then(r=>r.json());
+    if(!accs.length){
+      c.innerHTML='<div class="empty" style="padding:20px 0"><span class="mi">smart_display</span><span class="empty__ttl">Noch kein Kanal verbunden</span></div>';
+      return;
+    }
+    c.innerHTML='';
+    accs.forEach(a=>{
+      const row=document.createElement('div');
+      row.className='li';
+      row.style.cursor='default';
+      row.innerHTML=`
+        <div class="li__lead"><div class="sdot ${a.is_active?'sdot--ok':''}"></div></div>
+        <div class="li__body">
+          <div class="li__title">${escHtml(a.channel_title)}</div>
+          <div class="li__sub">Verbunden seit ${formatDateShort(a.added_at)} · ${a.is_active?'aktiv':'pausiert'}</div>
+        </div>
+        <div class="li__trail">
+          <button class="btn btn--tonal btn--sm" data-id="${a.id}" data-active="${a.is_active}" onclick="toggleYtAccount(this)">
+            ${a.is_active?'Pausieren':'Aktivieren'}
+          </button>
+          <button class="btn btn--icon" style="color:var(--ce)" onclick="deleteYtAccount(${a.id},'${escHtml(a.channel_title)}',this)">
+            <span class="mi">delete</span>
+          </button>
+        </div>`;
+      c.appendChild(row);
+    });
+  }catch(e){c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
+}
+
+async function toggleYtAccount(btn){
+  const id=btn.dataset.id;
+  const nowActive=btn.dataset.active==='1'||btn.dataset.active==='true';
+  btn.disabled=true;
+  try{
+    await fetch(`/api/youtube/accounts/${id}/toggle`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_active:!nowActive})});
+    showSnack(nowActive?'Kanal pausiert.':'Kanal aktiviert.','success');
+    loadYtAccounts();
+  }catch(e){showSnack('Fehler: '+e.message,'error');btn.disabled=false}
+}
+
+async function deleteYtAccount(id,title,btn){
+  if(!await showConfirm('Kanal entfernen',`"${title}" wirklich entfernen? Zukünftige Videos werden dann nicht mehr an diesen Kanal hochgeladen.`,{confirmLabel:'Entfernen',destructive:true}))return;
+  btn.disabled=true;
+  try{
+    await fetch(`/api/youtube/accounts/${id}`,{method:'DELETE'});
+    showSnack('Kanal entfernt.','success');
+    loadYtAccounts();
+  }catch(e){showSnack('Fehler: '+e.message,'error');btn.disabled=false}
+}
+
+async function loadYtSettings(){
+  try{
+    const s=await fetch('/api/settings').then(r=>r.json());
+    _ytAutoActive = s.yt_auto_upload !== '0';
+    updateYtAutoBtn();
+    document.getElementById('yt-interval').value = s.yt_upload_interval_min || '5';
+    document.getElementById('yt-privacy').value = s.yt_privacy_status || 'public';
+  }catch(e){}
+}
+
+function updateYtAutoBtn(){
+  const ico=document.getElementById('yt-auto-ico');
+  const btn=document.getElementById('yt-auto-btn');
+  ico.textContent = _ytAutoActive ? 'toggle_on' : 'toggle_off';
+  ico.style.color = _ytAutoActive ? 'var(--cg)' : 'var(--cosv)';
+  btn.textContent = _ytAutoActive ? 'An' : 'Aus';
+}
+
+async function toggleYtAuto(){
+  _ytAutoActive = !_ytAutoActive;
+  updateYtAutoBtn();
+  await saveYtSettings();
+}
+
+async function saveYtSettings(){
+  const interval = parseFloat(document.getElementById('yt-interval').value) || 5;
+  const privacy = document.getElementById('yt-privacy').value;
+  try{
+    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      yt_auto_upload: _ytAutoActive ? '1' : '0',
+      yt_upload_interval_min: interval,
+      yt_privacy_status: privacy,
+    })});
+    showSnack('Einstellungen gespeichert.','success');
+  }catch(e){showSnack('Fehler: '+e.message,'error')}
+}
+
+async function loadYtQueue(){
+  const c=document.getElementById('yt-queue-list');
+  try{
+    const jobs=await fetch('/api/youtube/queue').then(r=>r.json());
+    if(!jobs.length){
+      c.innerHTML='<div class="empty" style="padding:28px 0"><span class="mi">cloud_upload</span><span class="empty__ttl">Noch keine Uploads</span></div>';
+      return;
+    }
+    c.innerHTML='';
+    const ico={pending:'hourglass_empty',processing:'cloud_upload',done:'check_circle',error:'error'};
+    jobs.forEach(j=>{
+      const el=document.createElement('div');
+      el.className='jcard'+(j.status==='processing'?' jcard--on':'');
+      el.innerHTML=`
+        <div class="jcard__hdr">
+          <div class="jcard__ico"><span class="mi ${j.status==='processing'?'spin':''}">${ico[j.status]||'help'}</span></div>
+          <div class="jcard__title">${escHtml(j.story_title)} — Teil ${j.part_number} → ${escHtml(j.channel_title)}</div>
+          <span class="chip chip--${j.status}">${statusLabel(j.status)}</span>
+        </div>
+        <div class="jcard__meta">${j.story_code} · geplant ${formatDate(j.scheduled_at||j.created_at)}</div>
+        ${j.status==='done'&&j.video_id?`<div class="jcard__plbl" style="color:var(--cg)"><a href="https://youtube.com/watch?v=${j.video_id}" target="_blank" rel="noopener" style="text-decoration:underline">youtube.com/watch?v=${j.video_id}</a></div>`:''}
+        ${j.status==='error'?`<div class="jcard__err">${escHtml(j.error_msg||'Fehler')}</div>`:''}
+        ${(j.status==='pending'||j.status==='error')?`<div class="jcard__acts"><button class="btn btn--danger btn--sm" onclick="deleteYtQueueJob(${j.id})"><span class="mi">delete</span>Entfernen</button></div>`:''}`;
+      c.appendChild(el);
+    });
+  }catch(e){c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
+}
+
+async function deleteYtQueueJob(id){
+  try{await fetch(`/api/youtube/queue/${id}`,{method:'DELETE'});loadYtQueue()}catch(e){showSnack('Fehler: '+e.message,'error')}
+}
+
+/* ── Hintergrundvideos ───────────────────────────────────── */
+async function loadBackgrounds(){
+  const grid=document.getElementById('bg-grid');
+  try{
+    const bgs=await fetch('/api/backgrounds').then(r=>r.json());
+    document.getElementById('bg-count').textContent=bgs.length;
+    const navCount=document.getElementById('medien-bg-navcount');
+    if(navCount) navCount.textContent=bgs.length;
+    if(!bgs.length){
+      grid.innerHTML='<div class="empty" style="grid-column:1/-1;padding:28px 0"><span class="mi">video_library</span><span class="empty__ttl">Keine Hintergrundvideos</span></div>';
+      return;
+    }
+    grid.innerHTML='';
+    bgs.forEach(bg=>{
+      const div=document.createElement('div');
+      div.className='bgthumb';
+      div.innerHTML=`
+        <video src="/backgrounds/${bg.filename}" preload="metadata" muted loop></video>
+        <div class="bgthumb__ov">
+          <span class="bgthumb__name">${escHtml(bg.original_name||bg.filename)}</span>
+          <span class="bgthumb__date">${formatDateShort(bg.uploaded_at)}</span>
+        </div>
+        <button class="bgthumb__del" onclick="event.stopPropagation();deleteBackground('${escHtml(bg.filename)}',this)" title="Löschen">
+          <span class="mi">delete</span>
+        </button>`;
+      const vid=div.querySelector('video');
+      div.addEventListener('mouseenter',()=>{vid.play().catch(()=>{})});
+      div.addEventListener('mouseleave',()=>{vid.pause();vid.currentTime=0});
+      grid.appendChild(div);
+    });
+  }catch(e){grid.innerHTML=`<div class="empty" style="grid-column:1/-1"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
+}
+
+function handleDragOver(e){
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.add('dropzone--on');
+}
+function handleDragLeave(){
+  document.getElementById('upload-zone').classList.remove('dropzone--on');
+}
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('dropzone--on');
+  const file=e.dataTransfer?.files?.[0];
+  if(file) uploadFile(file);
+}
+
+function uploadFile(file){
+  if(!file) return;
+  const maxMB=500;
+  if(file.size>maxMB*1024*1024){showSnack(`Datei zu groß (max ${maxMB} MB)`,'error');return}
+  const wrap=document.getElementById('upload-progress-wrap');
+  const fnEl=document.getElementById('upload-filename');
+  const pctEl=document.getElementById('upload-percent');
+  const barEl=document.getElementById('upload-bar');
+  wrap.classList.remove('hidden');
+  fnEl.textContent=file.name;
+  const fd=new FormData();fd.append('video',file);
+  const xhr=new XMLHttpRequest();
+  xhr.open('POST','/api/backgrounds/upload');
+  xhr.upload.onprogress=e=>{
+    if(e.lengthComputable){const p=Math.round(e.loaded/e.total*100);pctEl.textContent=p+'%';barEl.style.width=p+'%'}
+  };
+  xhr.onload=()=>{
+    wrap.classList.add('hidden');barEl.style.width='0%';
+    if(xhr.status===200){showSnack('Upload erfolgreich!','success');loadBackgrounds()}
+    else{try{showSnack(JSON.parse(xhr.responseText).error||'Upload fehlgeschlagen','error')}catch{showSnack('Upload fehlgeschlagen','error')}}
+    document.getElementById('file-input').value='';
+  };
+  xhr.onerror=()=>{wrap.classList.add('hidden');showSnack('Netzwerkfehler','error')};
+  xhr.send(fd);
+}
+
+async function deleteBackground(filename,btn){
+  if(!await showConfirm('Hintergrund löschen',`"${filename}" wirklich löschen?`,{confirmLabel:'Löschen',destructive:true}))return;
+  btn.disabled=true;
+  btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px"></div>';
+  btn.closest('.bgthumb').style.opacity='.5';
+  try{
+    const res=await fetch(`/api/backgrounds/${encodeURIComponent(filename)}`,{method:'DELETE'});
+    const d=await res.json();
+    if(d.success){showSnack('Gelöscht.','success');loadBackgrounds()}
+    else{showSnack(d.error||'Fehler','error');btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>';btn.closest('.bgthumb').style.opacity=''}
+  }catch(e){showSnack('Fehler: '+e.message,'error');btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>';btn.closest('.bgthumb').style.opacity=''}
+}
+</script>

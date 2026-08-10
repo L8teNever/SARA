@@ -5,17 +5,14 @@
     <div class="wrap">
 
       <div class="page-hdr">
-        <div class="page-hdr__ico"><span class="mi">video_library</span></div>
-        <div>
-          <div class="page-hdr__title">Bibliothek</div>
-          <div class="page-hdr__sub">Fertige Videos verwalten und Upload-Status tracken</div>
-        </div>
+        <div class="page-hdr__title">Videos</div>
+        <div class="page-hdr__sub">Fertige Videos verwalten und Upload-Status tracken</div>
       </div>
 
       <div style="position:sticky;top:0;z-index:10;background:var(--cs);padding-bottom:10px;margin-bottom:2px">
         <div style="position:relative;margin-bottom:10px">
-          <span class="mi" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:20px;color:var(--cosv);pointer-events:none">search</span>
-          <input class="inp" id="lib-search" type="text" placeholder="Story suchen…" oninput="filterLibrary()" style="padding-left:42px">
+          <span class="mi" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:20px;color:var(--cosv);pointer-events:none">search</span>
+          <input class="inp" id="lib-search" type="text" placeholder="Story suchen…" oninput="filterLibrary()" style="padding-left:44px">
         </div>
         <div class="row" id="lib-filter-chips" style="gap:6px">
           <button class="fchip is-on" data-f="all" onclick="setLibFilter('all',this)"><span class="mi">layers</span> Alle</button>
@@ -35,13 +32,19 @@
         <button class="btn btn--tonal btn--sm" onclick="closeLibDetail()">
           <span class="mi">arrow_back</span> Zurück
         </button>
-        <span style="font-size:16px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="lib-detail-title"></span>
+        <span style="font-size:16px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="lib-detail-title"></span>
         <span style="font-size:12px;color:var(--cosv)" id="lib-detail-date"></span>
         <span class="badge" id="lib-detail-code"></span>
         <button class="btn btn--outlined btn--sm" id="lib-mark-all-btn" style="display:none">
           <span class="mi">done_all</span> Alle erledigt
         </button>
       </div>
+
+      <div class="card--el" style="margin-bottom:18px">
+        <div class="flabel" style="margin-bottom:6px">Gesamt-Performance</div>
+        <div style="font-size:28px;font-weight:800;color:var(--cg)"><span id="lib-detail-total-views">0</span> <span style="font-size:14px;font-weight:600;color:var(--cosv)">Aufrufe insgesamt</span></div>
+      </div>
+
       <div id="lib-parts-grid"></div>
     </div>
   </div>
@@ -63,6 +66,7 @@ async function loadLibrary(){
     ]);
     renderLibFilterChips();
     renderLibraryList();
+    loadLibraryListStats();
     if(pendingLibraryCode){
       const s=_libData.find(x=>x.code===pendingLibraryCode);
       if(s){pendingLibraryCode=null;openLibDetail(s,false)}
@@ -86,8 +90,9 @@ function setLibFilter(f,el){
   document.querySelectorAll('#lib-filter-chips .fchip').forEach(c=>c.classList.remove('is-on'));
   el.classList.add('is-on');
   renderLibraryList();
+  loadLibraryListStats();
 }
-function filterLibrary(){renderLibraryList()}
+function filterLibrary(){renderLibraryList();loadLibraryListStats()}
 
 function _matches(story){
   if(_libFilter==='all') return true;
@@ -96,6 +101,29 @@ function _matches(story){
     return story.parts.some(p=>!(p.uploads||[]).find(x=>x.platform===platform));
   }
   return true;
+}
+
+function _storyUploadStatus(story){
+  const accStatus=_ytAccounts.map((acc,i)=>{
+    const allOk = story.parts.length>0 && story.parts.every(p=>(p.uploads||[]).some(u=>u.platform===_ytPlatform(acc)));
+    return {label:`Y${i+1}`, ok:allOk};
+  });
+  if(!accStatus.length) return {label:'',color:'var(--cosv)',sub:''};
+  const allDone=accStatus.every(a=>a.ok);
+  const noneDone=accStatus.every(a=>!a.ok);
+  if(allDone) return {label:'Gepostet',color:'var(--cg)',sub:accStatus.map(a=>a.label).join(' & ')+' aktiv'};
+  if(noneDone) return {label:'Offen',color:'var(--cosv)',sub:accStatus.map(a=>a.label).join(' & ')+' wartend'};
+  return {label:'Teilweise',color:'var(--cw)',sub:accStatus.map(a=>`${a.label} ${a.ok?'OK':'Wartend'}`).join(' / ')};
+}
+
+function _storyVideoIds(story){
+  const ids=[];
+  story.parts.forEach(p=>(p.uploads||[]).forEach(u=>{
+    if(!u.platform||!u.platform.startsWith('youtube:'))return;
+    const m=(u.notes||'').match(/v=([\w-]+)/);
+    if(m)ids.push(m[1]);
+  }));
+  return ids;
 }
 
 function renderLibraryList(){
@@ -108,39 +136,27 @@ function renderLibraryList(){
   }
   c.innerHTML='';
   filtered.forEach(story=>{
-    const ups=story.parts.flatMap(p=>p.uploads||[]);
-    const ytDots=_ytAccounts.map((acc,i)=>({
-      ok: ups.some(u=>u.platform===_ytPlatform(acc)),
-      label: `Y${i+1}`,
-      title: _ytLabel(i),
-    }));
-    const allDone=story.parts.length>0&&_ytAccounts.length>0&&story.parts.every(p=>
-      _ytAccounts.every(acc=>(p.uploads||[]).some(u=>u.platform===_ytPlatform(acc)))
-    );
+    const status=_storyUploadStatus(story);
+    const vids=_storyVideoIds(story);
     const row=document.createElement('div');
-    row.className='lrow'+(allDone?' lrow--done':'');
+    row.className='lrow';
+    row.dataset.vids=vids.join(',');
     row.innerHTML=`
       <div class="lrow__info">
         <div class="lrow__head">
           <div class="lrow__title">${escHtml(story.title)}</div>
           <span class="badge">${story.code}</span>
         </div>
-        <div class="lrow__meta">${story.parts.length} Teil(e) · ${formatDate(story.created_at)}</div>
+        <div class="lrow__meta">${story.parts.length} Teil(e) · ${formatDate(story.created_at)}${vids.length?` · <span data-viewcount style="color:var(--cg);font-weight:700">–</span>`:''}</div>
       </div>
-      <div class="lrow__plat">
-        ${ytDots.map(d=>`<div class="pdot${d.ok?' pdot--ok':''}" title="${d.title}">${d.label}</div>`).join('')}
-      </div>
-      <button class="btn btn--icon lrow__check" title="${allDone?'Erledigt':'Alle als hochgeladen markieren'}" style="color:${allDone?'var(--cg)':'var(--cosv)'}">
-        <span class="mi">${allDone?'check_circle':'radio_button_unchecked'}</span>
-      </button>
+      ${status.label?`<div style="text-align:right;flex-shrink:0">
+        <div style="font-size:12px;font-weight:700;color:${status.color}">${status.label}</div>
+        <div style="font-size:10.5px;color:var(--cosv);margin-top:1px;white-space:nowrap">${status.sub}</div>
+      </div>`:''}
       <button class="btn btn--icon lrow__del" style="color:var(--ce)">
         <span class="mi">delete</span>
       </button>
       <span class="mi" style="color:var(--cosv)">chevron_right</span>`;
-    row.querySelector('.lrow__check').addEventListener('click',e=>{
-      e.stopPropagation();
-      if(!allDone) markAllUploaded(story,e.currentTarget);
-    });
     row.querySelector('.lrow__del').addEventListener('click',e=>{
       e.stopPropagation();
       deleteLibStory(story.story_id,story.title,e.currentTarget);
@@ -150,6 +166,29 @@ function renderLibraryList(){
   });
 }
 
+async function loadLibraryListStats(){
+  const idToEls={};
+  document.querySelectorAll('.lrow[data-vids]').forEach(row=>{
+    const vids=(row.dataset.vids||'').split(',').filter(Boolean);
+    const el=row.querySelector('[data-viewcount]');
+    if(!vids.length||!el)return;
+    vids.forEach(v=>{(idToEls[v]=idToEls[v]||[]).push(el)});
+    el.dataset.total='0';
+    el.dataset.vids=vids.join(',');
+  });
+  const ids=Object.keys(idToEls);
+  if(!ids.length)return;
+  try{
+    const stats=await fetch('/api/youtube/stats?video_ids='+ids.join(',')).then(r=>r.json());
+    document.querySelectorAll('[data-viewcount]').forEach(el=>{
+      const vids=(el.dataset.vids||'').split(',').filter(Boolean);
+      let total=0;
+      vids.forEach(v=>{if(stats[v])total+=stats[v].views||0});
+      el.textContent=total.toLocaleString('de-DE')+' Aufrufe';
+    });
+  }catch(_){}
+}
+
 function openLibDetail(story,push=true){
   document.getElementById('lib-overview').style.display='none';
   document.getElementById('lib-detail').style.display='block';
@@ -157,12 +196,14 @@ function openLibDetail(story,push=true){
   document.getElementById('lib-detail-code').textContent=story.code;
   document.getElementById('lib-detail-title').textContent=story.title;
   document.getElementById('lib-detail-date').textContent=formatDate(story.created_at);
+  document.getElementById('lib-detail-total-views').textContent='0';
   const mb=document.getElementById('lib-mark-all-btn');
   mb.style.display='';mb.onclick=()=>markAllUploaded(story,mb);
   const grid=document.getElementById('lib-parts-grid');
   grid.innerHTML='';
   story.parts.forEach(part=>{
     const social=part.social||{};
+    const hasUpload=(part.uploads||[]).length>0;
     const card=document.createElement('div');
     card.className='vcard';card.id='lib-card-'+part.id;
     card.innerHTML=`
@@ -172,7 +213,10 @@ function openLibDetail(story,push=true){
         <div class="vcard__pov"><span class="mi">play_circle</span></div>
       </div>
       <div class="vcard__body">
-        <div class="vcard__part">Teil ${part.part_number}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span class="badge" style="background:var(--cpc);color:var(--copc)">TEIL ${part.part_number} VON ${story.parts.length}</span>
+          <span class="chip ${hasUpload?'chip--done':'chip--pend'}">${hasUpload?'Gepostet':'Offen'}</span>
+        </div>
         ${social.video_title?`<div class="vcard__ttl">${escHtml(social.video_title)}</div>`:''}
         ${social.description?`<div class="vcard__desc">${escHtml(social.description)}</div>`:''}
         ${social.hashtags?`<div class="vcard__tags">${escHtml(social.hashtags)}</div>`:''}
@@ -251,13 +295,9 @@ async function triggerYoutubeUpload(partId,accountId,btn){
 }
 
 async function loadYtStats(story){
-  const ids=[];
-  story.parts.forEach(part=>(part.uploads||[]).forEach(u=>{
-    if(!u.platform||!u.platform.startsWith('youtube:'))return;
-    const m=(u.notes||'').match(/v=([\w-]+)/);
-    if(m)ids.push(m[1]);
-  }));
-  if(!ids.length)return;
+  const ids=_storyVideoIds(story);
+  const totalEl=document.getElementById('lib-detail-total-views');
+  if(!ids.length){if(totalEl)totalEl.textContent='0';return}
   try{
     const stats=await fetch('/api/youtube/stats?video_ids='+ids.join(',')).then(r=>r.json());
     document.querySelectorAll('.pchip[data-vid]').forEach(btn=>{
@@ -265,6 +305,9 @@ async function loadYtStats(story){
       const statEl=btn.querySelector('[data-stat]');
       if(s&&statEl)statEl.textContent=` · ${Number(s.views).toLocaleString('de-DE')} Aufrufe`;
     });
+    let total=0;
+    ids.forEach(id=>{if(stats[id])total+=stats[id].views||0});
+    if(totalEl)totalEl.textContent=total.toLocaleString('de-DE');
   }catch(_){}
 }
 

@@ -2,101 +2,76 @@
 <div class="wrap">
 
   <div class="page-hdr">
-    <div class="page-hdr__ico"><span class="mi">auto_stories</span></div>
-    <div>
-      <div class="page-hdr__title">Story erstellen</div>
-      <div class="page-hdr__sub">Prompt kopieren → KI verwenden → JSON importieren</div>
-    </div>
+    <div class="page-hdr__title">Story Skript &amp; Prompt</div>
+    <div class="page-hdr__sub">Prompt kopieren → in ChatGPT, Gemini oder Claude einfügen → Antwort hier importieren</div>
   </div>
 
-  <!-- Step 1: Prompt -->
-  <div class="step-card">
-    <div class="step-card__hdr">
-      <div class="step-card__num">01</div>
-      <div>
-        <div class="step-card__title">Prompt generieren</div>
-        <div class="step-card__sub">Thema eingeben und Prompt in ChatGPT, Gemini oder Claude einfügen</div>
-      </div>
+  <!-- Prompt generieren -->
+  <div class="card">
+    <div class="lbl" style="margin-top:0"><span class="mi">auto_awesome</span> Prompt generieren</div>
+    <div class="field">
+      <label class="flabel" for="story-idea">Thema <span style="font-weight:400;opacity:.6;text-transform:none;letter-spacing:0">(optional — leer = zufällige Story)</span></label>
+      <input id="story-idea" class="inp" type="text" placeholder='z.B. "a woman who discovers her husband has a secret family"'>
     </div>
-    <div class="step-card__body">
-      <div class="field">
-        <label class="flabel" for="story-idea">Thema <span style="font-weight:400;opacity:.6;text-transform:none;letter-spacing:0">(optional — leer = zufällige Story)</span></label>
-        <input id="story-idea" class="inp" type="text" placeholder='z.B. "a woman who discovers her husband has a secret family"'>
-      </div>
-      <div class="field">
-        <label class="flabel" for="story-parts">Teile</label>
-        <select id="story-parts" class="inp">
-          <option value="1">1 Teil — komplette Story in einem Video</option>
-          <option value="2" selected>2 Teile — Cliffhanger nach Teil 1</option>
-          <option value="3">3 Teile — längerer Spannungsbogen</option>
-        </select>
-      </div>
-      <button class="btn btn--filled btn--lg" id="btn-copy-full" onclick="copyFullPrompt()" style="margin-top:4px">
-        <span class="mi">content_copy</span> Prompt kopieren
+    <div class="field">
+      <label class="flabel" for="story-parts">Teile</label>
+      <select id="story-parts" class="inp">
+        <option value="1">1 Teil — komplette Story in einem Video</option>
+        <option value="2" selected>2 Teile — Cliffhanger nach Teil 1</option>
+        <option value="3">3 Teile — längerer Spannungsbogen</option>
+      </select>
+    </div>
+    <button class="btn btn--filled btn--lg" id="btn-copy-full" onclick="copyFullPrompt()" style="margin-top:4px">
+      <span class="mi">content_copy</span> Prompt kopieren
+    </button>
+    <div id="copy-confirm" style="text-align:center;font-size:12px;min-height:18px;margin-top:8px;color:var(--cg)"></div>
+    <div style="margin-top:10px">
+      <button class="btn btn--text btn--sm" onclick="togglePromptPreview(this)" style="color:var(--cosv)">
+        <span class="mi" style="font-size:16px;transition:transform .2s">expand_more</span>
+        Prompt anzeigen / bearbeiten
       </button>
-      <div id="copy-confirm" style="text-align:center;font-size:12px;min-height:18px;margin-top:8px;color:var(--cg)"></div>
-      <div style="margin-top:10px">
-        <button class="btn btn--text btn--sm" onclick="togglePromptPreview(this)" style="color:var(--cosv)">
-          <span class="mi" style="font-size:16px;transition:transform .2s">expand_more</span>
-          Prompt anzeigen / bearbeiten
+      <div id="prompt-preview-wrap" style="display:none;margin-top:10px">
+        <textarea id="prompt-template-ta" class="ta mono" style="font-size:12px;min-height:260px;line-height:1.55" spellcheck="false"></textarea>
+        <button class="btn btn--outlined btn--sm" onclick="resetPromptTemplate()" style="margin-top:8px">
+          <span class="mi">restart_alt</span> Zurücksetzen
         </button>
-        <div id="prompt-preview-wrap" style="display:none;margin-top:10px">
-          <textarea id="prompt-template-ta" class="ta" style="font-family:'Courier New',monospace;font-size:12px;min-height:260px;line-height:1.55" spellcheck="false"></textarea>
-          <button class="btn btn--outlined btn--sm" onclick="resetPromptTemplate()" style="margin-top:8px">
-            <span class="mi">restart_alt</span> Zurücksetzen
-          </button>
-        </div>
       </div>
     </div>
   </div>
 
-  <!-- Connector -->
-  <div class="step-conn">
-    <span class="mi">arrow_downward</span>
-    <span>In ChatGPT / Gemini / Claude.ai einfügen → Antwort kopieren</span>
-  </div>
-
-  <!-- Step 2: Import -->
-  <div class="step-card">
-    <div class="step-card__hdr">
-      <div class="step-card__num">02</div>
-      <div>
-        <div class="step-card__title">KI-Antwort importieren</div>
-        <div class="step-card__sub">JSON-Antwort hier einfügen und speichern</div>
-      </div>
-    </div>
-    <div class="step-card__body">
-      <div class="field">
-        <label class="flabel" for="import-json">JSON-Antwort</label>
-        <textarea id="import-json" class="ta" style="min-height:180px;font-family:'Courier New',monospace;font-size:12.5px"
-          placeholder='{
+  <!-- Import -->
+  <div class="card">
+    <div class="lbl" style="margin-top:0"><span class="mi">move_down</span> KI-Antwort importieren</div>
+    <div class="field">
+      <label class="flabel" for="import-json">JSON-Antwort</label>
+      <textarea id="import-json" class="ta mono" style="min-height:180px;font-size:12.5px"
+        placeholder='{
   "title": "The Betrayal",
   "total_parts": 2,
   "keywords": ["betrayal","trust",...],
   "parts": [...]
 }'></textarea>
+    </div>
+    <div class="li" style="cursor:default;margin-bottom:14px" onclick="event.stopPropagation()">
+      <div class="li__lead"><span class="mi" id="auto-queue-ico" style="color:var(--cosv)">toggle_off</span></div>
+      <div class="li__body">
+        <div class="li__title">Video automatisch erstellen</div>
+        <div class="li__sub" style="white-space:normal;overflow:visible;text-overflow:clip;line-height:1.4">Importierte Storys werden direkt zur Produktion eingereiht, ohne manuelle Auswahl im Video-Tab</div>
       </div>
-      <div class="li" style="cursor:default;margin-bottom:14px" onclick="event.stopPropagation()">
-        <div class="li__lead"><span class="mi" id="auto-queue-ico" style="color:var(--cosv)">toggle_off</span></div>
-        <div class="li__body">
-          <div class="li__title">Video automatisch erstellen</div>
-          <div class="li__sub" style="white-space:normal;overflow:visible;text-overflow:clip;line-height:1.4">Importierte Storys werden direkt zur Produktion eingereiht, ohne manuelle Auswahl im Video-Tab</div>
-        </div>
-        <button class="btn btn--tonal btn--sm" id="auto-queue-btn" onclick="toggleAutoQueue()">…</button>
-      </div>
-      <div class="row">
-        <button class="btn btn--filled" id="btn-import-story" onclick="importStory()" style="flex:1">
-          <span class="mi">check_circle</span> Story importieren
-        </button>
-        <button class="btn btn--outlined" onclick="clearImport()">
-          <span class="mi">delete_sweep</span> Leeren
-        </button>
-      </div>
-      <div class="impres" id="import-result">
-        <div class="impres__ttl" id="import-result-title"></div>
-        <div class="impres__body" id="import-result-body"></div>
-        <div id="import-result-actions" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"></div>
-      </div>
+      <button class="btn btn--tonal btn--sm" id="auto-queue-btn" onclick="toggleAutoQueue()">…</button>
+    </div>
+    <div class="row">
+      <button class="btn btn--filled" id="btn-import-story" onclick="importStory()" style="flex:1">
+        <span class="mi">check_circle</span> Story importieren
+      </button>
+      <button class="btn btn--outlined" onclick="clearImport()">
+        <span class="mi">delete_sweep</span> Leeren
+      </button>
+    </div>
+    <div class="impres" id="import-result">
+      <div class="impres__ttl" id="import-result-title"></div>
+      <div class="impres__body" id="import-result-body"></div>
+      <div id="import-result-actions" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"></div>
     </div>
   </div>
 
@@ -257,9 +232,9 @@ function resetPromptTemplate(){
 }
 
 function _saraPartStructure(parts){
-  if(parts===1) return '- Single video: hook \u2192 escalation \u2192 twist \u2192 payoff, all in one part. The ending must land completely \u2014 no cliffhanger, no "part 2" reference anywhere';
-  if(parts===3) return '- Part 1: normal \u2192 first crack shows \u2192 hard cut at the moment everything changes\n- Part 2: escalation \u2192 the narrator acts \u2192 cut at the point of no return\n- Part 3: fallout \u2192 confrontation \u2192 payoff that recontextualises part 1\n- Every part except the last ends mid-consequence, at the highest-tension sentence \u2014 never wrap a part up neatly\n- Parts 2 and 3 open with one short line of momentum, never a recap paragraph';
-  return '- Part 1: normal \u2192 something small feels off \u2192 hard cut at the moment everything changes\n- Part 2: fallout \u2192 confrontation or discovery \u2192 payoff that recontextualises part 1\n- Part 1 must end mid-consequence, at the highest-tension sentence \u2014 never wrap it up neatly\n- Part 2 opens with one short line of momentum, never a recap paragraph';
+  if(parts===1) return '- Single video: hook → escalation → twist → payoff, all in one part. The ending must land completely — no cliffhanger, no "part 2" reference anywhere';
+  if(parts===3) return '- Part 1: normal → first crack shows → hard cut at the moment everything changes\n- Part 2: escalation → the narrator acts → cut at the point of no return\n- Part 3: fallout → confrontation → payoff that recontextualises part 1\n- Every part except the last ends mid-consequence, at the highest-tension sentence — never wrap a part up neatly\n- Parts 2 and 3 open with one short line of momentum, never a recap paragraph';
+  return '- Part 1: normal → something small feels off → hard cut at the moment everything changes\n- Part 2: fallout → confrontation or discovery → payoff that recontextualises part 1\n- Part 1 must end mid-consequence, at the highest-tension sentence — never wrap it up neatly\n- Part 2 opens with one short line of momentum, never a recap paragraph';
 }
 
 function _saraJsonShape(parts){
@@ -268,12 +243,12 @@ function _saraJsonShape(parts){
     const last=i===parts;
     items.push(`    {
       "part_number": ${i},
-      "text": "Part ${i} text \u2014 MUST be 200 to 250 words, first person, past tense",
+      "text": "Part ${i} text — MUST be 200 to 250 words, first person, past tense",
       "cliffhanger_hint": ${last?'""':`"one sentence: what the viewer absolutely needs to see in part ${i+1}"`},
       "social": {
-        "video_title": "Punchy title${parts>1?` \u2014 include Part ${i}/${parts}`:''}, max 80 chars",
-        "description": "2\u20133 sentences teasing ${last?'the conclusion':'the story'} emotionally. Never spoil the ending. Close with a question or CTA.",
-        "hashtags": "#storytime #reddit #fyp #foryou \u2014 add 3\u20134 topic-specific tags"
+        "video_title": "Punchy title${parts>1?` — include Part ${i}/${parts}`:''}, max 80 chars",
+        "description": "2–3 sentences teasing ${last?'the conclusion':'the story'} emotionally. Never spoil the ending. Close with a question or CTA.",
+        "hashtags": "#storytime #reddit #fyp #foryou — add 3–4 topic-specific tags"
       }
     }`);
   }
