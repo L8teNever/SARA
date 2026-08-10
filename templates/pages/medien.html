@@ -1,34 +1,23 @@
 <section class="page" data-tab="medien">
 
-  <!-- Main -->
+  <!-- Main: nur Upload-Status -->
   <div id="medien-main">
     <div class="wrap">
-
-      <div class="page-hdr">
-        <div class="page-hdr__title">Hintergrundvideos &amp; YouTube</div>
-        <div class="page-hdr__sub">Verwalte ASMR-Clips und die YouTube-Automatisierungsintervalle</div>
+      <div class="lbl" style="margin-top:4px"><span class="mi">upload</span> YouTube Upload-Warteschlange</div>
+      <div id="yt-queue-list">
+        <div class="empty" style="padding:28px 0"><span class="mi">cloud_upload</span><span class="empty__ttl">Noch keine Uploads</span></div>
       </div>
+    </div>
+  </div>
 
-      <div class="card card--hero" style="cursor:pointer;display:flex;align-items:center;gap:16px" onclick="openBackgroundsView()">
-        <div style="flex:1;min-width:0">
-          <div class="flabel" style="color:rgba(255,255,255,.65)">ASMR &amp; Gameplay Bibliothek</div>
-          <div style="font-size:18px;font-weight:800;margin-top:6px">Hintergrundvideos verwalten</div>
-          <div style="font-size:12.5px;opacity:.75;margin-top:4px"><span id="medien-bg-navcount">0</span> Clips hochgeladen · Zufällige Rotation aktiv</div>
-        </div>
-        <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <span class="mi">chevron_right</span>
-        </div>
-      </div>
+  <!-- Upload-Einstellungen -->
+  <div id="medien-settings" style="display:none">
+    <div class="wrap">
+      <button class="btn btn--tonal btn--sm" onclick="closeMedienSettings()" style="margin-bottom:18px">
+        <span class="mi">arrow_back</span> Zurück
+      </button>
 
-      <div class="lbl" style="margin-top:28px"><span class="mi">account_circle</span> Verbundene Google-Konten</div>
-      <div id="yt-accounts-list">
-        <div style="display:flex;justify-content:center;padding:20px"><div class="spinner"></div></div>
-      </div>
-      <a class="btn btn--outlined btn--lg" href="/auth/youtube/login" style="margin-top:4px;margin-bottom:8px">
-        <span class="mi">add_circle</span> Weiteres Google-Konto verbinden
-      </a>
-
-      <div class="lbl"><span class="mi">tune</span> YouTube Upload-Einstellungen</div>
+      <div class="lbl" style="margin-top:0"><span class="mi">tune</span> YouTube Upload-Einstellungen</div>
       <div class="card">
         <div class="li" style="cursor:default;margin-bottom:14px" onclick="event.stopPropagation()">
           <div class="li__lead"><span class="mi" id="yt-auto-ico" style="color:var(--cosv)">toggle_off</span></div>
@@ -57,31 +46,37 @@
           </select>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Verbundene Google-Konten -->
+  <div id="medien-accounts" style="display:none">
+    <div class="wrap">
+      <button class="btn btn--tonal btn--sm" onclick="closeMedienAccounts()" style="margin-bottom:18px">
+        <span class="mi">arrow_back</span> Zurück
+      </button>
+
+      <div class="lbl" style="margin-top:0"><span class="mi">account_circle</span> Verbundene Google-Konten</div>
+      <div id="yt-accounts-list">
+        <div style="display:flex;justify-content:center;padding:20px"><div class="spinner"></div></div>
+      </div>
+      <a class="btn btn--outlined btn--lg" href="/auth/youtube/login" style="margin-top:4px;margin-bottom:8px">
+        <span class="mi">add_circle</span> Weiteres Google-Konto verbinden
+      </a>
 
       <div class="tbox tbox--surface">
         <span class="mi" style="flex-shrink:0">info</span>
         <span style="font-size:12.5px;line-height:1.5">Beim Verbinden öffnet sich die Google-Anmeldung. Es wird nur Zugriff zum Hochladen von Videos sowie Lesen öffentlicher Kanaldaten angefragt.</span>
       </div>
-
-      <div class="lbl" style="margin-top:28px"><span class="mi">upload</span> Upload-Warteschlange</div>
-      <div id="yt-queue-list">
-        <div class="empty" style="padding:28px 0"><span class="mi">cloud_upload</span><span class="empty__ttl">Noch keine Uploads</span></div>
-      </div>
-
     </div>
   </div>
 
-  <!-- Hintergrundvideos (Detail) -->
+  <!-- Hintergrundvideos -->
   <div id="medien-backgrounds" style="display:none">
     <div class="wrap">
       <button class="btn btn--tonal btn--sm" onclick="closeBackgroundsView()" style="margin-bottom:18px">
         <span class="mi">arrow_back</span> Zurück
       </button>
-
-      <div class="page-hdr">
-        <div class="page-hdr__title">Hintergrundvideos</div>
-        <div class="page-hdr__sub">Videos hochladen, die als Hintergrund für Stories verwendet werden</div>
-      </div>
 
       <div class="dropzone" id="upload-zone"
         onclick="document.getElementById('file-input').click()"
@@ -117,16 +112,18 @@
 <script>
 let _ytAutoActive = true;
 
-function openBackgroundsView(push=true){
-  document.getElementById('medien-main').style.display='none';
-  document.getElementById('medien-backgrounds').style.display='block';
-  if(push) history.pushState({tab:'medien',view:'backgrounds'},'','/medien/hintergrund');
+function _medienShow(id,push,url){
+  ['medien-main','medien-settings','medien-accounts','medien-backgrounds'].forEach(v=>{
+    document.getElementById(v).style.display = (v===id) ? 'block' : 'none';
+  });
+  if(push) history.pushState({tab:'medien',view:id},'',url);
 }
-function closeBackgroundsView(push=true){
-  document.getElementById('medien-backgrounds').style.display='none';
-  document.getElementById('medien-main').style.display='block';
-  if(push) history.pushState({tab:'medien'},'','/medien');
-}
+function openMedienSettings(push=true){ _medienShow('medien-settings',push,'/medien/einstellungen'); }
+function closeMedienSettings(push=true){ _medienShow('medien-main',push,'/medien'); }
+function openMedienAccounts(push=true){ _medienShow('medien-accounts',push,'/medien/konten'); }
+function closeMedienAccounts(push=true){ _medienShow('medien-main',push,'/medien'); }
+function openBackgroundsView(push=true){ _medienShow('medien-backgrounds',push,'/medien/hintergrund'); }
+function closeBackgroundsView(push=true){ _medienShow('medien-main',push,'/medien'); }
 
 async function loadYoutubeChannels(){
   await Promise.all([loadYtAccounts(), loadYtSettings(), loadYtQueue()]);
@@ -260,8 +257,6 @@ async function loadBackgrounds(){
   try{
     const bgs=await fetch('/api/backgrounds').then(r=>r.json());
     document.getElementById('bg-count').textContent=bgs.length;
-    const navCount=document.getElementById('medien-bg-navcount');
-    if(navCount) navCount.textContent=bgs.length;
     if(!bgs.length){
       grid.innerHTML='<div class="empty" style="grid-column:1/-1;padding:28px 0"><span class="mi">video_library</span><span class="empty__ttl">Keine Hintergrundvideos</span></div>';
       return;

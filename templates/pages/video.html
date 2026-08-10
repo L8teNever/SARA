@@ -4,16 +4,6 @@
   <div id="video-main">
     <div class="wrap">
 
-      <div class="page-hdr" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
-        <div>
-          <div class="page-hdr__title">Video produzieren</div>
-          <div class="page-hdr__sub">Status der automatischen Produktion auf einen Blick</div>
-        </div>
-        <button class="btn btn--icon" style="background:var(--cs1);flex-shrink:0" onclick="openVideoSettings()" title="Einstellungen">
-          <span class="mi">tune</span>
-        </button>
-      </div>
-
       <!-- Production status -->
       <div class="tbox" id="prod-status-bar">
         <span class="mi" id="prod-status-icon" style="font-size:22px">check_circle</span>
@@ -27,7 +17,7 @@
       </div>
 
       <!-- Queue -->
-      <div class="lbl" style="margin-top:24px">
+      <div class="lbl" style="margin-top:16px">
         <span class="mi">bolt</span> Aktuell in Produktion &amp; Warteschlange
         <span id="sse-status" style="font-size:11px;text-transform:none;letter-spacing:0;font-weight:400;opacity:.7;margin-left:-4px"></span>
       </div>
@@ -46,13 +36,8 @@
         <span class="mi">arrow_back</span> Zurück
       </button>
 
-      <div class="page-hdr">
-        <div class="page-hdr__title">Produktions-Einstellungen</div>
-        <div class="page-hdr__sub">Story manuell auswählen und Produktionsintervall festlegen</div>
-      </div>
-
       <!-- Interval -->
-      <div class="card--el" style="margin-bottom:20px">
+      <div class="card--el">
         <div class="field" style="margin-bottom:0">
           <label class="flabel" for="prod-interval">
             <span class="mi" style="font-size:13px;vertical-align:-2px;margin-right:2px">timer</span>Pause zwischen Videos (Minuten)
@@ -64,20 +49,6 @@
             </button>
           </div>
         </div>
-      </div>
-
-      <!-- Story list -->
-      <div class="lbl" style="margin-top:0"><span class="mi">auto_stories</span> Verfügbare Stories</div>
-      <div id="story-list" class="story-select-grid">
-        <div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>
-      </div>
-
-      <!-- Create button -->
-      <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
-        <button class="btn btn--filled btn--lg" id="btn-create-video" onclick="createVideo()" disabled>
-          <span class="mi">video_settings</span> <span id="btn-create-video-text">Video-Produktion starten</span>
-        </button>
-        <div id="selected-story-info" style="font-size:12px;color:var(--cg);text-align:center;min-height:16px;font-weight:600"></div>
       </div>
 
     </div>
@@ -95,132 +66,6 @@ function closeVideoSettings(push=true){
   document.getElementById('video-settings').style.display='none';
   document.getElementById('video-main').style.display='block';
   if(push) history.pushState({tab:'video'},'','/video');
-}
-
-async function loadStoryList(){
-  const c=document.getElementById('story-list');
-  try{
-    const stories=await fetch('/api/stories').then(r=>r.json());
-    if(!stories.length){
-      c.innerHTML='<div class="empty"><span class="mi">auto_stories</span><span class="empty__ttl">Keine Stories</span><span class="empty__sub">Importiere zuerst eine Story</span></div>';
-      return;
-    }
-    const done  =stories.filter(s=>s.total_parts>0&&s.video_done_parts>=s.total_parts);
-    const queued=stories.filter(s=>s.video_done_parts<s.total_parts&&s.video_queue_parts>0);
-    const ready =stories.filter(s=>s.video_done_parts<s.total_parts&&s.video_queue_parts===0);
-
-    let html = '';
-
-    function getStoryItem(s){
-      const isDone=s.total_parts>0&&s.video_done_parts>=s.total_parts;
-      const isQ=s.video_queue_parts>0;
-      let dot=isDone?'sdot sdot--ok':isQ?'sdot sdot--on':'sdot';
-      let trail='';
-      if(isDone) trail='<span class="chip chip--done">Fertig</span>';
-      else if(isQ) trail=`<span class="chip chip--proc">${s.video_queue_parts} aktiv</span>`;
-      else if(s.video_done_parts>0) trail=`<span class="chip chip--pend">${s.video_done_parts}/${s.total_parts}</span>`;
-
-      return `
-        <div class="li${s.id===selectedStoryId?' is-sel':''}${isDone?' is-dim':''}" data-id="${s.id}" data-title="${escHtml(s.title)}" data-code="${s.code}" onclick="selectStory(this)">
-          <div class="li__lead"><div class="${dot}"></div></div>
-          <div class="li__body">
-            <div class="li__head">
-              <div class="li__title">${escHtml(s.title)}</div>
-              <span class="badge">${s.code}</span>
-            </div>
-            <div class="li__sub">${s.total_parts} Teile · ${formatDate(s.created_at)}</div>
-          </div>
-          <div class="li__trail">
-            ${trail}
-            <button class="btn btn--icon" data-id="${s.id}" data-title="${escHtml(s.title)}" style="color:var(--ce);opacity:.7" onclick="event.stopPropagation();deleteStoryFromVideo(+this.dataset.id,this.dataset.title,this)">
-              <span class="mi">delete</span>
-            </button>
-          </div>
-        </div>`;
-    }
-
-    ready.forEach(s=>html += getStoryItem(s));
-
-    if(queued.length){
-      html += `<div class="lbl lbl--sm">Wird produziert</div>`;
-      queued.forEach(s=>html += getStoryItem(s));
-    }
-    if(done.length){
-      html += `<div class="lbl lbl--sm">Fertig</div>`;
-      done.forEach(s=>html += getStoryItem(s));
-    }
-
-    c.innerHTML = html;
-
-    if(pendingSelectStoryId){
-      const s=stories.find(x=>x.id===pendingSelectStoryId);
-      if(s) selectStoryById(s.id,s.title,s.code);
-      pendingSelectStoryId=null;
-      openVideoSettings(false);
-    } else if(selectedStoryId) {
-      selectStoryById(selectedStoryId);
-    }
-  }catch(e){c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
-}
-
-function selectStory(el){
-  const id = parseInt(el.dataset.id);
-  const title = el.dataset.title;
-  const code = el.dataset.code;
-  selectStoryById(id, title, code);
-}
-
-function selectStoryById(id, title='', code=''){
-  selectedStoryId=id;
-  document.querySelectorAll('.li[data-id]').forEach(el=>{
-    const isSel = parseInt(el.dataset.id)===id;
-    el.classList.toggle('is-sel', isSel);
-    if(isSel && !title) {
-        title = el.dataset.title;
-    }
-  });
-  document.getElementById('btn-create-video').disabled=false;
-  document.getElementById('selected-story-info').textContent=title?`"${title}" ausgewählt`:'';
-}
-
-async function createVideo(){
-  if(!selectedStoryId) return;
-  const btn = document.getElementById('btn-create-video');
-
-  btn.disabled = true;
-  const oldHtml = btn.innerHTML;
-  btn.innerHTML = '<div class="spinner spinner--sm" style="margin-right:8px;border-width:2px;width:18px;height:18px"></div> Verarbeite...';
-
-  try{
-    const res=await fetch('/api/create-video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_id:selectedStoryId})});
-    const d=await res.json();
-    if(d.error){showSnack(d.error,'error');return}
-    showSnack(`${d.job_ids.length} Teil(e) zur Warteschlange hinzugefügt!`,'success');
-    loadQueue();
-    setTimeout(loadStoryList, 500);
-  }catch(e){
-    showSnack('Fehler: '+e.message,'error');
-  } finally {
-    btn.innerHTML = oldHtml;
-    btn.disabled = false;
-  }
-}
-
-async function deleteStoryFromVideo(id,title,btn){
-  if(!await showConfirm('Story löschen',`"${title}" und alle zugehörigen Daten löschen?`,{confirmLabel:'Löschen',destructive:true}))return;
-  if(btn){btn.disabled=true;btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px"></div>'}
-  try{
-    const res=await fetch(`/api/stories/${id}`,{method:'DELETE'});
-    const d=await res.json();
-    if(d.error){showSnack(d.error,'error');if(btn){btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>'}return}
-    showSnack('Story gelöscht.','success');
-    if(selectedStoryId===id){
-      selectedStoryId=null;
-      document.getElementById('btn-create-video').disabled=true;
-      document.getElementById('selected-story-info').textContent='';
-    }
-    loadStoryList();
-  }catch(e){showSnack('Fehler: '+e.message,'error');if(btn){btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>'}}
 }
 
 async function loadProdSettings(){

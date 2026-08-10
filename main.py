@@ -1491,6 +1491,31 @@ def api_queue_stats():
     return jsonify({row["status"]: row["count"] for row in stats})
 
 
+def _avg_job_duration_seconds(conn, limit: int = 20) -> float:
+    """Durchschnittliche Produktionsdauer der letzten `limit` fertigen Jobs --
+    Grundlage fuer die ETA-Anzeige im Video-Tab. Nur die juengsten Jobs
+    zaehlen (statt aller je), damit sich die Schaetzung automatisch an
+    aktuelle Produktionsgeschwindigkeit anpasst ("soll immer genauer werden")."""
+    row = conn.execute(
+        """SELECT AVG((julianday(finished_at) - julianday(started_at)) * 86400.0) AS avg_sec,
+                  COUNT(*) AS n
+           FROM (
+               SELECT started_at, finished_at FROM queue
+               WHERE status='done' AND started_at IS NOT NULL AND finished_at IS NOT NULL
+               ORDER BY id DESC LIMIT ?
+           )""",
+        (limit,),
+    ).fetchone()
+    return float(row["avg_sec"]) if row and row["avg_sec"] else 0.0
+
+
+@app.route("/api/queue/avg-duration", methods=["GET"])
+def api_queue_avg_duration():
+    with db_session(write=False) as conn:
+        avg_sec = _avg_job_duration_seconds(conn)
+    return jsonify({"avg_duration_seconds": avg_sec})
+
+
 @app.route("/api/queue/live")
 def api_queue_live():
     """SSE stream: sends current queue state every 1.5 s."""
@@ -1511,9 +1536,11 @@ def api_queue_live():
                            JOIN stories s ON s.id = sp.story_id
                            ORDER BY q.id DESC LIMIT 100"""
                     ).fetchall()
+                    avg_duration = _avg_job_duration_seconds(conn)
                     payload = json.dumps({
                         "jobs": [dict(j) for j in jobs],
                         "prod_active": prod_active,
+                        "avg_duration_seconds": avg_duration,
                     })
                 finally:
                     conn.close()

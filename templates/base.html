@@ -62,8 +62,14 @@ input,textarea,select{font:inherit;color:inherit}
   border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:12px;box-shadow:var(--e2)}
 .ghead__logo{font-size:17px;font-weight:800;letter-spacing:.04em}
 .ghead__space{flex:1}
-.ghead__badge{display:flex;align-items:center;gap:8px;background:rgba(109,213,140,.14);color:var(--cg);padding:8px 16px;border-radius:var(--rf);font-size:12.5px;font-weight:600;border:1px solid rgba(109,213,140,.22)}
+.ghead__actions{flex:1;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.ghead__badge{display:flex;align-items:center;gap:8px;background:rgba(109,213,140,.14);color:var(--cg);padding:8px 16px;border-radius:var(--rf);font-size:12.5px;font-weight:600;border:1px solid rgba(109,213,140,.22);flex-shrink:0}
 .ghead__badge.is-idle{background:var(--cs2);color:var(--cosv);border-color:transparent}
+.ghead-search{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:var(--cs2);border-radius:var(--rf);padding:0 14px;height:38px}
+.ghead-search .mi{font-size:18px;color:var(--cosv);flex-shrink:0}
+.ghead-search input{flex:1;min-width:0;background:none;border:none;outline:none;color:var(--cos);font-size:14px;height:100%}
+.ghead-search input::placeholder{color:var(--co)}
+.ghead__actions .btn--icon{background:var(--cs2)}
 
 /* ── Shell row (sidebar + content) ──────────────────────── */
 /* padding-top raeumt Platz fuer den fixierten Header frei; Inhalt selbst
@@ -382,7 +388,7 @@ input,textarea,select{font:inherit;color:inherit}
 <div class="appshell">
   <header class="ghead">
     <span class="ghead__logo">SARA</span>
-    <div class="ghead__space"></div>
+    <div class="ghead__actions" id="ghead-actions"></div>
     <div class="ghead__badge is-idle" id="header-qbadge">
       <div class="qdot" id="top-qdot"></div>
       <span id="top-qtxt">Bereit</span>
@@ -470,12 +476,11 @@ input,textarea,select{font:inherit;color:inherit}
 <script>
 /* ── State ───────────────────────────────────────────────── */
 let currentTab = 'story';
-let selectedStoryId = null;
-let pendingSelectStoryId = null;
 let pendingLibraryCode = null;
 let _sseSource = null;
 let _prodActive = true;
 let _prevProcessingCount = 0;
+let _avgJobDuration = 0;
 
 /* ── Utils ───────────────────────────────────────────────── */
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
@@ -514,13 +519,28 @@ function switchTab(name, push=true){
     el.classList.toggle('is-active', el.dataset.tab===name);
   });
   if(push) history.pushState({tab:name},'',TAB_URL[name]||'/');
-  if(name==='story'    && typeof loadRecentStories==='function') loadRecentStories();
-  if(name==='video'    && typeof loadStoryList==='function'){loadStoryList();loadQueue();if(typeof loadProdSettings==='function')loadProdSettings();}
+  updateGheadActions(name);
+  if(name==='video'    && typeof loadQueue==='function'){loadQueue();if(typeof loadProdSettings==='function')loadProdSettings();}
   if(name==='library'  && typeof loadLibrary==='function') loadLibrary();
   if(name==='statistik'&& typeof loadStatistik==='function') loadStatistik();
-  if(name==='medien'){
-    if(typeof loadYoutubeChannels==='function') loadYoutubeChannels();
-    if(typeof loadBackgrounds==='function') loadBackgrounds();
+  if(name==='medien'   && typeof loadYoutubeChannels==='function') loadYoutubeChannels();
+}
+
+/* ── Dynamische Header-Aktionen pro Tab ──────────────────── */
+function updateGheadActions(name){
+  const el=document.getElementById('ghead-actions');
+  if(!el) return;
+  if(name==='video'){
+    el.innerHTML='<button class="btn btn--icon" onclick="openVideoSettings()" title="Einstellungen"><span class="mi">tune</span></button>';
+  }else if(name==='library'){
+    el.innerHTML='<div class="ghead-search"><span class="mi">search</span><input id="lib-search" type="text" placeholder="Story suchen…" oninput="filterLibrary()"></div>';
+  }else if(name==='medien'){
+    el.innerHTML=`
+      <button class="btn btn--icon" onclick="openMedienSettings()" title="Upload-Einstellungen"><span class="mi">tune</span></button>
+      <button class="btn btn--icon" onclick="openMedienAccounts()" title="Google-Konten"><span class="mi">account_circle</span></button>
+      <button class="btn btn--icon" onclick="openBackgroundsView()" title="Hintergrundvideos"><span class="mi">video_file</span></button>`;
+  }else{
+    el.innerHTML='';
   }
 }
 
@@ -544,10 +564,9 @@ function startSSE(){
       if(typeof d.prod_active!=='undefined'){_prodActive=d.prod_active;if(typeof updateProdBtn==='function')updateProdBtn()}
       const nowProc=d.stats?.processing??(d.jobs?.filter(j=>j.status==='processing').length||0);
       if(_prevProcessingCount>0&&nowProc<_prevProcessingCount){
-        if(currentTab==='video'&&typeof loadStoryList==='function') loadStoryList();
-        if(currentTab==='story'&&typeof loadRecentStories==='function') loadRecentStories();
         if(currentTab==='library'&&typeof loadLibrary==='function') loadLibrary();
       }
+      if(typeof d.avg_duration_seconds==='number') _avgJobDuration=d.avg_duration_seconds;
       _prevProcessingCount=nowProc;
     }catch(_){}
   };
@@ -561,9 +580,46 @@ function startSSE(){
 
 async function loadQueue(){
   try{
-    const [jobs,stats]=await Promise.all([fetch('/api/queue').then(r=>r.json()),fetch('/api/queue/stats').then(r=>r.json())]);
+    const [jobs,stats,avg]=await Promise.all([
+      fetch('/api/queue').then(r=>r.json()),
+      fetch('/api/queue/stats').then(r=>r.json()),
+      fetch('/api/queue/avg-duration').then(r=>r.json()).catch(()=>({avg_duration_seconds:0})),
+    ]);
+    if(typeof avg.avg_duration_seconds==='number') _avgJobDuration=avg.avg_duration_seconds;
     renderQueueStats(stats);renderQueueList(jobs);updateQBadge(stats);
   }catch(_){}
+}
+
+/* ── ETA-Schaetzung ──────────────────────────────────────────
+   Lernt aus den zuletzt fertiggestellten Jobs (Server liefert den
+   gleitenden Durchschnitt in _avgJobDuration) und rechnet daraus pro
+   Job in der Warteschlange eine ungefaehre Restzeit: der laufende Job
+   bekommt (Durchschnitt - bereits vergangene Zeit), jeder wartende Job
+   danach kommt in FIFO-Reihenfolge (aufsteigende ID) dazu. */
+function _formatEta(seconds){
+  if(seconds==null) return '';
+  seconds=Math.max(0,Math.round(seconds));
+  if(seconds<45) return 'gleich fertig';
+  const m=Math.floor(seconds/60), s=seconds%60;
+  return m>0?`noch ca. ${m}m ${s}s`:`noch ca. ${s}s`;
+}
+function _computeEtas(activeJobs){
+  const etaById={};
+  if(!_avgJobDuration) return etaById;
+  const fifo=[...activeJobs].sort((a,b)=>a.id-b.id);
+  let cum=0;
+  fifo.forEach(j=>{
+    if(j.status==='processing'){
+      const elapsed=j.started_at?(Date.now()-_parseDbDate(j.started_at).getTime())/1000:0;
+      const remaining=Math.max(4,_avgJobDuration-elapsed);
+      etaById[j.id]=remaining;
+      cum=remaining;
+    }else{
+      cum+=_avgJobDuration;
+      etaById[j.id]=cum;
+    }
+  });
+  return etaById;
 }
 
 function renderQueueStats(stats){
@@ -582,12 +638,16 @@ function renderQueueList(jobs){
   }
   const activeJobs = jobs.filter(j=>j.status==='processing'||j.status==='pending');
   const doneJobs   = jobs.filter(j=>j.status==='done'||j.status==='error');
+  const etaById = _computeEtas(activeJobs);
 
   function getJobHtml(job){
     const isP=job.status==='processing';
+    const isPend=job.status==='pending';
     const pct=job.progress_pct||0;
     const lbl=job.progress_label||'';
     const ico={pending:'hourglass_empty',processing:'settings',done:'check_circle',error:'error'};
+    const eta=etaById[job.id];
+    const etaTxt=(isP||isPend)&&eta!=null?_formatEta(eta):'';
     return `
       <div class="jcard${isP?' jcard--on':''}" data-jid="${job.id}">
         <div class="jcard__hdr">
@@ -596,7 +656,7 @@ function renderQueueList(jobs){
           <span class="badge">${job.code}</span>
           <span class="chip chip--${job.status}">${statusLabel(job.status)}</span>
         </div>
-        <div class="jcard__meta">${formatDate(job.created_at)}${job.started_at?` · ⏱ ${getDuration(job.started_at,job.finished_at)}`:''}</div>
+        <div class="jcard__meta">${formatDate(job.created_at)}${job.started_at?` · ⏱ ${getDuration(job.started_at,job.finished_at)}`:''}${etaTxt?` · <span style="color:var(--cp)">${etaTxt}</span>`:''}</div>
         ${isP?`<div class="jcard__bar"><div class="jcard__track"><div class="jcard__fill" style="width:${pct}%"></div></div><span class="jcard__pct">${pct}%</span></div>${lbl?`<div class="jcard__plbl">${escHtml(lbl)}</div>`:''}`:
           (job.status==='done'&&lbl)?`<div class="jcard__plbl" style="color:var(--cg)">${escHtml(lbl)}</div>`:''}
         ${job.status==='error'?`<div class="jcard__err">${escHtml(job.error_msg||'Fehler')}</div>`:''}
@@ -695,7 +755,7 @@ function closeModal(){
   const p=location.pathname;
   let tab='story';
   let pendingVideoSettings=false;
-  let pendingMedienBackgrounds=false;
+  let pendingMedienView=null;
   if(p.startsWith('/video')){
     tab='video';
     if(p.startsWith('/video/einstellungen')) pendingVideoSettings=true;
@@ -708,12 +768,16 @@ function closeModal(){
   else if(p.startsWith('/statistik')) tab='statistik';
   else if(p.startsWith('/medien') || p.startsWith('/upload') || p.startsWith('/channels')){
     tab='medien';
-    if(p.startsWith('/medien/hintergrund')) pendingMedienBackgrounds=true;
+    if(p.startsWith('/medien/hintergrund')) pendingMedienView='backgrounds';
+    else if(p.startsWith('/medien/einstellungen')) pendingMedienView='settings';
+    else if(p.startsWith('/medien/konten')) pendingMedienView='accounts';
   }
   window.addEventListener('popstate',e=>switchTab(e.state?.tab||'story',false));
   switchTab(tab,false);
   if(pendingVideoSettings && typeof openVideoSettings==='function') openVideoSettings(false);
-  if(pendingMedienBackgrounds && typeof openBackgroundsView==='function') openBackgroundsView(false);
+  if(pendingMedienView==='backgrounds' && typeof openBackgroundsView==='function') openBackgroundsView(false);
+  if(pendingMedienView==='settings' && typeof openMedienSettings==='function') openMedienSettings(false);
+  if(pendingMedienView==='accounts' && typeof openMedienAccounts==='function') openMedienAccounts(false);
   startSSE();
 })();
 </script>
