@@ -1314,6 +1314,7 @@ def start_youtube_worker():
 
 @app.route("/")
 @app.route("/story")
+@app.route("/story/<path:rest4>")
 @app.route("/video")
 @app.route("/video/<path:rest3>")
 @app.route("/library")
@@ -1323,7 +1324,7 @@ def start_youtube_worker():
 @app.route("/medien/<path:rest2>")
 @app.route("/upload")
 @app.route("/channels")
-def index(rest=None, rest2=None, rest3=None):
+def index(rest=None, rest2=None, rest3=None, rest4=None):
     return render_template("index.html")
 
 

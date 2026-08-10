@@ -60,11 +60,10 @@ input,textarea,select{font:inherit;color:inherit}
 .ghead{position:fixed;top:14px;left:16px;right:16px;z-index:40;padding:10px 10px 10px 22px;border-radius:var(--rf);
   background:rgba(32,34,44,.72);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);
   border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:12px;box-shadow:var(--e2)}
-.ghead__logo{font-size:17px;font-weight:800;letter-spacing:.04em}
-.ghead__space{flex:1}
+.ghead__logo{font-size:17px;font-weight:800;letter-spacing:.04em;flex-shrink:0}
+.ghead__title{flex:1;min-width:0;font-size:15.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ghead__back{flex-shrink:0;background:var(--cs2)}
 .ghead__actions{flex:1;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:8px}
-.ghead__badge{display:flex;align-items:center;gap:8px;background:rgba(109,213,140,.14);color:var(--cg);padding:8px 16px;border-radius:var(--rf);font-size:12.5px;font-weight:600;border:1px solid rgba(109,213,140,.22);flex-shrink:0}
-.ghead__badge.is-idle{background:var(--cs2);color:var(--cosv);border-color:transparent}
 .ghead-search{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:var(--cs2);border-radius:var(--rf);padding:0 14px;height:38px}
 .ghead-search .mi{font-size:18px;color:var(--cosv);flex-shrink:0}
 .ghead-search input{flex:1;min-width:0;background:none;border:none;outline:none;color:var(--cos);font-size:14px;height:100%}
@@ -364,7 +363,7 @@ input,textarea,select{font:inherit;color:inherit}
   .vcard__thumb{width:100%;aspect-ratio:16/9}
   .page-hdr__title{font-size:19px}
   .ghead__logo{font-size:15px}
-  .ghead__badge{padding:7px 13px;font-size:11.5px}
+  .ghead__title{font-size:14.5px}
 }
 /* Kurze Viewports (z.B. Handy im Querformat) -- weniger vertikaler
    Leerraum in Header/Nav, damit fuer den eigentlichen Inhalt mehr
@@ -387,12 +386,12 @@ input,textarea,select{font:inherit;color:inherit}
 
 <div class="appshell">
   <header class="ghead">
-    <span class="ghead__logo">SARA</span>
+    <button class="btn btn--icon ghead__back" id="ghead-back" onclick="gheadBack()" style="display:none">
+      <span class="mi">arrow_back</span>
+    </button>
+    <span class="ghead__logo" id="ghead-logo">SARA</span>
+    <span class="ghead__title" id="ghead-title" style="display:none"></span>
     <div class="ghead__actions" id="ghead-actions"></div>
-    <div class="ghead__badge is-idle" id="header-qbadge">
-      <div class="qdot" id="top-qdot"></div>
-      <span id="top-qtxt">Bereit</span>
-    </div>
   </header>
 
   <div class="shell">
@@ -512,6 +511,7 @@ const TAB_URL={story:'/',video:'/video',library:'/library',statistik:'/statistik
 
 function switchTab(name, push=true){
   currentTab=name;
+  exitSubpage();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('is-active'));
   const pg=document.querySelector(`.page[data-tab="${name}"]`);
   if(pg) pg.classList.add('is-active');
@@ -519,7 +519,6 @@ function switchTab(name, push=true){
     el.classList.toggle('is-active', el.dataset.tab===name);
   });
   if(push) history.pushState({tab:name},'',TAB_URL[name]||'/');
-  updateGheadActions(name);
   if(name==='video'    && typeof loadQueue==='function'){loadQueue();if(typeof loadProdSettings==='function')loadProdSettings();}
   if(name==='library'  && typeof loadLibrary==='function') loadLibrary();
   if(name==='statistik'&& typeof loadStatistik==='function') loadStatistik();
@@ -530,10 +529,12 @@ function switchTab(name, push=true){
 function updateGheadActions(name){
   const el=document.getElementById('ghead-actions');
   if(!el) return;
-  if(name==='video'){
+  if(name==='story'){
+    el.innerHTML='<button class="btn btn--icon" onclick="openStorySettings()" title="Einstellungen"><span class="mi">tune</span></button>';
+  }else if(name==='video'){
     el.innerHTML='<button class="btn btn--icon" onclick="openVideoSettings()" title="Einstellungen"><span class="mi">tune</span></button>';
   }else if(name==='library'){
-    el.innerHTML='<div class="ghead-search"><span class="mi">search</span><input id="lib-search" type="text" placeholder="Story suchen…" oninput="filterLibrary()"></div>';
+    el.innerHTML='<button class="btn btn--icon" id="lib-search-toggle" onclick="expandLibSearch()" title="Suchen"><span class="mi">search</span></button>';
   }else if(name==='medien'){
     el.innerHTML=`
       <button class="btn btn--icon" onclick="openMedienSettings()" title="Upload-Einstellungen"><span class="mi">tune</span></button>
@@ -542,6 +543,33 @@ function updateGheadActions(name){
   }else{
     el.innerHTML='';
   }
+}
+
+/* ── Unterseiten-Header: Zurueck-Button + Titel statt Logo/Aktionen ── */
+let _subpageCloser = null;
+function enterSubpage(title, closer){
+  _subpageCloser = closer || null;
+  const logo=document.getElementById('ghead-logo');
+  const back=document.getElementById('ghead-back');
+  const titleEl=document.getElementById('ghead-title');
+  const actions=document.getElementById('ghead-actions');
+  if(logo) logo.style.display='none';
+  if(back) back.style.display='';
+  if(titleEl){ titleEl.textContent=title||''; titleEl.style.display=''; }
+  if(actions) actions.innerHTML='';
+}
+function exitSubpage(){
+  _subpageCloser = null;
+  const logo=document.getElementById('ghead-logo');
+  const back=document.getElementById('ghead-back');
+  const titleEl=document.getElementById('ghead-title');
+  if(logo) logo.style.display='';
+  if(back) back.style.display='none';
+  if(titleEl) titleEl.style.display='none';
+  updateGheadActions(currentTab);
+}
+function gheadBack(){
+  if(_subpageCloser){ const c=_subpageCloser; c(); }
 }
 
 /* ── SSE / Queue ─────────────────────────────────────────── */
@@ -705,10 +733,8 @@ function updateQBadge(stats){
   let txt='Bereit',live=false;
   if(proc>0){txt=`${proc} läuft`;live=true}
   else if(pend>0){txt=`${pend} wartend`;live=true}
-  ['rail-qdot','top-qdot'].forEach(id=>{const d=document.getElementById(id);if(d)d.className='qdot'+(live?' live':'')});
-  ['rail-qtxt','top-qtxt'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=txt});
-  const badge=document.getElementById('header-qbadge');
-  if(badge) badge.classList.toggle('is-idle', !live);
+  const d=document.getElementById('rail-qdot'); if(d) d.className='qdot'+(live?' live':'');
+  const el=document.getElementById('rail-qtxt'); if(el) el.textContent=txt;
 }
 
 async function cancelJob(id){try{const r=await fetch(`/api/queue/${id}/cancel`,{method:'POST'});const j=await r.json();showSnack(j.success?'Abgebrochen':j.error||'Fehler',j.success?'success':'error');loadQueue()}catch{showSnack('Netzwerkfehler','error')}}
@@ -754,8 +780,10 @@ function closeModal(){
 (function(){
   const p=location.pathname;
   let tab='story';
+  let pendingStorySettings=false;
   let pendingVideoSettings=false;
   let pendingMedienView=null;
+  if(p.startsWith('/story/einstellungen')) pendingStorySettings=true;
   if(p.startsWith('/video')){
     tab='video';
     if(p.startsWith('/video/einstellungen')) pendingVideoSettings=true;
@@ -772,8 +800,12 @@ function closeModal(){
     else if(p.startsWith('/medien/einstellungen')) pendingMedienView='settings';
     else if(p.startsWith('/medien/konten')) pendingMedienView='accounts';
   }
-  window.addEventListener('popstate',e=>switchTab(e.state?.tab||'story',false));
+  window.addEventListener('popstate',e=>{
+    if(_subpageCloser){ const c=_subpageCloser; _subpageCloser=null; c(false); }
+    switchTab(e.state?.tab||'story',false);
+  });
   switchTab(tab,false);
+  if(pendingStorySettings && typeof openStorySettings==='function') openStorySettings(false);
   if(pendingVideoSettings && typeof openVideoSettings==='function') openVideoSettings(false);
   if(pendingMedienView==='backgrounds' && typeof openBackgroundsView==='function') openBackgroundsView(false);
   if(pendingMedienView==='settings' && typeof openMedienSettings==='function') openMedienSettings(false);

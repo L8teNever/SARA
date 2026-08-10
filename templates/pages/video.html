@@ -4,20 +4,8 @@
   <div id="video-main">
     <div class="wrap">
 
-      <!-- Production status -->
-      <div class="tbox" id="prod-status-bar">
-        <span class="mi" id="prod-status-icon" style="font-size:22px">check_circle</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:700" id="prod-status-label">Produktion aktiv</div>
-          <div style="font-size:12px;opacity:.8" id="prod-status-hint">Videos werden automatisch produziert</div>
-        </div>
-        <button class="btn btn--outlined btn--sm" id="btn-toggle-prod" onclick="toggleProdStatus()">
-          <span class="mi">pause_circle</span> Pausieren
-        </button>
-      </div>
-
       <!-- Queue -->
-      <div class="lbl" style="margin-top:16px">
+      <div class="lbl" style="margin-top:4px">
         <span class="mi">bolt</span> Aktuell in Produktion &amp; Warteschlange
         <span id="sse-status" style="font-size:11px;text-transform:none;letter-spacing:0;font-weight:400;opacity:.7;margin-left:-4px"></span>
       </div>
@@ -32,9 +20,18 @@
   <!-- Einstellungen -->
   <div id="video-settings" style="display:none">
     <div class="wrap">
-      <button class="btn btn--tonal btn--sm" onclick="closeVideoSettings()" style="margin-bottom:18px">
-        <span class="mi">arrow_back</span> Zurück
-      </button>
+
+      <!-- Production status -->
+      <div class="tbox" id="prod-status-bar">
+        <span class="mi" id="prod-status-icon" style="font-size:22px">check_circle</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:700" id="prod-status-label">Produktion aktiv</div>
+          <div style="font-size:12px;opacity:.8" id="prod-status-hint">Videos werden automatisch produziert</div>
+        </div>
+        <button class="btn btn--outlined btn--sm" id="btn-toggle-prod" onclick="toggleProdStatus()">
+          <span class="mi">pause_circle</span> Pausieren
+        </button>
+      </div>
 
       <!-- Interval -->
       <div class="card--el">
@@ -61,11 +58,13 @@ function openVideoSettings(push=true){
   document.getElementById('video-main').style.display='none';
   document.getElementById('video-settings').style.display='block';
   if(push) history.pushState({tab:'video',view:'settings'},'','/video/einstellungen');
+  enterSubpage('Einstellungen', closeVideoSettings);
 }
 function closeVideoSettings(push=true){
   document.getElementById('video-settings').style.display='none';
   document.getElementById('video-main').style.display='block';
   if(push) history.pushState({tab:'video'},'','/video');
+  exitSubpage();
 }
 
 async function loadProdSettings(){

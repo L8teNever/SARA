@@ -1,4 +1,6 @@
 <section class="page is-active" data-tab="story">
+
+<div id="story-main">
 <div class="wrap">
 
   <!-- Prompt generieren -->
@@ -47,14 +49,6 @@
   "parts": [...]
 }'></textarea>
     </div>
-    <div class="li" style="cursor:default;margin-bottom:14px" onclick="event.stopPropagation()">
-      <div class="li__lead"><span class="mi" id="auto-queue-ico" style="color:var(--cosv)">toggle_off</span></div>
-      <div class="li__body">
-        <div class="li__title">Video automatisch erstellen</div>
-        <div class="li__sub" style="white-space:normal;overflow:visible;text-overflow:clip;line-height:1.4">Importierte Storys werden direkt zur Produktion eingereiht, ohne manuelle Auswahl im Video-Tab</div>
-      </div>
-      <button class="btn btn--tonal btn--sm" id="auto-queue-btn" onclick="toggleAutoQueue()">…</button>
-    </div>
     <div class="row">
       <button class="btn btn--filled" id="btn-import-story" onclick="importStory()" style="flex:1">
         <span class="mi">check_circle</span> Story importieren
@@ -71,9 +65,40 @@
   </div>
 
 </div>
+</div>
+
+<!-- Einstellungen -->
+<div id="story-settings" style="display:none">
+  <div class="wrap">
+    <div class="card">
+      <div class="li" style="cursor:default;margin-bottom:0" onclick="event.stopPropagation()">
+        <div class="li__lead"><span class="mi" id="auto-queue-ico" style="color:var(--cosv)">toggle_off</span></div>
+        <div class="li__body">
+          <div class="li__title">Video automatisch erstellen</div>
+          <div class="li__sub" style="white-space:normal;overflow:visible;text-overflow:clip;line-height:1.4">Importierte Storys werden direkt zur Produktion eingereiht, ohne manuelle Auswahl im Video-Tab</div>
+        </div>
+        <button class="btn btn--tonal btn--sm" id="auto-queue-btn" onclick="toggleAutoQueue()">…</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </section>
 
 <script>
+function openStorySettings(push=true){
+  document.getElementById('story-main').style.display='none';
+  document.getElementById('story-settings').style.display='block';
+  if(push) history.pushState({tab:'story',view:'settings'},'','/story/einstellungen');
+  enterSubpage('Einstellungen', closeStorySettings);
+}
+function closeStorySettings(push=true){
+  document.getElementById('story-settings').style.display='none';
+  document.getElementById('story-main').style.display='block';
+  if(push) history.pushState({tab:'story'},'','/');
+  exitSubpage();
+}
+
 const SARA_POOLS={
   category:[
     "r/TIFU — an embarrassing screw-up with a cringe or funny payoff",

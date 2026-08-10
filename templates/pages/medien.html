@@ -13,11 +13,7 @@
   <!-- Upload-Einstellungen -->
   <div id="medien-settings" style="display:none">
     <div class="wrap">
-      <button class="btn btn--tonal btn--sm" onclick="closeMedienSettings()" style="margin-bottom:18px">
-        <span class="mi">arrow_back</span> Zurück
-      </button>
-
-      <div class="lbl" style="margin-top:0"><span class="mi">tune</span> YouTube Upload-Einstellungen</div>
+      <div class="lbl" style="margin-top:4px"><span class="mi">tune</span> YouTube Upload-Einstellungen</div>
       <div class="card">
         <div class="li" style="cursor:default;margin-bottom:14px" onclick="event.stopPropagation()">
           <div class="li__lead"><span class="mi" id="yt-auto-ico" style="color:var(--cosv)">toggle_off</span></div>
@@ -52,11 +48,7 @@
   <!-- Verbundene Google-Konten -->
   <div id="medien-accounts" style="display:none">
     <div class="wrap">
-      <button class="btn btn--tonal btn--sm" onclick="closeMedienAccounts()" style="margin-bottom:18px">
-        <span class="mi">arrow_back</span> Zurück
-      </button>
-
-      <div class="lbl" style="margin-top:0"><span class="mi">account_circle</span> Verbundene Google-Konten</div>
+      <div class="lbl" style="margin-top:4px"><span class="mi">account_circle</span> Verbundene Google-Konten</div>
       <div id="yt-accounts-list">
         <div style="display:flex;justify-content:center;padding:20px"><div class="spinner"></div></div>
       </div>
@@ -74,10 +66,6 @@
   <!-- Hintergrundvideos -->
   <div id="medien-backgrounds" style="display:none">
     <div class="wrap">
-      <button class="btn btn--tonal btn--sm" onclick="closeBackgroundsView()" style="margin-bottom:18px">
-        <span class="mi">arrow_back</span> Zurück
-      </button>
-
       <div class="dropzone" id="upload-zone"
         onclick="document.getElementById('file-input').click()"
         ondragover="handleDragOver(event)"
@@ -118,12 +106,12 @@ function _medienShow(id,push,url){
   });
   if(push) history.pushState({tab:'medien',view:id},'',url);
 }
-function openMedienSettings(push=true){ _medienShow('medien-settings',push,'/medien/einstellungen'); }
-function closeMedienSettings(push=true){ _medienShow('medien-main',push,'/medien'); }
-function openMedienAccounts(push=true){ _medienShow('medien-accounts',push,'/medien/konten'); }
-function closeMedienAccounts(push=true){ _medienShow('medien-main',push,'/medien'); }
-function openBackgroundsView(push=true){ _medienShow('medien-backgrounds',push,'/medien/hintergrund'); if(typeof loadBackgrounds==='function') loadBackgrounds(); }
-function closeBackgroundsView(push=true){ _medienShow('medien-main',push,'/medien'); }
+function openMedienSettings(push=true){ _medienShow('medien-settings',push,'/medien/einstellungen'); enterSubpage('Upload-Einstellungen', closeMedienSettings); }
+function closeMedienSettings(push=true){ _medienShow('medien-main',push,'/medien'); exitSubpage(); }
+function openMedienAccounts(push=true){ _medienShow('medien-accounts',push,'/medien/konten'); enterSubpage('Google-Konten', closeMedienAccounts); }
+function closeMedienAccounts(push=true){ _medienShow('medien-main',push,'/medien'); exitSubpage(); }
+function openBackgroundsView(push=true){ _medienShow('medien-backgrounds',push,'/medien/hintergrund'); enterSubpage('Hintergrundvideos', closeBackgroundsView); if(typeof loadBackgrounds==='function') loadBackgrounds(); }
+function closeBackgroundsView(push=true){ _medienShow('medien-main',push,'/medien'); exitSubpage(); }
 
 async function loadYoutubeChannels(){
   await Promise.all([loadYtAccounts(), loadYtSettings(), loadYtQueue()]);

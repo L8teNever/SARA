@@ -19,13 +19,10 @@
   <!-- Detail -->
   <div id="lib-detail" style="display:none">
     <div class="wrap">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px">
-        <button class="btn btn--tonal btn--sm" onclick="closeLibDetail()">
-          <span class="mi">arrow_back</span> Zurück
-        </button>
-        <span style="font-size:16px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="lib-detail-title"></span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;margin-top:4px">
         <span style="font-size:12px;color:var(--cosv)" id="lib-detail-date"></span>
         <span class="badge" id="lib-detail-code"></span>
+        <div style="flex:1"></div>
         <button class="btn btn--outlined btn--sm" id="lib-mark-all-btn" style="display:none">
           <span class="mi">done_all</span> Alle erledigt
         </button>
@@ -119,7 +116,7 @@ function _storyVideoIds(story){
 
 function renderLibraryList(){
   const c=document.getElementById('lib-story-list');
-  const q=(document.getElementById('lib-search').value||'').toLowerCase().trim();
+  const q=(document.getElementById('lib-search')?.value||'').toLowerCase().trim();
   const filtered=_libData.filter(s=>(!q||s.title.toLowerCase().includes(q)||s.code.toLowerCase().includes(q))&&_matches(s));
   if(!filtered.length){
     c.innerHTML=`<div class="empty"><span class="mi">search_off</span><span class="empty__ttl">${_libData.length?'Keine Treffer':'Noch keine Videos'}</span></div>`;
@@ -184,8 +181,8 @@ function openLibDetail(story,push=true){
   document.getElementById('lib-overview').style.display='none';
   document.getElementById('lib-detail').style.display='block';
   if(push) history.pushState({tab:'library',code:story.code},'',`/library/${story.code}`);
+  enterSubpage(story.title, closeLibDetail);
   document.getElementById('lib-detail-code').textContent=story.code;
-  document.getElementById('lib-detail-title').textContent=story.title;
   document.getElementById('lib-detail-date').textContent=formatDate(story.created_at);
   document.getElementById('lib-detail-total-views').textContent='0';
   const mb=document.getElementById('lib-mark-all-btn');
@@ -244,6 +241,20 @@ function closeLibDetail(push=true){
   document.getElementById('lib-detail').style.display='none';
   document.getElementById('lib-overview').style.display='block';
   if(push) history.pushState({tab:'library'},'','/library');
+  exitSubpage();
+}
+
+/* ── Suche im Header: klein als Icon, aufklappen bei Klick ──── */
+function expandLibSearch(){
+  const el=document.getElementById('ghead-actions');
+  if(!el) return;
+  el.innerHTML='<div class="ghead-search"><span class="mi">search</span><input id="lib-search" type="text" placeholder="Story suchen…" oninput="filterLibrary()" onblur="collapseLibSearchIfEmpty()"></div>';
+  const inp=document.getElementById('lib-search');
+  if(inp) inp.focus();
+}
+function collapseLibSearchIfEmpty(){
+  const inp=document.getElementById('lib-search');
+  if(inp && !inp.value.trim() && typeof updateGheadActions==='function') updateGheadActions('library');
 }
 
 function renderPlatChips(partId,uploads){
