@@ -932,7 +932,7 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
                 ",drawtext=text='KI-generiert':"
                 f"fontfile='{font_escaped}':"
                 "fontsize=30:fontcolor=white@0.85:"
-                "x=w-text_w-30:y=h-text_h-60:"
+                "x=30:y=h-text_h-60:"
                 "box=1:boxcolor=black@0.45:boxborderw=14"
             )
         _run_sub(
