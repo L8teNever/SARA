@@ -19,18 +19,10 @@
   <!-- Detail -->
   <div id="lib-detail" style="display:none">
     <div class="wrap">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;margin-top:4px">
-        <span style="font-size:12px;color:var(--cosv)" id="lib-detail-date"></span>
-        <span class="badge" id="lib-detail-code"></span>
-        <div style="flex:1"></div>
-        <button class="btn btn--outlined btn--sm" id="lib-mark-all-btn" style="display:none">
-          <span class="mi">done_all</span> Alle erledigt
-        </button>
-      </div>
-
-      <div class="card--el" style="margin-bottom:18px">
-        <div class="flabel" style="margin-bottom:6px">Gesamt-Performance</div>
-        <div style="font-size:28px;font-weight:800;color:var(--cg)"><span id="lib-detail-total-views">0</span> <span style="font-size:14px;font-weight:600;color:var(--cosv)">Aufrufe insgesamt</span></div>
+      <div class="card card--hero" style="margin-top:4px;margin-bottom:18px">
+        <div class="flabel" style="color:rgba(255,255,255,.65);margin-bottom:10px">Gesamt-Performance</div>
+        <div style="font-size:32px;font-weight:800" id="lib-detail-total-views">0</div>
+        <div style="font-size:13px;opacity:.75;margin-top:2px">Aufrufe insgesamt</div>
       </div>
 
       <div id="lib-parts-grid"></div>
@@ -182,11 +174,9 @@ function openLibDetail(story,push=true){
   document.getElementById('lib-detail').style.display='block';
   if(push) history.pushState({tab:'library',code:story.code},'',`/library/${story.code}`);
   enterSubpage(story.title, closeLibDetail);
-  document.getElementById('lib-detail-code').textContent=story.code;
-  document.getElementById('lib-detail-date').textContent=formatDate(story.created_at);
+  const actions=document.getElementById('ghead-actions');
+  if(actions) actions.innerHTML=`<span class="badge">${story.code}</span><span style="font-size:12px;color:var(--cosv);white-space:nowrap">${formatDate(story.created_at)}</span>`;
   document.getElementById('lib-detail-total-views').textContent='0';
-  const mb=document.getElementById('lib-mark-all-btn');
-  mb.style.display='';mb.onclick=()=>markAllUploaded(story,mb);
   const grid=document.getElementById('lib-parts-grid');
   grid.innerHTML='';
   story.parts.forEach(part=>{
@@ -376,25 +366,4 @@ async function deleteLibStory(storyId,title,btn){
   }catch(e){showSnack('Fehler: '+e.message,'error');if(btn){btn.disabled=false;btn.innerHTML='<span class="mi">delete</span>'}}
 }
 
-async function markAllUploaded(story,btn){
-  if(!await showConfirm('Alle markieren',`Alle Teile von "${story.title}" als hochgeladen markieren?`,{confirmLabel:'Markieren'}))return;
-  const oldHtml=btn?btn.innerHTML:null;
-  if(btn){btn.disabled=true;btn.innerHTML='<div class="spinner spinner--sm" style="width:14px;height:14px;border-width:2px;margin-right:6px"></div> Markiere…'}
-  try{
-    const jobs=[];
-    for(const part of story.parts){
-      for(const acc of _ytAccounts){
-        const p=_ytPlatform(acc);
-        if(!(part.uploads||[]).some(u=>u.platform===p)){
-          jobs.push(fetch('/api/uploads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story_part_id:part.id,platform:p})}));
-        }
-      }
-    }
-    await Promise.all(jobs);
-    showSnack('Alle als erledigt markiert.','success');
-    await loadLibrary();
-    const updated=_libData.find(s=>s.story_id===story.story_id);
-    if(updated) openLibDetail(updated,false);
-  }catch(e){showSnack('Fehler: '+e.message,'error');if(btn){btn.disabled=false;btn.innerHTML=oldHtml}}
-}
 </script>
