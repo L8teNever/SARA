@@ -668,16 +668,26 @@ function closeModal(){
 (function(){
   const p=location.pathname;
   let tab='story';
-  if(p.startsWith('/video'))  tab='video';
+  let pendingVideoSettings=false;
+  let pendingMedienBackgrounds=false;
+  if(p.startsWith('/video')){
+    tab='video';
+    if(p.startsWith('/video/einstellungen')) pendingVideoSettings=true;
+  }
   else if(p.startsWith('/library')){
     tab='library';
     const code=p.split('/library/')[1];
     if(code) pendingLibraryCode=code;
   }
   else if(p.startsWith('/statistik')) tab='statistik';
-  else if(p.startsWith('/medien') || p.startsWith('/upload') || p.startsWith('/channels')) tab='medien';
+  else if(p.startsWith('/medien') || p.startsWith('/upload') || p.startsWith('/channels')){
+    tab='medien';
+    if(p.startsWith('/medien/hintergrund')) pendingMedienBackgrounds=true;
+  }
   window.addEventListener('popstate',e=>switchTab(e.state?.tab||'story',false));
   switchTab(tab,false);
+  if(pendingVideoSettings && typeof openVideoSettings==='function') openVideoSettings(false);
+  if(pendingMedienBackgrounds && typeof openBackgroundsView==='function') openBackgroundsView(false);
   startSSE();
 })();
 </script>
