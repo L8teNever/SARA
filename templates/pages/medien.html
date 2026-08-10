@@ -122,7 +122,7 @@ function openMedienSettings(push=true){ _medienShow('medien-settings',push,'/med
 function closeMedienSettings(push=true){ _medienShow('medien-main',push,'/medien'); }
 function openMedienAccounts(push=true){ _medienShow('medien-accounts',push,'/medien/konten'); }
 function closeMedienAccounts(push=true){ _medienShow('medien-main',push,'/medien'); }
-function openBackgroundsView(push=true){ _medienShow('medien-backgrounds',push,'/medien/hintergrund'); }
+function openBackgroundsView(push=true){ _medienShow('medien-backgrounds',push,'/medien/hintergrund'); if(typeof loadBackgrounds==='function') loadBackgrounds(); }
 function closeBackgroundsView(push=true){ _medienShow('medien-main',push,'/medien'); }
 
 async function loadYoutubeChannels(){
