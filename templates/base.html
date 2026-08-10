@@ -812,6 +812,11 @@ function closeModal(){
     if(_subpageCloser){ const c=_subpageCloser; _subpageCloser=null; c(false); }
     switchTab(e.state?.tab||'story',false);
   });
+  /* Der allererste Verlaufseintrag beim direkten Laden einer Seite
+     (Lesezeichen, eingetippte URL, o.ae.) hat sonst KEIN State-Objekt --
+     ein spaeteres Browser-Zurueck dorthin wuerde ohne dies immer auf
+     'story' zurueckfallen statt auf den tatsaechlich erkannten Tab. */
+  history.replaceState({tab:tab},'',location.pathname);
   switchTab(tab,false);
   if(pendingStorySettings && typeof openStorySettings==='function') openStorySettings(false);
   if(pendingVideoSettings && typeof openVideoSettings==='function') openVideoSettings(false);
