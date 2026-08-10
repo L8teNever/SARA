@@ -870,6 +870,12 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
     part_number = part["part_number"]
     text        = part["text"]
 
+    # Titel wird zu Beginn der Vertonung gesprochen -- baut Spannung auf und
+    # hilft bei mehrteiligen Storys der Wiedererkennung. Teil 1 nur der Titel,
+    # ab Teil 2 zusaetzlich die Teil-Nummer.
+    title_intro = f"{story_title}." if part_number == 1 else f"{story_title} — Part {part_number}."
+    narration_text = f"{title_intro} {text}"
+
     output_dir = OUTPUTS_DIR / story_code
     output_dir.mkdir(parents=True, exist_ok=True)
     COVERS_DIR.mkdir(parents=True, exist_ok=True)
@@ -884,12 +890,12 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
     try:
         # Step 1 — TTS
         progress(10, "Stimme wird generiert (Kokoro, lokal)...")
-        tts_to_file(text, audio_path)
+        tts_to_file(narration_text, audio_path)
         audio_duration = get_audio_duration(audio_path)
 
         # Step 2 — ASS subtitles with word highlighting
         progress(30, "Wort-Timing wird berechnet…")
-        build_word_timed_ass(text, ass_path, audio_path)
+        build_word_timed_ass(narration_text, ass_path, audio_path)
 
         # Step 3 — Background video loop
         progress(45, "Hintergrundvideos werden zusammengestellt…")
