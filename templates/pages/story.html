@@ -23,6 +23,14 @@
         <label class="flabel" for="story-idea">Thema <span style="font-weight:400;opacity:.6;text-transform:none;letter-spacing:0">(optional — leer = zufällige Story)</span></label>
         <input id="story-idea" class="inp" type="text" placeholder='z.B. "a woman who discovers her husband has a secret family"'>
       </div>
+      <div class="field">
+        <label class="flabel" for="story-parts">Teile</label>
+        <select id="story-parts" class="inp">
+          <option value="1">1 Teil — komplette Story in einem Video</option>
+          <option value="2" selected>2 Teile — Cliffhanger nach Teil 1</option>
+          <option value="3">3 Teile — längerer Spannungsbogen</option>
+        </select>
+      </div>
       <button class="btn btn--filled btn--lg" id="btn-copy-full" onclick="copyFullPrompt()" style="margin-top:4px">
         <span class="mi">content_copy</span> Prompt kopieren
       </button>
@@ -102,66 +110,130 @@
 </section>
 
 <script>
+const SARA_POOLS={
+  category:[
+    "r/TIFU — an embarrassing screw-up with a cringe or funny payoff",
+    "r/AmItheAsshole — a moral dilemma where the narrator might genuinely be wrong",
+    "r/pettyrevenge — small, precise, deeply satisfying revenge",
+    "r/ProRevenge — long-game revenge that escalates far beyond expectation",
+    "r/MaliciousCompliance — following a rule so exactly it destroys the rule-maker",
+    "r/TrueOffMyChest — a confession the narrator has never said out loud",
+    "r/relationship_advice — loyalty or trust tested in an unexpected way",
+    "r/entitledparents — a clash with an unreasonable parent or in-law",
+    "r/antiwork — a toxic workplace and the moment the narrator stopped complying",
+    "r/confession — something morally grey the narrator still lives with",
+    "r/NuclearRevenge — revenge that permanently changed someone's life",
+    "r/ChoosingBeggars — someone demanding far more than they are owed",
+    "r/JUSTNOMIL — an in-law who crossed a line at exactly the wrong moment",
+    "r/talesfromretail — a customer interaction that escalated absurdly",
+    "r/legaladvice — an everyday situation that suddenly turned legal"
+  ],
+  narrator:[
+    "23F, first real office job, still learning to push back",
+    "31M, night-shift warehouse supervisor, dry sense of humour",
+    "27F, dental receptionist, keeps meticulous notes on everything",
+    "38M, single dad, chronically exhausted, very little patience left",
+    "19M, university freshman, broke and desperate for the job",
+    "44F, small-business owner, has heard every excuse in the book",
+    "29F, ICU nurse, unshockable in a way that unsettles people",
+    "35M, mid-level manager who hates being a manager",
+    "26F, freelance graphic designer working from her kitchen table",
+    "52M, tradesman, thirty years in, zero tolerance for nonsense",
+    "24F, barista and part-time student, sharper than people assume",
+    "33M, IT support, has admin access and remarkable restraint",
+    "41F, school teacher, professionally calm, privately furious",
+    "22M, delivery driver, sees everything, says nothing"
+  ],
+  setting:[
+    "a fluorescent-lit break room that always smells like burnt coffee",
+    "a company Christmas party nobody wanted to attend",
+    "a shared apartment kitchen at 2am",
+    "a suburban Costco parking lot on a Saturday",
+    "a family group chat that will not stop buzzing",
+    "a Sunday dinner at the in-laws with assigned seating",
+    "an open-plan office where everyone can hear everything",
+    "a hospital waiting room at 4am",
+    "a rented cabin on a trip that was supposed to fix things",
+    "a small-town hardware store where everyone knows everyone",
+    "a wedding rehearsal that is running two hours late",
+    "a customer service counter twenty minutes before closing",
+    "a cramped car on a six-hour drive with no way out",
+    "a neighbourhood WhatsApp group with strong opinions"
+  ],
+  hook:[
+    "IN MEDIA RES — open in the single most dramatic second, then rewind. Example shape: \'I was holding the receipt that proved my sister had been lying for four years.\'",
+    "FLAT CONFESSION — state the shocking thing plainly in sentence one, no build-up. Example shape: \'I got my own mother banned from my wedding, and I would do it again.\'",
+    "COUNTDOWN — anchor to a ticking clock. Example shape: \'Forty minutes before the inspection, I found what my boss had hidden in the back room.\'",
+    "BROKEN EXPECTATION — set up something ordinary, shatter it in the same breath. Example shape: \'My husband made me coffee every morning for nine years. That is how I knew something was wrong.\'",
+    "DIRECT ADDRESS — speak to the viewer as if mid-argument. Example shape: \'Tell me I was wrong. Seriously. Because everyone in my family says I was.\'",
+    "ABSURD CONCRETE DETAIL — lead with one strange, specific object or number. Example shape: \'My coworker billed the company $1,400 for a chair he stole from our own break room.\'",
+    "CONSEQUENCE FIRST — name the outcome, withhold the cause. Example shape: \'I am the reason my entire department got restructured. Nobody there knows that.\'",
+    "QUIET DREAD — something small and wrong that the viewer notices before the narrator does. Example shape: \'The first time I noticed the second toothbrush, I did not think anything of it.\'"
+  ],
+  twist:[
+    "the person the narrator trusted was quietly the source of the problem all along",
+    "the narrator\'s own harmless-seeming decision from earlier is what causes the collapse",
+    "the antagonist is not evil, just catastrophically incompetent, which is worse",
+    "a document, recording, or receipt surfaces at the exact worst moment",
+    "the narrator wins, but the victory costs something they did not expect to lose",
+    "a bystander nobody paid attention to turns out to hold all the leverage",
+    "the rule the antagonist weaponised is the rule that ends up destroying them",
+    "the truth was known by everyone except the one person it was about",
+    "the narrator was right, but proving it publicly makes them the villain",
+    "what looked like malice turns out to be a secret the other person was protecting"
+  ],
+  tone:[
+    "cold and controlled — the narrator never raises their voice, which makes it worse",
+    "darkly funny — the narrator finds the absurdity even while it is happening",
+    "raw and shaken — the narrator is still processing while telling it",
+    "quietly vindicated — satisfaction earned slowly, not gloated over",
+    "bitter and blunt — no softening, no diplomacy left",
+    "warm but devastating — genuine affection makes the betrayal land harder"
+  ]
+};
+
+function _saraPick(a){return a[Math.floor(Math.random()*a.length)]}
+
 const SARA_DEFAULT_PROMPT=
 `You are a writer creating authentic Reddit-style first-person stories for TikTok/Reels.
 
-STEP 1 — Pick ONE category at random (do not always default to relationships/cheating):
-  A) r/TIFU — embarrassing accident or miscommunication with funny/cringe payoff
-  B) r/AmItheAsshole — moral dilemma where the narrator may or may not be wrong
-  C) r/pettyrevenge or r/ProRevenge — satisfying revenge on a bully, boss, or entitled person
-  D) r/MaliciousCompliance — following rules so literally it backfires on someone
-  E) r/TrueOffMyChest — confession, regret, or a secret finally revealed
-  F) r/relationship_advice — betrayal, trust, or loyalty tested in an unexpected way
-  G) r/entitledparents — clash with an unreasonable parent, in-law, or authority figure
-  H) r/antiwork — toxic workplace, unfair boss, or quitting moment
-  I) r/offmychest — personal growth moment, unexpected kindness, or a life-changing decision
-  J) r/confession — doing something morally grey and living with the consequences
+STEP 0 — THIS story's assigned variation. Follow every line exactly. Do not substitute your own preferences:
+- Category: {{CATEGORY}}
+- Narrator: {{NARRATOR}}
+- Setting: {{SETTING}}
+- Opening hook style: {{HOOK}}
+- Twist: {{TWIST}}
+- Tone: {{TONE}}
+- Variation seed: {{SEED}} — treat this as a fingerprint. Two stories with different seeds must not share the same names, jobs, objects, or turning points.
 
-STEP 2 — Make it feel REAL and SPECIFIC:
-- Use a real-feeling first name for yourself and any key person (never "my partner", always "Jake" or "Sarah" etc.)
-- Ground it in a specific, mundane setting (break room, parking lot, family dinner, Discord call, Walmart, etc.)
-- Include one concrete detail that makes it feel lived-in (a specific food, a text message, a song, a time of day)
-- Avoid recycled TikTok tropes: no "secret family", no finding texts on a phone as the ONLY twist, no cancer reveals
+STEP 1 — THE FIRST LINE IS THE WHOLE JOB.
+Roughly half of viewers decide within two seconds. The first sentence must do ALL of this:
+- Land a concrete image or number, never an abstract feeling ("$400 deducted from my paycheck", not "I was treated unfairly")
+- Imply a conflict that is already in progress — never warm up, never scene-set first
+- Raise exactly one question the viewer needs answered, and refuse to answer it yet
+- Be under 20 words
+Never open with: "So this happened...", "I need to tell you about...", "Growing up, I...", "This is a throwaway account".
 
-STEP 3 — Structure for maximum watch time:
-- Part 1: Normal → something small feels off → end on the moment everything changes (hard cliffhanger)
-- Part 2: Fallout → confrontation or discovery → satisfying resolution or gut-punch ending
+STEP 2 — MAKE IT FEEL REAL:
+- Real first names for everyone (never "my coworker" — "Marcus")
+- One mundane, specific detail per part that no invented story would bother with (a brand, a time, a smell, an exact amount)
+- Dialogue in at least two places — real people interrupt, repeat themselves, and say unremarkable things
+- Avoid worn-out TikTok tropes: no secret second family, no terminal illness reveal, no "found texts on his phone" as the ONLY twist
+
+STEP 3 — RETENTION STRUCTURE:
+- Sentences stay short. Every 2–3 sentences must deliver a new piece of information — no paragraph is allowed to just describe
+- Escalate in visible steps: bad → worse → unrecoverable
+- Plant one small detail early that pays off later. The viewer should feel it click, not have it explained
+{{PART_STRUCTURE}}
 
 Output ONLY this JSON — no text before or after:
-{
-  "title": "Story Title",
-  "total_parts": 2,
-  "keywords": ["word1","word2","word3","word4","word5","word6","word7","word8","word9","word10"],
-  "parts": [
-    {
-      "part_number": 1,
-      "text": "Part 1 text — MUST be 200 to 250 words, first person, past tense",
-      "cliffhanger_hint": "one sentence: what the viewer absolutely needs to see in part 2",
-      "social": {
-        "video_title": "Punchy title — include Part 1/2, max 80 chars",
-        "description": "2–3 sentences teasing the story emotionally. Never spoil the ending. Close with a question or CTA.",
-        "hashtags": "#storytime #reddit #fyp #foryou — add 3–4 topic-specific tags"
-      }
-    },
-    {
-      "part_number": 2,
-      "text": "Part 2 text — MUST be 200 to 250 words, first person, past tense",
-      "cliffhanger_hint": "",
-      "social": {
-        "video_title": "Punchy title — include Part 2/2, max 80 chars",
-        "description": "2–3 sentences teasing the conclusion. Never spoil the ending. Close with a question or CTA.",
-        "hashtags": "#storytime #reddit #fyp #foryou — add 3–4 topic-specific tags"
-      }
-    }
-  ]
-}
+{{JSON_SHAPE}}
 
 Hard rules:
-- Each part: exactly 200–250 words — count carefully, never go under 200
-- Part 1 cliffhanger: the single most tension-filled moment — listener MUST click Part 2
-- keywords: exactly 10 English words describing the story's core content
+- Each part: exactly 200–250 words — count carefully, never under 200
+- keywords: exactly 10 English words describing this story's core content
 - Hashtags: 6–8 tags as one space-separated string, mix general + topic-specific
-- Every story must feel like it could be a real Reddit post — raw, specific, emotionally honest
+- Every story must read like a real Reddit post — raw, specific, emotionally honest, never polished or literary
 
 Create a story about: [DEIN THEMA HIER EINTRAGEN — oder Zeile so lassen für eine zufällige Story]`;
 
@@ -184,10 +256,56 @@ function resetPromptTemplate(){
   showSnack('Prompt zurückgesetzt.','success');
 }
 
+function _saraPartStructure(parts){
+  if(parts===1) return '- Single video: hook \u2192 escalation \u2192 twist \u2192 payoff, all in one part. The ending must land completely \u2014 no cliffhanger, no "part 2" reference anywhere';
+  if(parts===3) return '- Part 1: normal \u2192 first crack shows \u2192 hard cut at the moment everything changes\n- Part 2: escalation \u2192 the narrator acts \u2192 cut at the point of no return\n- Part 3: fallout \u2192 confrontation \u2192 payoff that recontextualises part 1\n- Every part except the last ends mid-consequence, at the highest-tension sentence \u2014 never wrap a part up neatly\n- Parts 2 and 3 open with one short line of momentum, never a recap paragraph';
+  return '- Part 1: normal \u2192 something small feels off \u2192 hard cut at the moment everything changes\n- Part 2: fallout \u2192 confrontation or discovery \u2192 payoff that recontextualises part 1\n- Part 1 must end mid-consequence, at the highest-tension sentence \u2014 never wrap it up neatly\n- Part 2 opens with one short line of momentum, never a recap paragraph';
+}
+
+function _saraJsonShape(parts){
+  const items=[];
+  for(let i=1;i<=parts;i++){
+    const last=i===parts;
+    items.push(`    {
+      "part_number": ${i},
+      "text": "Part ${i} text \u2014 MUST be 200 to 250 words, first person, past tense",
+      "cliffhanger_hint": ${last?'""':`"one sentence: what the viewer absolutely needs to see in part ${i+1}"`},
+      "social": {
+        "video_title": "Punchy title${parts>1?` \u2014 include Part ${i}/${parts}`:''}, max 80 chars",
+        "description": "2\u20133 sentences teasing ${last?'the conclusion':'the story'} emotionally. Never spoil the ending. Close with a question or CTA.",
+        "hashtags": "#storytime #reddit #fyp #foryou \u2014 add 3\u20134 topic-specific tags"
+      }
+    }`);
+  }
+  return `{
+  "title": "Story Title",
+  "total_parts": ${parts},
+  "keywords": ["word1","word2","word3","word4","word5","word6","word7","word8","word9","word10"],
+  "parts": [
+${items.join(',\n')}
+  ]
+}`;
+}
+
+function buildSaraPrompt(template,parts){
+  return template
+    .replace(/\{\{CATEGORY\}\}/g,_saraPick(SARA_POOLS.category))
+    .replace(/\{\{NARRATOR\}\}/g,_saraPick(SARA_POOLS.narrator))
+    .replace(/\{\{SETTING\}\}/g,_saraPick(SARA_POOLS.setting))
+    .replace(/\{\{HOOK\}\}/g,_saraPick(SARA_POOLS.hook))
+    .replace(/\{\{TWIST\}\}/g,_saraPick(SARA_POOLS.twist))
+    .replace(/\{\{TONE\}\}/g,_saraPick(SARA_POOLS.tone))
+    .replace(/\{\{SEED\}\}/g,Math.random().toString(36).slice(2,10).toUpperCase())
+    .replace(/\{\{PART_STRUCTURE\}\}/g,_saraPartStructure(parts))
+    .replace(/\{\{JSON_SHAPE\}\}/g,_saraJsonShape(parts));
+}
+
 async function copyFullPrompt(){
   const idea=(document.getElementById('story-idea')?.value||'').trim();
+  const parts=parseInt(document.getElementById('story-parts')?.value||'2',10);
   initPromptTemplate();
   let text=document.getElementById('prompt-template-ta').value.trim()||SARA_DEFAULT_PROMPT;
+  text=buildSaraPrompt(text,parts);
   if(idea) text=text.replace(/Create a story about:.*$/,`Create a story about: ${idea}`);
   const btn=document.getElementById('btn-copy-full');
   const cfm=document.getElementById('copy-confirm');
@@ -195,7 +313,7 @@ async function copyFullPrompt(){
     const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();
   }
   if(btn) btn.innerHTML='<span class="mi">check</span> Kopiert!';
-  if(cfm) cfm.textContent='✓ Jetzt in ChatGPT / Gemini / Claude.ai einfügen!';
+  if(cfm) cfm.textContent='✓ Neu gewürfelte Variante — jetzt in ChatGPT / Gemini / Claude.ai einfügen!';
   showSnack('Prompt kopiert!','success');
   setTimeout(()=>{
     if(btn) btn.innerHTML='<span class="mi">content_copy</span> Prompt kopieren';
