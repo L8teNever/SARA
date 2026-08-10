@@ -383,16 +383,22 @@ input,textarea,select{font:inherit;color:inherit}
 </head>
 <body>
 
-<div class="appshell">
-  <header class="ghead">
-    <button class="btn btn--icon ghead__back" id="ghead-back" onclick="gheadBack()" style="display:none">
-      <span class="mi">arrow_back</span>
-    </button>
-    <span class="ghead__logo" id="ghead-logo">SARA</span>
-    <span class="ghead__title" id="ghead-title" style="display:none"></span>
-    <div class="ghead__actions" id="ghead-actions"></div>
-  </header>
+<!-- Header/Bottom-Nav bewusst AUSSERHALB von .appshell -- .appshell hat
+     overflow:hidden, und manche mobilen Browser (v.a. iOS Safari)
+     rendern position:fixed-Kinder eines overflow:hidden-Vorfahren
+     unzuverlaessig (Backdrop-Blur bleibt aus / Element loest sich beim
+     Scrollen nicht wirklich vom Dokumentfluss). Als direktes body-Kind
+     bleiben Header und Nav garantiert relativ zum Viewport fixiert. -->
+<header class="ghead">
+  <button class="btn btn--icon ghead__back" id="ghead-back" onclick="gheadBack()" style="display:none">
+    <span class="mi">arrow_back</span>
+  </button>
+  <span class="ghead__logo" id="ghead-logo">SARA</span>
+  <span class="ghead__title" id="ghead-title" style="display:none"></span>
+  <div class="ghead__actions" id="ghead-actions"></div>
+</header>
 
+<div class="appshell">
   <div class="shell">
     <nav class="rail">
       <div class="rail__eyebrow">Navigation</div>
@@ -417,29 +423,29 @@ input,textarea,select{font:inherit;color:inherit}
       <div class="pages">
         {% block content %}{% endblock %}
       </div>
-
-      <nav class="botnav">
-        <div class="botnav__pill">
-          <button class="botnav__item nav-btn is-active" data-tab="story" onclick="switchTab('story')" title="Story">
-            <span class="mi">auto_stories</span>
-          </button>
-          <button class="botnav__item nav-btn" data-tab="video" onclick="switchTab('video')" title="Video">
-            <span class="mi">movie</span>
-          </button>
-          <button class="botnav__item nav-btn" data-tab="library" onclick="switchTab('library')" title="Videos">
-            <span class="mi">video_library</span>
-          </button>
-          <button class="botnav__item nav-btn" data-tab="statistik" onclick="switchTab('statistik')" title="Statistik">
-            <span class="mi">bar_chart</span>
-          </button>
-          <button class="botnav__item nav-btn" data-tab="medien" onclick="switchTab('medien')" title="Medien & YouTube">
-            <span class="mi">perm_media</span>
-          </button>
-        </div>
-      </nav>
     </div>
   </div>
 </div>
+
+<nav class="botnav">
+  <div class="botnav__pill">
+    <button class="botnav__item nav-btn is-active" data-tab="story" onclick="switchTab('story')" title="Story">
+      <span class="mi">auto_stories</span>
+    </button>
+    <button class="botnav__item nav-btn" data-tab="video" onclick="switchTab('video')" title="Video">
+      <span class="mi">movie</span>
+    </button>
+    <button class="botnav__item nav-btn" data-tab="library" onclick="switchTab('library')" title="Videos">
+      <span class="mi">video_library</span>
+    </button>
+    <button class="botnav__item nav-btn" data-tab="statistik" onclick="switchTab('statistik')" title="Statistik">
+      <span class="mi">bar_chart</span>
+    </button>
+    <button class="botnav__item nav-btn" data-tab="medien" onclick="switchTab('medien')" title="Medien & YouTube">
+      <span class="mi">perm_media</span>
+    </button>
+  </div>
+</nav>
 
 <!-- Video Modal -->
 <div class="mback" id="video-modal" onclick="if(event.target===this)closeModal()">
