@@ -1174,7 +1174,22 @@ def upload_to_youtube(story_part_id: int, youtube_account_id: int) -> str:
     response = None
     while response is None:
         _status, response = req.next_chunk()
-    return response["id"]
+    video_id = response["id"]
+
+    cover_path = BASE_DIR / part["cover_path"] if part["cover_path"] else None
+    if cover_path and cover_path.exists():
+        try:
+            youtube.thumbnails().set(
+                videoId=video_id,
+                media_body=MediaFileUpload(str(cover_path), mimetype="image/jpeg"),
+            ).execute()
+        except Exception:
+            # Eigene Thumbnails brauchen ein telefonisch verifiziertes YouTube-Konto --
+            # ohne das schlaegt dieser Aufruf fehl. Der Video-Upload selbst ist davon
+            # unabhaengig schon erfolgreich, deshalb hier nur stillschweigend weiter.
+            pass
+
+    return video_id
 
 
 def youtube_worker():
