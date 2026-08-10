@@ -12,6 +12,7 @@
       <div>
         <div style="font-size:26px;font-weight:800" id="stat-subs">–</div>
         <div style="font-size:12px;opacity:.75;margin-top:2px">Abonnenten Gesamt</div>
+        <div style="font-size:11px;opacity:.6;margin-top:1px" id="stat-subs-avg"></div>
       </div>
       <div>
         <div style="font-size:26px;font-weight:800;color:var(--cg)" id="stat-videos">–</div>
@@ -20,6 +21,7 @@
       <div>
         <div style="font-size:26px;font-weight:800;color:var(--cp)" id="stat-views">–</div>
         <div style="font-size:12px;opacity:.75;margin-top:2px">Gesamtaufrufe</div>
+        <div style="font-size:11px;opacity:.6;margin-top:1px" id="stat-views-avg"></div>
       </div>
     </div>
   </div>
@@ -47,6 +49,7 @@
     <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--covv)">
       <div style="font-size:22px;font-weight:800;color:var(--cp)" id="stat-days-left">–</div>
       <div style="font-size:12px;color:var(--cosv);margin-top:2px">Content reicht noch, bei ca. 10 Uploads pro Kanal und Tag</div>
+      <div style="font-size:11px;color:var(--cosv);opacity:.7;margin-top:2px" id="stat-days-left-date"></div>
     </div>
   </div>
 
@@ -107,13 +110,23 @@ async function loadProductionOverview(){
     document.getElementById('stat-full-uploaded').textContent=full.toLocaleString('de-DE');
     document.getElementById('stat-partial-uploaded').textContent=partial.toLocaleString('de-DE');
     const daysLeftEl=document.getElementById('stat-days-left');
+    const daysLeftDateEl=document.getElementById('stat-days-left-date');
     if(daysLeftEl){
       const dailyCapacity=accounts.length*EST_UPLOADS_PER_CHANNEL_PER_DAY;
-      if(remainingSlots<=0) daysLeftEl.textContent='Alles hochgeladen';
-      else if(dailyCapacity<=0) daysLeftEl.textContent='–';
-      else{
+      if(remainingSlots<=0){
+        daysLeftEl.textContent='Alles hochgeladen';
+        if(daysLeftDateEl) daysLeftDateEl.textContent='';
+      }else if(dailyCapacity<=0){
+        daysLeftEl.textContent='–';
+        if(daysLeftDateEl) daysLeftDateEl.textContent='';
+      }else{
         const days=remainingSlots/dailyCapacity;
-        daysLeftEl.textContent=days<1?'Weniger als 1 Tag':`Ca. ${days.toFixed(1).replace('.0','')} Tage`;
+        const wholeDays=Math.floor(days);
+        daysLeftEl.textContent=wholeDays<1?'Weniger als 1 Tag':`Ca. ${wholeDays} ${wholeDays===1?'Tag':'Tage'}`;
+        if(daysLeftDateEl){
+          const target=new Date(Date.now()+wholeDays*86400000);
+          daysLeftDateEl.textContent=`Reicht bis ca. ${target.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}`;
+        }
       }
     }
     document.getElementById('stat-not-uploaded').textContent=none.toLocaleString('de-DE');
@@ -123,34 +136,40 @@ async function loadProductionOverview(){
 /* channels().list().statistics.viewCount bleibt bei kleinen/neuen
    Kanaelen oft laenger bei 0 haengen (Propagations-Verzoegerung),
    waehrend die Aufrufzahlen der einzelnen Videos (videos().list())
-   zuverlaessig sofort stimmen -- Gesamtaufrufe deshalb aus der Summe
-   der einzelnen hochgeladenen Videos berechnen statt aus der
-   Kanal-Statistik. */
-async function loadRealViewsTotal(){
-  try{
-    const videos=await fetch('/api/videos').then(r=>r.json());
-    const ids=[];
-    videos.forEach(s=>(s.parts||[]).forEach(p=>(p.uploads||[]).forEach(u=>{
-      if(!u.platform||!u.platform.startsWith('youtube:'))return;
-      const m=(u.notes||'').match(/v=([\w-]+)/);
-      if(m) ids.push(m[1]);
-    })));
-    const el=document.getElementById('stat-views');
-    if(!el) return;
-    if(!ids.length){ el.textContent='0'; return; }
-    const stats=await fetch('/api/youtube/stats?video_ids='+ids.join(',')).then(r=>r.json());
-    let total=0;
-    ids.forEach(id=>{ if(stats[id]) total+=stats[id].views||0; });
-    el.textContent=_fmtCompact(total);
-  }catch(e){}
+   zuverlaessig sofort stimmen -- Gesamt- UND Pro-Kanal-Aufrufe deshalb
+   aus der Summe der einzelnen hochgeladenen Videos berechnen statt aus
+   der Kanal-Statistik. */
+async function computeRealViewsByAccount(){
+  const videos=await fetch('/api/videos').then(r=>r.json());
+  const idToAccount={};
+  videos.forEach(s=>(s.parts||[]).forEach(p=>(p.uploads||[]).forEach(u=>{
+    if(!u.platform||!u.platform.startsWith('youtube:'))return;
+    const accId=u.platform.split(':')[1];
+    const m=(u.notes||'').match(/v=([\w-]+)/);
+    if(m) idToAccount[m[1]]=accId;
+  })));
+  const ids=Object.keys(idToAccount);
+  if(!ids.length) return {total:0,byAccount:{}};
+  const stats=await fetch('/api/youtube/stats?video_ids='+ids.join(',')).then(r=>r.json());
+  let total=0;
+  const byAccount={};
+  ids.forEach(id=>{
+    const v=stats[id]?.views||0;
+    total+=v;
+    const acc=idToAccount[id];
+    byAccount[acc]=(byAccount[acc]||0)+v;
+  });
+  return {total,byAccount};
 }
 
 async function loadStatistik(){
   loadProductionOverview();
-  loadRealViewsTotal();
   const c=document.getElementById('stat-channels');
   try{
-    const chans=await fetch('/api/youtube/channel-stats').then(r=>r.json());
+    const [chans,viewsData]=await Promise.all([
+      fetch('/api/youtube/channel-stats').then(r=>r.json()),
+      computeRealViewsByAccount().catch(()=>({total:0,byAccount:{}})),
+    ]);
     _statChannels=chans;
 
     let subs=0,vids=0,anyHidden=false,anyOk=false;
@@ -162,6 +181,12 @@ async function loadStatistik(){
     });
     document.getElementById('stat-subs').textContent=anyOk?(_fmtCompact(subs)+(anyHidden?'+':'')):'–';
     document.getElementById('stat-videos').textContent=anyOk?vids.toLocaleString('de-DE'):'–';
+    document.getElementById('stat-views').textContent=_fmtCompact(viewsData.total);
+
+    const subsAvgEl=document.getElementById('stat-subs-avg');
+    if(subsAvgEl) subsAvgEl.textContent=(anyOk&&!anyHidden&&chans.length)?`⌀ ${(subs/chans.length).toLocaleString('de-DE',{maximumFractionDigits:1})} pro Kanal`:'';
+    const viewsAvgEl=document.getElementById('stat-views-avg');
+    if(viewsAvgEl) viewsAvgEl.textContent=chans.length?`⌀ ${_fmtCompact(Math.round(viewsData.total/chans.length))} pro Kanal`:'';
 
     document.getElementById('stat-channels-lbl').innerHTML=`<span class="mi">smart_display</span> Verknüpfte YouTube-Kanäle (${chans.length})`;
 
@@ -175,6 +200,7 @@ async function loadStatistik(){
       card.className='card';
       card.style.padding='0';
       card.style.overflow='hidden';
+      const chViews=viewsData.byAccount[String(ch.account_id)]||0;
       const bannerStyle=ch.banner_url
         ? `background-image:url('${ch.banner_url}');background-size:cover;background-position:center`
         : `background:linear-gradient(135deg,var(--cpc),#2E2359)`;
@@ -189,7 +215,7 @@ async function loadStatistik(){
             : `<div style="display:flex;flex-wrap:wrap;gap:16px 24px">
                 <div style="flex-shrink:0"><div style="font-size:17px;font-weight:800">${ch.subscriber_count!=null?_fmtCompact(ch.subscriber_count):'verborgen'}</div><div style="font-size:11px;color:var(--cosv)">Abonnenten</div></div>
                 <div style="flex-shrink:0"><div style="font-size:17px;font-weight:800;color:var(--cg)">${(ch.video_count||0).toLocaleString('de-DE')}</div><div style="font-size:11px;color:var(--cosv)">Videos</div></div>
-                <div style="flex-shrink:0"><div style="font-size:17px;font-weight:800;color:var(--cp)">${_fmtCompact(ch.view_count||0)}</div><div style="font-size:11px;color:var(--cosv)">Aufrufe</div></div>
+                <div style="flex-shrink:0"><div style="font-size:17px;font-weight:800;color:var(--cp)">${_fmtCompact(chViews)}</div><div style="font-size:11px;color:var(--cosv)">Aufrufe</div></div>
               </div>`}
         </div>`;
       c.appendChild(card);
