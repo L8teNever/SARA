@@ -1548,7 +1548,21 @@ def api_get_queue():
                FROM queue q
                JOIN story_parts sp ON sp.id = q.story_part_id
                JOIN stories s ON s.id = sp.story_id
-               ORDER BY q.id DESC
+               ORDER BY
+                   -- 1. was gerade laeuft, 2. was als naechstes drankommt,
+                   -- 3. was schon erledigt ist. Vorher stand hier stumpf
+                   -- "q.id DESC", wodurch der laufende Job (aeltester aktiver
+                   -- Eintrag, also kleinste id) hinter allen Wartenden landete
+                   -- und im UI praktisch unsichtbar war.
+                   CASE q.status
+                       WHEN 'processing' THEN 0
+                       WHEN 'pending'    THEN 1
+                       ELSE 2
+                   END,
+                   -- Wartende in echter Abarbeitungsreihenfolge (FIFO)
+                   CASE WHEN q.status IN ('processing', 'pending') THEN q.id END ASC,
+                   -- Erledigte/Fehlerhafte: zuletzt passiertes zuerst
+                   q.id DESC
                LIMIT 500"""
         ).fetchall()
     return jsonify([dict(j) for j in jobs])
