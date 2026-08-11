@@ -1001,7 +1001,7 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
                 ",drawtext=text='KI-generiert':"
                 f"fontfile='{font_escaped}':"
                 "fontsize=30:fontcolor=white@0.85:"
-                "x=30:y=h-text_h-60:"
+                "x=30:y=(h-text_h)/2:"
                 "box=1:boxcolor=black@0.45:boxborderw=14"
             )
         _run_sub(
@@ -1269,6 +1269,10 @@ def upload_to_youtube(story_part_id: int, youtube_account_id: int) -> str:
         "status": {
             "privacyStatus": _yt_privacy_status(),
             "selfDeclaredMadeForKids": False,
+            # Selbstauskunft "veraenderte oder synthetische Inhalte" -- damit
+            # zeigt YouTube auf dem Video sein eigenes KI-Label an, zusaetzlich
+            # zum eingebrannten "KI-generiert"-Wasserzeichen im Videobild.
+            "containsSyntheticMedia": True,
         },
     }
     media = MediaFileUpload(str(video_path), chunksize=-1, resumable=True, mimetype="video/mp4")
