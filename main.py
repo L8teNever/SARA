@@ -566,6 +566,34 @@ Rules for Content:
 # TTS — Kokoro-82M (local, offline)
 # ---------------------------------------------------------------------------
 
+def _ensure_ai_label_icon() -> str:
+    """Offizielles EU-Icon "AI GENERATED" (weiss, transparent) fuer die
+    Kennzeichnungspflicht nach Art. 50(4) AI Act -- Teil des von der
+    EU-Kommission veroeffentlichten Icon-Sets, siehe
+    digital-strategy.ec.europa.eu/en/policies/eu-icons-labelling-ai-generated-content.
+    Wird einmalig heruntergeladen und im data-Verzeichnis zwischengespeichert,
+    genau wie das Kokoro-TTS-Modell."""
+    import urllib.request
+    import zipfile
+
+    icon_dir = DATA_DIR / "assets"
+    icon_dir.mkdir(parents=True, exist_ok=True)
+    icon_path = icon_dir / "eu_ai_generated_white_transparent.png"
+
+    if not icon_path.exists():
+        print("Lade offizielles EU-KI-Kennzeichnungs-Icon herunter...")
+        zip_path = icon_dir / "eu_icons_png.zip"
+        urllib.request.urlretrieve(
+            "https://ec.europa.eu/newsroom/dae/redirection/document/129547", zip_path,
+        )
+        with zipfile.ZipFile(zip_path) as z:
+            with z.open("LABEL_AI GENERATED_white transparent.png") as src:
+                icon_path.write_bytes(src.read())
+        zip_path.unlink(missing_ok=True)
+
+    return str(icon_path)
+
+
 def _ensure_kokoro_model() -> tuple:
     import urllib.request
     model_dir = DATA_DIR / "kokoro_models"
@@ -990,37 +1018,56 @@ def create_video_for_part(story_part_id: int, job_id: int) -> Path:
         # Step 5 — FFmpeg render (9:16)
         progress(65, "Video wird gerendert (9:16 Hochformat)...")
         ass_escaped = str(ass_path).replace("\\", "/").replace(":", "\\:")
-        vf_filter = (
+        base_filter = (
             f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,"
             f"crop={VIDEO_WIDTH}:{VIDEO_HEIGHT},"
             f"ass='{ass_escaped}'"
         )
         if DRAWTEXT_FONT:
             font_escaped = DRAWTEXT_FONT.replace("\\", "/").replace(":", "\\:")
-            vf_filter += (
+            base_filter += (
                 ",drawtext=text='KI-generiert':"
                 f"fontfile='{font_escaped}':"
                 "fontsize=30:fontcolor=white@0.85:"
-                "x=30:y=(h-text_h)/2:"
+                "x=30:y=(h-text_h)/2-45:"
                 "box=1:boxcolor=black@0.45:boxborderw=14"
             )
-        _run_sub(
-            [
-                FFMPEG_EXE, "-y",
-                "-i", str(bg_concat),
-                "-i", str(audio_path),
-                "-vf", vf_filter,
-                "-c:v", "libx264",
-                "-c:a", "aac",
-                "-b:a", "192k",
-                "-shortest",
-                "-preset", "fast",
-                "-crf", "23",
-                "-movflags", "+faststart",
-                str(output_path),
-            ],
-            check=True, capture_output=True,
-        )
+
+        try:
+            ai_icon_path = _ensure_ai_label_icon()
+        except Exception as e:
+            print(f"EU-KI-Icon konnte nicht geladen werden, Video wird ohne erstellt: {e}")
+            ai_icon_path = None
+
+        ffmpeg_cmd = [FFMPEG_EXE, "-y", "-i", str(bg_concat), "-i", str(audio_path)]
+        if ai_icon_path:
+            # Amtliches EU-Icon fuer KI-generierte Inhalte (Art. 50 AI Act,
+            # Kennzeichnungspflicht seit 2026-08-02) -- sitzt direkt unter dem
+            # "KI-generiert"-Wasserzeichen, gleiche linke Ausrichtung.
+            ffmpeg_cmd += ["-i", ai_icon_path]
+            filter_complex = (
+                f"[0:v]{base_filter}[base];"
+                "[2:v]scale=-1:44[icon];"
+                "[base][icon]overlay=x=30:y=(H-h)/2+15[vout]"
+            )
+            ffmpeg_cmd += [
+                "-filter_complex", filter_complex,
+                "-map", "[vout]", "-map", "1:a",
+            ]
+        else:
+            ffmpeg_cmd += ["-vf", base_filter]
+
+        ffmpeg_cmd += [
+            "-c:v", "libx264",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-shortest",
+            "-preset", "fast",
+            "-crf", "23",
+            "-movflags", "+faststart",
+            str(output_path),
+        ]
+        _run_sub(ffmpeg_cmd, check=True, capture_output=True)
 
         # Step 6 — Update DB
         progress(95, "Datenbank aktualisiert…")
