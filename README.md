@@ -100,6 +100,31 @@ SARA/
 
 ---
 
+## Stories per Kommandozeile importieren
+
+Statt jede Story einzeln über die GUI zu importieren, geht es mit `import_stories.py` auch direkt per Kommandozeile — praktisch für Bulk-Importe von mehreren KI-generierten Stories auf einmal:
+
+```bash
+# Einzelne Datei
+python import_stories.py meine_story.json
+
+# Alle JSON-Dateien in einem Ordner
+python import_stories.py stories/
+
+# Glob-Muster
+python import_stories.py stories/*.json
+
+# Gegen eine andere SARA-Instanz (Standard: http://localhost:7842)
+python import_stories.py stories/*.json --url http://10.7.0.1:7842
+
+# Nur importieren, nicht automatisch produzieren
+python import_stories.py stories/*.json --no-queue
+```
+
+Jede Datei muss das normale SARA-Story-JSON enthalten (`title`, `total_parts`, `keywords`, `parts[]` — dasselbe Format wie der Prompt-Builder es von der KI erwartet). Duplikate werden erkannt und übersprungen, jeder Import zeigt Erfolg/Fehler pro Datei.
+
+---
+
 ## YouTube-Upload einrichten
 
 Der "YouTube"-Tab erlaubt es, ein oder mehrere Google-Konten per OAuth zu verbinden. Fertige Videos werden dann automatisch als YouTube Shorts hochgeladen — mit einstellbarer Pause zwischen den einzelnen Uploads (Standard: 5 Minuten), damit es nicht nach automatisiertem Massen-Posting aussieht. Bei mehreren verbundenen Kanälen bekommt jeder Kanal eine eigene Kopie, zeitlich versetzt nacheinander statt alle gleichzeitig.
