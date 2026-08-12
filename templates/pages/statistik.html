@@ -3,76 +3,85 @@
 <div id="statistik-main">
 <div class="wrap">
 
-  <div class="card card--hero" style="margin-top:4px">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px">
-      <div class="flabel" style="color:rgba(255,255,255,.65)">Netzwerk Gesamt-Performance</div>
-      <button class="btn btn--text btn--sm" style="color:#fff" onclick="openChartModal()">
-        Grafen anzeigen <span class="mi" style="font-size:16px">chevron_right</span>
+  <!-- Kompaktes Kennzahlen-Raster: ersetzt die vorherigen zwei separaten
+       Karten (Hero + Produktions-Ueberblick). Ein Grid statt zwei Kartem
+       mit je eigenem Innenabstand spart auf Mobilgeraeten spuerbar
+       Bildschirmhoehe, ohne Informationen zu verlieren. -->
+  <div class="card" style="margin-top:4px;padding:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 4px 12px">
+      <div class="flabel">Netzwerk-Überblick</div>
+      <button class="btn btn--text btn--sm" onclick="openChartModal()">
+        Verlauf <span class="mi" style="font-size:16px">chevron_right</span>
       </button>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px 12px">
-      <div>
-        <div style="font-size:26px;font-weight:800" id="stat-subs">–</div>
-        <div style="font-size:12px;opacity:.75;margin-top:2px">Abonnenten Gesamt</div>
-        <div style="font-size:11px;opacity:.6;margin-top:1px" id="stat-subs-avg"></div>
+    <div class="statgrid">
+      <div class="statgrid__cell">
+        <div class="statgrid__num" id="stat-subs">–</div>
+        <div class="statgrid__lbl">Abonnenten</div>
+        <div class="statgrid__sub" id="stat-subs-avg"></div>
       </div>
-      <div>
-        <div style="font-size:26px;font-weight:800;color:var(--cg)" id="stat-videos">–</div>
-        <div style="font-size:12px;opacity:.75;margin-top:2px">Videos Hochgeladen</div>
+      <div class="statgrid__cell">
+        <div class="statgrid__num" style="color:var(--cg)" id="stat-videos">–</div>
+        <div class="statgrid__lbl">Hochgeladen</div>
       </div>
-      <div>
-        <div style="font-size:26px;font-weight:800;color:var(--cp)" id="stat-views">–</div>
-        <div style="font-size:12px;opacity:.75;margin-top:2px">Gesamtaufrufe</div>
-        <div style="font-size:11px;opacity:.6;margin-top:1px" id="stat-views-avg"></div>
+      <div class="statgrid__cell">
+        <div class="statgrid__num" style="color:var(--cp)" id="stat-views">–</div>
+        <div class="statgrid__lbl">Aufrufe</div>
+        <div class="statgrid__sub" id="stat-views-avg"></div>
+      </div>
+      <div class="statgrid__cell">
+        <div class="statgrid__num" id="stat-total-videos">–</div>
+        <div class="statgrid__lbl">Erstellt</div>
+      </div>
+      <div class="statgrid__cell">
+        <div class="statgrid__num" style="color:var(--cg)" id="stat-full-uploaded">–</div>
+        <div class="statgrid__lbl">Vollständig</div>
+      </div>
+      <div class="statgrid__cell">
+        <div class="statgrid__num" style="color:var(--cw)" id="stat-partial-uploaded">–</div>
+        <div class="statgrid__lbl">Teilweise</div>
+      </div>
+      <div class="statgrid__cell">
+        <div class="statgrid__num" style="color:var(--cosv)" id="stat-not-uploaded">–</div>
+        <div class="statgrid__lbl">Wartend</div>
+      </div>
+      <div class="statgrid__cell statgrid__cell--wide">
+        <div class="statgrid__num" style="color:var(--cp);font-size:19px" id="stat-days-left">–</div>
+        <div class="statgrid__lbl">Content reicht noch</div>
+        <div class="statgrid__sub" id="stat-days-left-date"></div>
       </div>
     </div>
   </div>
 
-  <div class="lbl" style="margin-top:24px"><span class="mi">movie</span> Produktions-Überblick</div>
-  <div class="card">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px 12px">
-      <div>
-        <div style="font-size:26px;font-weight:800" id="stat-total-videos">–</div>
-        <div style="font-size:12px;color:var(--cosv);margin-top:2px">Videos erstellt</div>
-      </div>
-      <div>
-        <div style="font-size:26px;font-weight:800;color:var(--cg)" id="stat-full-uploaded">–</div>
-        <div style="font-size:12px;color:var(--cosv);margin-top:2px">Vollständig hochgeladen</div>
-      </div>
-      <div>
-        <div style="font-size:26px;font-weight:800;color:var(--cw)" id="stat-partial-uploaded">–</div>
-        <div style="font-size:12px;color:var(--cosv);margin-top:2px">Teilweise hochgeladen</div>
-      </div>
-      <div>
-        <div style="font-size:26px;font-weight:800;color:var(--cosv)" id="stat-not-uploaded">–</div>
-        <div style="font-size:12px;color:var(--cosv);margin-top:2px">Warten auf Upload</div>
-      </div>
-    </div>
-    <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--covv)">
-      <div style="font-size:22px;font-weight:800;color:var(--cp)" id="stat-days-left">–</div>
-      <div style="font-size:12px;color:var(--cosv);margin-top:2px">Content reicht noch, bei ca. 10 Uploads pro Kanal und Tag</div>
-      <div style="font-size:11px;color:var(--cosv);opacity:.7;margin-top:2px" id="stat-days-left-date"></div>
+  <div class="row" style="gap:12px;margin-top:14px;align-items:stretch">
+    <div class="card" id="channel-compare-card" style="flex:1;min-width:0;padding:12px">
+      <div class="flabel" style="padding:2px 4px 8px">Kanal-Vergleich</div>
+      <div style="position:relative"><canvas id="channel-compare-canvas" style="width:100%;display:block"></canvas></div>
+      <div id="channel-compare-empty" style="display:none" class="empty" style="padding:12px 0"><span class="empty__sub">Noch keine Daten</span></div>
     </div>
   </div>
 
-  <div class="lbl" style="margin-top:24px"><span class="mi">bar_chart</span> Kanal-Vergleich · Aufrufe</div>
-  <div class="card" id="channel-compare-card">
-    <div style="position:relative"><canvas id="channel-compare-canvas" style="width:100%;display:block"></canvas></div>
-    <div id="channel-compare-empty" style="display:none" class="empty"><span class="empty__sub">Noch keine Daten</span></div>
-  </div>
-
-  <div class="lbl" style="margin-top:24px;display:flex;align-items:center;justify-content:space-between">
+  <div class="lbl" style="margin-top:14px;display:flex;align-items:center;justify-content:space-between">
     <span><span class="mi">trophy</span> Top Videos</span>
     <button class="btn btn--text btn--sm" onclick="openStatistikVideos()">
-      Alle anzeigen <span class="mi" style="font-size:16px">chevron_right</span>
+      Alle <span class="mi" style="font-size:16px">chevron_right</span>
     </button>
   </div>
-  <div class="card" style="padding:8px" id="top-videos-card">
-    <div style="display:flex;justify-content:center;padding:24px"><div class="spinner"></div></div>
+  <div class="card" style="padding:6px" id="top-videos-card">
+    <div style="display:flex;justify-content:center;padding:20px"><div class="spinner"></div></div>
   </div>
 
 </div>
 </div>
+
+<style>
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--hairline);border-radius:var(--r3);overflow:hidden}
+.statgrid__cell{background:var(--cs1);padding:12px 8px;text-align:center}
+.statgrid__cell--wide{grid-column:span 3;text-align:left;padding:12px 14px}
+.statgrid__num{font-size:20px;font-weight:800;line-height:1.1}
+.statgrid__lbl{font-size:10.5px;color:var(--cosv);margin-top:3px;letter-spacing:.02em}
+.statgrid__sub{font-size:10px;color:var(--cosv);opacity:.75;margin-top:2px}
+</style>
 
 <!-- Verknuepfte YouTube-Kanaele (Unterseite) -->
 <div id="statistik-channels" style="display:none">
