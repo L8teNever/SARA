@@ -438,50 +438,60 @@ function closeChartModal(){
   document.getElementById('chart-modal').classList.remove('open');
 }
 
+let _chartMode='views'; // 'views' = Gesamtaufrufe, 'avg' = Durchschnitt/Video
+let _chartSeries=[];
+
 async function loadViewsChart(){
   const body=document.getElementById('chart-modal-body');
   body.innerHTML='<div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>';
   try{
-    const d=await fetch('/api/youtube/analytics/views?days=7').then(r=>r.json());
-    if(d.needs_api_enable){
-      body.innerHTML=`
-        <div class="empty" style="padding:20px 0">
-          <span class="mi">build</span>
-          <span class="empty__ttl">YouTube Analytics API nicht aktiviert</span>
-          <span class="empty__sub">Diese API muss einmalig in der Google Cloud Console fürs Projekt freigeschaltet werden — danach ein paar Minuten warten.</span>
-          <a href="${d.api_enable_url||'https://console.cloud.google.com/apis/library/youtubeanalytics.googleapis.com'}" target="_blank" rel="noopener" class="btn btn--filled btn--sm" style="margin-top:14px">
-            <span class="mi">open_in_new</span> API aktivieren
-          </a>
-        </div>`;
-      return;
-    }
-    if(d.needs_reconnect){
-      body.innerHTML=`
-        <div class="empty" style="padding:20px 0">
-          <span class="mi">link_off</span>
-          <span class="empty__ttl">Graph noch nicht verfügbar</span>
-          <span class="empty__sub">Deine Kanäle wurden verbunden, bevor Analytics-Zugriff hinzugefügt wurde.<br>Einmal neu verbinden, um Verlaufsdaten freizuschalten.</span>
-          <a href="/auth/youtube/login" class="btn btn--filled btn--sm" style="margin-top:14px">
-            <span class="mi">refresh</span> Kanal neu verbinden
-          </a>
-        </div>`;
-      return;
-    }
+    const d=await fetch('/api/stats/history?days=30').then(r=>r.json());
     const series=d.series||[];
+    if(series.length<2){
+      body.innerHTML=`
+        <div class="empty" style="padding:20px 0">
+          <span class="mi">insights</span>
+          <span class="empty__ttl">Noch nicht genug Verlaufsdaten</span>
+          <span class="empty__sub">SARA speichert alle 6 Stunden einen Schnappschuss deiner Kanalzahlen. Der Graph füllt sich automatisch — schau in ein paar Tagen wieder vorbei.</span>
+        </div>`;
+      return;
+    }
+    _chartSeries=series;
     body.innerHTML=`
-      <div style="position:relative"><canvas id="views-chart-canvas" style="width:100%;display:block"></canvas></div>
-      <div style="display:flex;justify-content:space-between;margin-top:10px">
-        ${series.map((s,i)=>`<span style="font-size:11px;color:${i===series.length-1?'var(--cg)':'var(--cosv)'};font-weight:${i===series.length-1?700:400}">${_weekdayDE(s.date)}</span>`).join('')}
+      <div class="row" style="gap:6px;margin-bottom:12px">
+        <button class="btn btn--tonal btn--sm" id="chart-btn-views" onclick="_setChartMode('views')" style="flex:1">Gesamtaufrufe</button>
+        <button class="btn btn--outlined btn--sm" id="chart-btn-avg" onclick="_setChartMode('avg')" style="flex:1">⌀ pro Video</button>
       </div>
-      ${d.errors&&d.errors.length?`<div style="font-size:11px;color:var(--cosv);margin-top:12px">Hinweis: ${d.errors.length} Kanal/Kanäle konnten nicht abgefragt werden.</div>`:''}
+      <div style="position:relative"><canvas id="views-chart-canvas" style="width:100%;display:block"></canvas></div>
+      <div id="chart-labels" style="display:flex;justify-content:space-between;margin-top:10px"></div>
+      <div style="font-size:11px;color:var(--cosv);margin-top:12px">Letzte ${series.length} Tage mit gespeicherten Daten · alle 6h aktualisiert</div>
     `;
-    drawViewsChart(series);
+    _renderChartLabels(series);
+    drawViewsChart(series,'views');
   }catch(e){
     body.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`;
   }
 }
 
-function drawViewsChart(series){
+function _renderChartLabels(series){
+  const el=document.getElementById('chart-labels');
+  if(!el) return;
+  // Bei vielen Tagen nicht jeden Tag beschriften, sonst ueberladen -- max. ~6 Labels
+  const step=Math.max(1,Math.ceil(series.length/6));
+  el.innerHTML=series.map((s,i)=>{
+    const show=i===series.length-1||i%step===0;
+    return show?`<span style="font-size:10.5px;color:${i===series.length-1?'var(--cg)':'var(--cosv)'};font-weight:${i===series.length-1?700:400}">${s.date.slice(5)}</span>`:'';
+  }).join('');
+}
+
+function _setChartMode(mode){
+  _chartMode=mode;
+  document.getElementById('chart-btn-views').className=mode==='views'?'btn btn--tonal btn--sm':'btn btn--outlined btn--sm';
+  document.getElementById('chart-btn-avg').className=mode==='avg'?'btn btn--tonal btn--sm':'btn btn--outlined btn--sm';
+  drawViewsChart(_chartSeries,mode);
+}
+
+function drawViewsChart(series,mode){
   const canvas=document.getElementById('views-chart-canvas');
   if(!canvas||!series.length) return;
   const wrap=canvas.parentElement;
@@ -493,14 +503,14 @@ function drawViewsChart(series){
   ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,w,h);
   const pad={l:6,r:6,t:14,b:6};
-  const values=series.map(s=>s.views);
+  const values=series.map(s=>mode==='avg'?s.avg_views_per_video:s.views);
   const max=Math.max(1,...values);
   const stepX=series.length>1?(w-pad.l-pad.r)/(series.length-1):0;
   const pts=series.map((s,i)=>({
     x: pad.l+i*stepX,
-    y: pad.t+(h-pad.t-pad.b)*(1-(s.views/max))
+    y: pad.t+(h-pad.t-pad.b)*(1-(values[i]/max))
   }));
-  ctx.strokeStyle='rgba(255,255,255,.08)';
+  ctx.strokeStyle='var(--hairline)';
   ctx.lineWidth=1;
   for(let i=0;i<=2;i++){
     const y=pad.t+(h-pad.t-pad.b)*i/2;
@@ -529,6 +539,11 @@ function drawViewsChart(series){
     const last=pts[pts.length-1];
     ctx.beginPath();ctx.arc(last.x,last.y,4,0,Math.PI*2);
     ctx.fillStyle='#D0BCFF';ctx.fill();
+    // aktueller Wert als Zahl neben dem letzten Punkt
+    ctx.font='700 12px Inter, sans-serif';
+    ctx.fillStyle='var(--cos)';
+    ctx.textAlign='right';
+    ctx.fillText(_fmtCompact(values[values.length-1]),last.x-8,last.y-8);
   }
 }
 </script>
