@@ -55,6 +55,22 @@
     </div>
   </div>
 
+  <div class="lbl" style="margin-top:24px"><span class="mi">bar_chart</span> Kanal-Vergleich · Aufrufe</div>
+  <div class="card" id="channel-compare-card">
+    <div style="position:relative"><canvas id="channel-compare-canvas" style="width:100%;display:block"></canvas></div>
+    <div id="channel-compare-empty" style="display:none" class="empty"><span class="empty__sub">Noch keine Daten</span></div>
+  </div>
+
+  <div class="lbl" style="margin-top:24px;display:flex;align-items:center;justify-content:space-between">
+    <span><span class="mi">trophy</span> Top Videos</span>
+    <button class="btn btn--text btn--sm" onclick="openStatistikVideos()">
+      Alle anzeigen <span class="mi" style="font-size:16px">chevron_right</span>
+    </button>
+  </div>
+  <div class="card" style="padding:8px" id="top-videos-card">
+    <div style="display:flex;justify-content:center;padding:24px"><div class="spinner"></div></div>
+  </div>
+
 </div>
 </div>
 
@@ -63,6 +79,16 @@
   <div class="wrap">
     <div class="lbl" id="stat-channels-lbl" style="margin-top:4px"><span class="mi">smart_display</span> Verknüpfte YouTube-Kanäle</div>
     <div id="stat-channels">
+      <div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Alle Videos im Aufrufe-Ranking (Unterseite) -->
+<div id="statistik-videos" style="display:none">
+  <div class="wrap">
+    <div class="lbl" id="stat-videos-lbl" style="margin-top:4px"><span class="mi">trophy</span> Videos nach Aufrufen</div>
+    <div id="stat-videos-list">
       <div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>
     </div>
   </div>
@@ -171,8 +197,155 @@ async function computeRealViewsByAccount(){
   return {total,byAccount};
 }
 
+/* Rangliste einzelner Videos nach echten Aufrufen -- gleiche Datenquelle
+   und ID-Extraktion wie computeRealViewsByAccount(), nur pro Video statt
+   pro Konto aufsummiert. */
+async function computeVideoRanking(){
+  const videos=await fetch('/api/videos').then(r=>r.json());
+  const entries=[];
+  videos.forEach(s=>(s.parts||[]).forEach(p=>(p.uploads||[]).forEach(u=>{
+    if(!u.platform||!u.platform.startsWith('youtube:'))return;
+    const m=(u.notes||'').match(/v=([\w-]+)/);
+    if(!m)return;
+    const social=p.social||{};
+    entries.push({
+      video_id: m[1],
+      title: social.video_title || `${s.title} — Teil ${p.part_number}`,
+      channel_title: (u.notes||'').split(' · ')[0] || '',
+      account_id: u.platform.split(':')[1],
+      views: 0,
+    });
+  })));
+  if(!entries.length) return entries;
+  const ids=[...new Set(entries.map(e=>e.video_id))];
+  const stats=await fetch('/api/youtube/stats?video_ids='+ids.join(',')).then(r=>r.json());
+  entries.forEach(e=>{ e.views=stats[e.video_id]?.views||0; });
+  entries.sort((a,b)=>b.views-a.views);
+  return entries;
+}
+
+function _videoRow(entry,rank){
+  const row=document.createElement('div');
+  row.className='lrow';
+  row.style.cursor='default';
+  const medal=rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':null;
+  row.innerHTML=`
+    <div style="width:32px;height:32px;border-radius:var(--rf);flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--cs2);font-size:${medal?'16px':'13px'};font-weight:700;color:var(--cosv)">${medal||rank}</div>
+    <div class="lrow__info">
+      <div class="lrow__head"><div class="lrow__title">${escHtml(entry.title)}</div></div>
+      <div class="lrow__meta">${escHtml(entry.channel_title)}</div>
+    </div>
+    <div style="flex-shrink:0;font-weight:800;color:var(--cp);font-size:15px">${_fmtCompact(entry.views)}</div>`;
+  return row;
+}
+
+async function loadTopVideos(){
+  const card=document.getElementById('top-videos-card');
+  try{
+    const ranking=await computeVideoRanking();
+    if(!ranking.length){
+      card.innerHTML='<div class="empty" style="padding:20px 0"><span class="empty__sub">Noch keine hochgeladenen Videos mit Aufrufzahlen</span></div>';
+      return;
+    }
+    card.innerHTML='';
+    ranking.slice(0,5).forEach((e,i)=>card.appendChild(_videoRow(e,i+1)));
+  }catch(e){
+    card.innerHTML=`<div class="empty" style="padding:20px 0"><span class="empty__sub">Fehler: ${e.message}</span></div>`;
+  }
+}
+
+function openStatistikVideos(push=true){
+  document.getElementById('statistik-main').style.display='none';
+  document.getElementById('statistik-videos').style.display='block';
+  if(push) history.pushState({tab:'statistik',view:'videos'},'','/statistik/videos');
+  enterSubpage('Videos nach Aufrufen', closeStatistikVideos);
+  loadStatistikVideosPage();
+}
+function closeStatistikVideos(push=true){
+  document.getElementById('statistik-videos').style.display='none';
+  document.getElementById('statistik-main').style.display='block';
+  if(push) history.pushState({tab:'statistik'},'','/statistik');
+  exitSubpage();
+}
+async function loadStatistikVideosPage(){
+  const c=document.getElementById('stat-videos-list');
+  c.innerHTML='<div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>';
+  try{
+    const ranking=await computeVideoRanking();
+    document.getElementById('stat-videos-lbl').innerHTML=`<span class="mi">trophy</span> Videos nach Aufrufen (${ranking.length})`;
+    if(!ranking.length){
+      c.innerHTML='<div class="empty"><span class="mi">trophy</span><span class="empty__ttl">Noch keine Daten</span></div>';
+      return;
+    }
+    c.innerHTML='';
+    ranking.forEach((e,i)=>c.appendChild(_videoRow(e,i+1)));
+  }catch(e){
+    c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`;
+  }
+}
+
+/* Kompaktes horizontales Balkendiagramm zum Kanal-Vergleich -- bewusst als
+   eigene Canvas-Zeichnung statt Chart-Bibliothek, gleiches Muster wie
+   drawViewsChart(), um kein zusaetzliches Skript nachladen zu muessen. */
+function drawChannelCompareChart(chans,viewsByAccount){
+  const canvas=document.getElementById('channel-compare-canvas');
+  const emptyEl=document.getElementById('channel-compare-empty');
+  if(!canvas) return;
+  const data=chans.map(ch=>({
+    label: ch.channel_title||'Kanal',
+    value: viewsByAccount[String(ch.account_id)]||0,
+  })).sort((a,b)=>b.value-a.value);
+
+  if(!data.length || data.every(d=>d.value===0)){
+    canvas.style.display='none';
+    if(emptyEl) emptyEl.style.display='block';
+    return;
+  }
+  canvas.style.display='block';
+  if(emptyEl) emptyEl.style.display='none';
+
+  const wrap=canvas.parentElement;
+  const dpr=window.devicePixelRatio||1;
+  const rowH=34, w=wrap.clientWidth||440, h=data.length*rowH+8;
+  canvas.width=w*dpr; canvas.height=h*dpr;
+  canvas.style.width=w+'px'; canvas.style.height=h+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+
+  const max=Math.max(1,...data.map(d=>d.value));
+  const labelW=110, valueW=56, barMaxW=w-labelW-valueW-8;
+
+  ctx.font='12px Inter, sans-serif';
+  ctx.textBaseline='middle';
+  data.forEach((d,i)=>{
+    const y=i*rowH+rowH/2+4;
+    ctx.fillStyle='rgba(255,255,255,.75)';
+    ctx.textAlign='left';
+    const label=d.label.length>13?d.label.slice(0,12)+'…':d.label;
+    ctx.fillText(label,0,y);
+
+    const barW=Math.max(3,(d.value/max)*barMaxW);
+    const grad=ctx.createLinearGradient(labelW,0,labelW+barW,0);
+    grad.addColorStop(0,'#D0BCFF');
+    grad.addColorStop(1,'#8C6FD1');
+    ctx.fillStyle=grad;
+    const barH=16, barY=i*rowH+(rowH-barH)/2+4;
+    ctx.beginPath();
+    if(ctx.roundRect) ctx.roundRect(labelW,barY,barW,barH,8); else ctx.rect(labelW,barY,barW,barH);
+    ctx.fill();
+
+    ctx.fillStyle='#fff';
+    ctx.font='700 12px Inter, sans-serif';
+    ctx.textAlign='right';
+    ctx.fillText(_fmtCompact(d.value),w,y);
+    ctx.font='12px Inter, sans-serif';
+  });
+}
+
 async function loadStatistik(){
   loadProductionOverview();
+  loadTopVideos();
   const c=document.getElementById('stat-channels');
   try{
     const [chans,viewsData]=await Promise.all([
@@ -180,6 +353,7 @@ async function loadStatistik(){
       computeRealViewsByAccount().catch(()=>({total:0,byAccount:{}})),
     ]);
     _statChannels=chans;
+    drawChannelCompareChart(chans,viewsData.byAccount||{});
 
     let subs=0,vids=0,anyHidden=false,anyOk=false;
     chans.forEach(ch=>{

@@ -580,7 +580,7 @@ const TAB_URL={story:'/',video:'/video',library:'/library',statistik:'/statistik
    auf einer Unterseite verlassen hat, beim naechsten Mal wieder mit
    seiner Hauptansicht startet statt mit der stehengebliebenen
    Unterseite (die dann falsche/keine Daten zeigte). */
-const SUBVIEW_CLOSERS=['closeStorySettings','closeVideoSettings','closeLibDetail','closeMedienSettings','closeMedienAccounts','closeBackgroundsView','closeStatistikChannels'];
+const SUBVIEW_CLOSERS=['closeStorySettings','closeVideoSettings','closeLibDetail','closeMedienSettings','closeMedienAccounts','closeBackgroundsView','closeStatistikChannels','closeStatistikVideos'];
 function _closeAllSubviews(){
   SUBVIEW_CLOSERS.forEach(fn=>{ if(typeof window[fn]==='function') window[fn](false); });
 }
@@ -848,11 +848,12 @@ function closeModal(){
 /* ── Init ────────────────────────────────────────────────── */
 (function(){
   const p=location.pathname;
-  let tab='story';
+  let tab='statistik'; // Standard-Tab: bei laufender Automatisierung schaut man meist nur noch auf die Zahlen
   let pendingStorySettings=false;
   let pendingVideoSettings=false;
   let pendingMedienView=null;
   let pendingStatistikChannels=false;
+  let pendingStatistikVideos=false;
   if(p.startsWith('/story/einstellungen')) pendingStorySettings=true;
   if(p.startsWith('/video')){
     tab='video';
@@ -866,6 +867,7 @@ function closeModal(){
   else if(p.startsWith('/statistik')){
     tab='statistik';
     if(p.startsWith('/statistik/kanaele')) pendingStatistikChannels=true;
+    else if(p.startsWith('/statistik/videos')) pendingStatistikVideos=true;
   }
   else if(p.startsWith('/medien') || p.startsWith('/upload') || p.startsWith('/channels')){
     tab='medien';
@@ -889,6 +891,7 @@ function closeModal(){
   if(pendingMedienView==='settings' && typeof openMedienSettings==='function') openMedienSettings(false);
   if(pendingMedienView==='accounts' && typeof openMedienAccounts==='function') openMedienAccounts(false);
   if(pendingStatistikChannels && typeof openStatistikChannels==='function') openStatistikChannels(false);
+  if(pendingStatistikVideos && typeof openStatistikVideos==='function') openStatistikVideos(false);
   startSSE();
 })();
 </script>
