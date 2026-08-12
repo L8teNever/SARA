@@ -188,14 +188,24 @@ async function loadStatistik(){
       if(ch.subscriber_count!=null) subs+=ch.subscriber_count; else anyHidden=true;
       vids+=ch.video_count||0;
     });
+    // Fallback: computeRealViewsByAccount() zaehlt echte Aufrufe pro Video,
+    // basiert aber auf SARAs eigener Story-/Upload-Historie (/api/videos).
+    // Ist die leer -- z.B. nach einem Datenbank-Reset, waehrend die Kanaele
+    // selbst weiter live auf YouTube stehen -- auf die direkten
+    // Kanal-Gesamtzahlen aus /api/youtube/channel-stats ausweichen, statt 0
+    // anzuzeigen, obwohl real Aufrufe da sind.
+    const viewsFallbackTotal = chans.reduce((s,ch)=>s+(ch.view_count||0),0);
+    const usingFallback = viewsData.total===0 && viewsFallbackTotal>0;
+    const displayTotal = usingFallback ? viewsFallbackTotal : viewsData.total;
+
     document.getElementById('stat-subs').textContent=anyOk?(_fmtCompact(subs)+(anyHidden?'+':'')):'–';
     document.getElementById('stat-videos').textContent=anyOk?vids.toLocaleString('de-DE'):'–';
-    document.getElementById('stat-views').textContent=_fmtCompact(viewsData.total);
+    document.getElementById('stat-views').textContent=_fmtCompact(displayTotal);
 
     const subsAvgEl=document.getElementById('stat-subs-avg');
     if(subsAvgEl) subsAvgEl.textContent=(anyOk&&!anyHidden&&chans.length)?`⌀ ${(subs/chans.length).toLocaleString('de-DE',{maximumFractionDigits:1})} pro Kanal`:'';
     const viewsAvgEl=document.getElementById('stat-views-avg');
-    if(viewsAvgEl) viewsAvgEl.textContent=chans.length?`⌀ ${_fmtCompact(Math.round(viewsData.total/chans.length))} pro Kanal`:'';
+    if(viewsAvgEl) viewsAvgEl.textContent=chans.length?`⌀ ${_fmtCompact(Math.round(displayTotal/chans.length))} pro Kanal`:'';
 
     document.getElementById('stat-channels-lbl').innerHTML=`<span class="mi">smart_display</span> Verknüpfte YouTube-Kanäle (${chans.length})`;
 
