@@ -13,6 +13,67 @@
   <style>
 /* ── Material You Dark Tokens ─────────────────────────────── */
 :root {
+  /* ── Light Palette (Basis) ──────────────────────────────── */
+  --cp:  #6750A4; --cop:  #FFFFFF;
+  --cpc: #EADDFF; --copc: #21005D;
+  --csc: #E8DEF8; --cosc: #1D192B;
+  --cs:  #FFFBFE;
+  --cs0: #F7F2FA;
+  --cs1: #F3EDF7;
+  --cs2: #ECE6F0;
+  --cs3: #E6E0E9;
+  --cos:  #1C1B1F;
+  --cosv: #49454F;
+  --co:   #79747E;
+  --cov:  #CAC4D0;
+  --covv: #E7E0EC;
+  --ce: #B3261E; --cec: #F9DEDC;
+  --cg: #146C2E; --cgc: #C8F7D3;
+  --cw: #FFB951;
+  --r1: 8px; --r2: 16px; --r3: 20px; --r4: 28px; --r5: 24px; --rf: 9999px;
+  --rail: 220px; --botnav: 72px;
+  --e1: 0 1px 2px rgba(0,0,0,.12),0 1px 3px 1px rgba(0,0,0,.08);
+  --e2: 0 4px 16px rgba(0,0,0,.14),0 1px 4px rgba(0,0,0,.10);
+  --e3: 0 8px 28px rgba(0,0,0,.18),0 2px 8px rgba(0,0,0,.12);
+  --glass-rgb: 255,255,255;
+  --glass-a1: .72; --glass-a2: .82;
+  --glass-border: rgba(0,0,0,.08);
+  --hairline: rgba(0,0,0,.08);
+  --hairline-hover: rgba(0,0,0,.14);
+  --tint-02: rgba(0,0,0,.03);
+}
+/* System steht auf "dunkel" und es gibt keine explizite Nutzerwahl (data-theme) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --cp:  #D0BCFF; --cop:  #381E72;
+    --cpc: #4F378B; --copc: #EADDFF;
+    --csc: #3B384E; --cosc: #E8DEF8;
+    --cs:  #0F1015;
+    --cs0: #181920;
+    --cs1: #20222C;
+    --cs2: #2B2D3A;
+    --cs3: #363848;
+    --cos:  #E6E1E5;
+    --cosv: #CAC4D0;
+    --co:   #938F99;
+    --cov:  #49454F;
+    --covv: #2E303E;
+    --ce: #F2B8B5; --cec: #8C1D18;
+    --cg: #6DD58C; --cgc: #0A3818;
+    --cw: #FFB951;
+    --e1: 0 1px 2px rgba(0,0,0,.35),0 1px 3px 1px rgba(0,0,0,.2);
+    --e2: 0 4px 16px rgba(0,0,0,.4),0 1px 4px rgba(0,0,0,.25);
+    --e3: 0 8px 28px rgba(0,0,0,.5),0 2px 8px rgba(0,0,0,.3);
+    --glass-rgb: 32,34,44;
+    --glass-a1: .72; --glass-a2: .82;
+    --glass-border: rgba(255,255,255,.07);
+    --hairline: rgba(255,255,255,.05);
+    --hairline-hover: rgba(255,255,255,.08);
+    --tint-02: rgba(255,255,255,.02);
+  }
+}
+/* Explizite Nutzerwahl "dunkel" gewinnt immer, auch wenn das System hell steht */
+:root[data-theme="dark"] {
   --cp:  #D0BCFF; --cop:  #381E72;
   --cpc: #4F378B; --copc: #EADDFF;
   --csc: #3B384E; --cosc: #E8DEF8;
@@ -29,11 +90,15 @@
   --ce: #F2B8B5; --cec: #8C1D18;
   --cg: #6DD58C; --cgc: #0A3818;
   --cw: #FFB951;
-  --r1: 8px; --r2: 16px; --r3: 20px; --r4: 28px; --r5: 24px; --rf: 9999px;
-  --rail: 220px; --botnav: 72px;
   --e1: 0 1px 2px rgba(0,0,0,.35),0 1px 3px 1px rgba(0,0,0,.2);
   --e2: 0 4px 16px rgba(0,0,0,.4),0 1px 4px rgba(0,0,0,.25);
   --e3: 0 8px 28px rgba(0,0,0,.5),0 2px 8px rgba(0,0,0,.3);
+  --glass-rgb: 32,34,44;
+  --glass-a1: .72; --glass-a2: .82;
+  --glass-border: rgba(255,255,255,.07);
+  --hairline: rgba(255,255,255,.05);
+  --hairline-hover: rgba(255,255,255,.08);
+  --tint-02: rgba(255,255,255,.02);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
@@ -58,8 +123,8 @@ input,textarea,select{font:inherit;color:inherit}
    den Weichzeichner), statt dass beide nur fest oben/unten eingerahmten
    Platz belegen. */
 .ghead{position:fixed;top:14px;left:16px;right:16px;z-index:40;padding:10px 10px 10px 22px;border-radius:var(--rf);
-  background:rgba(32,34,44,.72);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);
-  border:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:12px;box-shadow:var(--e2)}
+  background:rgba(var(--glass-rgb),var(--glass-a1));backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);
+  border:1px solid var(--glass-border);display:flex;align-items:center;gap:12px;box-shadow:var(--e2)}
 .ghead__logo{font-size:17px;font-weight:800;letter-spacing:.04em;flex-shrink:0}
 .ghead__title{flex:1;min-width:0;font-size:15.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ghead__back{flex-shrink:0;background:var(--cs2)}
@@ -79,7 +144,7 @@ input,textarea,select{font:inherit;color:inherit}
 
 /* ── Sidebar (desktop) ──────────────────────────────────── */
 .rail{width:var(--rail);flex-shrink:0;margin-right:16px;background:var(--cs0);border-radius:var(--r5);
-  border:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;padding:20px 14px;box-shadow:var(--e1);overflow-y:auto}
+  border:1px solid var(--hairline);display:flex;flex-direction:column;padding:20px 14px;box-shadow:var(--e1);overflow-y:auto}
 .rail__eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--co);padding:0 12px;margin-bottom:12px}
 .rail__item{position:relative;display:flex;align-items:center;gap:12px;width:100%;padding:11px 16px;border-radius:var(--rf);
   color:var(--cosv);font-size:13.5px;font-weight:500;transition:background .18s,color .18s;cursor:pointer;margin-bottom:2px}
@@ -90,8 +155,8 @@ input,textarea,select{font:inherit;color:inherit}
 
 /* ── Bottom nav (mobile) — floating pill, ueberlagert Inhalt ────── */
 .botnav{display:none;position:fixed;left:0;right:0;bottom:0;z-index:40;justify-content:center;padding:10px 0 calc(10px + env(safe-area-inset-bottom))}
-.botnav__pill{display:flex;align-items:center;gap:2px;background:rgba(32,34,44,.82);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);
-  border:1px solid rgba(255,255,255,.07);border-radius:var(--rf);padding:6px;box-shadow:var(--e2)}
+.botnav__pill{display:flex;align-items:center;gap:2px;background:rgba(var(--glass-rgb),var(--glass-a2));backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);
+  border:1px solid var(--glass-border);border-radius:var(--rf);padding:6px;box-shadow:var(--e2)}
 .botnav__item{position:relative;display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;color:var(--cosv);transition:background .18s,color .18s}
 .botnav__item.is-active{background:var(--cp);color:var(--cop)}
 .botnav__item.is-active .mi{font-variation-settings:'FILL' 1,'wght' 500,'GRAD' 0,'opsz' 24}
@@ -112,14 +177,14 @@ input,textarea,select{font:inherit;color:inherit}
 .page-hdr__sub{font-size:13px;color:var(--cosv);margin-top:4px}
 
 /* ── Cards ───────────────────────────────────────────────── */
-.card{background:var(--cs1);border-radius:var(--r5);padding:22px;margin-bottom:14px;border:1px solid rgba(255,255,255,.05)}
+.card{background:var(--cs1);border-radius:var(--r5);padding:22px;margin-bottom:14px;border:1px solid var(--hairline)}
 .card:last-child{margin-bottom:0}
 .card--el{background:var(--cs0);box-shadow:var(--e1);border:none}
 .card--hero{background:linear-gradient(135deg,var(--cpc),#2E2359);color:var(--copc);border:none;box-shadow:var(--e2)}
 
 /* Step cards */
-.step-card{background:var(--cs1);border-radius:var(--r5);border:1px solid rgba(255,255,255,.05);overflow:hidden;margin-bottom:14px}
-.step-card__hdr{display:flex;align-items:center;gap:14px;padding:18px 22px;background:rgba(255,255,255,.02);border-bottom:1px solid rgba(255,255,255,.05)}
+.step-card{background:var(--cs1);border-radius:var(--r5);border:1px solid var(--hairline);overflow:hidden;margin-bottom:14px}
+.step-card__hdr{display:flex;align-items:center;gap:14px;padding:18px 22px;background:var(--tint-02);border-bottom:1px solid var(--hairline)}
 .step-card__num{width:32px;height:32px;flex-shrink:0;border-radius:var(--rf);background:var(--cpc);color:var(--copc);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;letter-spacing:-.3px}
 .step-card__title{font-size:15px;font-weight:700;line-height:1.2}
 .step-card__sub{font-size:12px;color:var(--cosv);margin-top:2px}
@@ -131,7 +196,7 @@ input,textarea,select{font:inherit;color:inherit}
 
 /* ── Status boxes ────────────────────────────────────────── */
 .tbox{display:flex;align-items:center;gap:14px;background:var(--cpc);color:var(--copc);border-radius:var(--r3);padding:16px 20px;margin-bottom:14px}
-.tbox--surface{background:var(--cs3);color:var(--cos);border:1px solid rgba(255,255,255,.05)}
+.tbox--surface{background:var(--cs3);color:var(--cos);border:1px solid var(--hairline)}
 .tbox--warn{background:rgba(255,185,81,.1);color:var(--cos);border:1px solid rgba(255,185,81,.3)}
 
 /* ── Buttons ─────────────────────────────────────────────── */
@@ -215,7 +280,7 @@ input,textarea,select{font:inherit;color:inherit}
 .csep__ico.col{transform:rotate(-90deg)}
 
 /* ── Queue job cards ─────────────────────────────────────── */
-.jcard{background:var(--cs1);border-radius:var(--r3);padding:14px 16px;margin-bottom:8px;border:1px solid rgba(255,255,255,.05);transition:border-color .15s}
+.jcard{background:var(--cs1);border-radius:var(--r3);padding:14px 16px;margin-bottom:8px;border:1px solid var(--hairline);transition:border-color .15s}
 .jcard--on{border-color:rgba(208,188,255,.35);background:rgba(79,55,139,.14)}
 .jcard__hdr{display:flex;align-items:center;gap:8px}
 .jcard__ico{color:var(--cosv);display:flex;align-items:center;flex-shrink:0}
@@ -231,8 +296,8 @@ input,textarea,select{font:inherit;color:inherit}
 .jcard__acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 
 /* ── Library rows ────────────────────────────────────────── */
-.lrow{display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:var(--r3);background:var(--cs1);cursor:pointer;border:1px solid rgba(255,255,255,.05);transition:background .15s,border-color .15s;margin-bottom:8px}
-.lrow:hover{background:var(--cs2);border-color:rgba(255,255,255,.08)}
+.lrow{display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:var(--r3);background:var(--cs1);cursor:pointer;border:1px solid var(--hairline);transition:background .15s,border-color .15s;margin-bottom:8px}
+.lrow:hover{background:var(--cs2);border-color:var(--hairline-hover)}
 .lrow__info{flex:1;min-width:0}
 .lrow__title{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lrow__meta{font-size:12px;color:var(--cosv);margin-top:3px}
@@ -245,7 +310,7 @@ input,textarea,select{font:inherit;color:inherit}
 .pdot--ok{background:var(--cpc);color:var(--copc)}
 
 /* ── Video cards (library detail) ───────────────────────── */
-.vcard{display:flex;gap:16px;align-items:flex-start;padding:18px;background:var(--cs1);border-radius:var(--r5);margin-bottom:14px;border:1px solid rgba(255,255,255,.05)}
+.vcard{display:flex;gap:16px;align-items:flex-start;padding:18px;background:var(--cs1);border-radius:var(--r5);margin-bottom:14px;border:1px solid var(--hairline)}
 .vcard__thumb{width:72px;aspect-ratio:9/16;border-radius:var(--r2);background:#000;position:relative;overflow:hidden;flex-shrink:0;cursor:pointer}
 .vcard__thumb img,.vcard__thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:opacity .3s}
 .vcard__thumb video{opacity:0}
@@ -305,7 +370,7 @@ input,textarea,select{font:inherit;color:inherit}
 /* ── Modal ───────────────────────────────────────────────── */
 .mback{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.76);display:none;align-items:center;justify-content:center;padding:24px}
 .mback.open{display:flex}
-.modal{background:var(--cs1);border-radius:var(--r4);padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;animation:mIn .28s cubic-bezier(.2,0,0,1);box-shadow:var(--e3);border:1px solid rgba(255,255,255,.06)}
+.modal{background:var(--cs1);border-radius:var(--r4);padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;animation:mIn .28s cubic-bezier(.2,0,0,1);box-shadow:var(--e3);border:1px solid var(--hairline)}
 .modal__hdr{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 .modal__ttl{flex:1;font-size:18px;font-weight:700}
 .cdlg{max-width:360px;padding:28px}
