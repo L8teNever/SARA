@@ -283,6 +283,25 @@ def init_db():
                 finished_at         TEXT
             )
         """)
+        # Dauerhafter Verlauf der YouTube-Kanalzahlen -- ein Snapshot pro
+        # verbundenem Konto und Abruf, damit die Statistik-Seite echte
+        # Zeitreihen (Wachstum ueber Tage/Wochen) zeigen kann, statt nur den
+        # aktuellen Live-Wert. Unabhaengig von der YouTube Analytics API
+        # (die einen eigenen Scope + manuelle Aktivierung braucht).
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS stats_snapshots (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                youtube_account_id  INTEGER NOT NULL REFERENCES youtube_accounts(id),
+                taken_at            TEXT    NOT NULL DEFAULT (datetime('now')),
+                subscriber_count    INTEGER,
+                video_count         INTEGER,
+                view_count          INTEGER
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_stats_snapshots_taken_at
+            ON stats_snapshots (taken_at)
+        """)
 
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_interval_min', '0')")
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('prod_slots', '')")
@@ -1429,6 +1448,58 @@ def start_youtube_worker():
     threading.Thread(target=youtube_worker, daemon=True, name="YouTubeWorker").start()
 
 
+STATS_SNAPSHOT_INTERVAL_HOURS = 6
+
+
+def _take_stats_snapshot():
+    """Fragt fuer jedes verbundene Konto die aktuellen YouTube-Kanalzahlen ab
+    und speichert sie als Zeile in stats_snapshots -- Grundlage fuer die
+    Zeitreihen-Grafen auf der Statistik-Seite. Ein einzelnes fehlschlagendes
+    Konto (z.B. abgelaufenes Token) darf die anderen nicht verhindern."""
+    with db_session(write=False) as conn:
+        accounts = conn.execute("SELECT * FROM youtube_accounts").fetchall()
+    for acc in accounts:
+        try:
+            creds = _creds_for_account(acc)
+            youtube = yt_build("youtube", "v3", credentials=creds, cache_discovery=False)
+            resp = youtube.channels().list(part="statistics", mine=True).execute()
+            items = resp.get("items", [])
+            if not items:
+                continue
+            stats = items[0].get("statistics", {})
+            with db_session() as conn:
+                conn.execute(
+                    "INSERT INTO stats_snapshots "
+                    "(youtube_account_id, subscriber_count, video_count, view_count) "
+                    "VALUES (?,?,?,?)",
+                    (
+                        acc["id"],
+                        None if stats.get("hiddenSubscriberCount") else int(stats.get("subscriberCount", 0)),
+                        int(stats.get("videoCount", 0)),
+                        int(stats.get("viewCount", 0)),
+                    ),
+                )
+        except Exception as e:
+            print(f"[Stats-Snapshot] Konto {acc['id']} fehlgeschlagen: {e}")
+
+
+def stats_snapshot_worker():
+    """Nimmt beim Start sofort einen Snapshot (damit nicht bis zu
+    STATS_SNAPSHOT_INTERVAL_HOURS gewartet werden muss, bis der erste
+    Datenpunkt existiert) und danach im festen Intervall."""
+    import time as _time
+    while True:
+        try:
+            _take_stats_snapshot()
+        except Exception as e:
+            print(f"[Stats-Snapshot] Lauf fehlgeschlagen: {e}")
+        _time.sleep(STATS_SNAPSHOT_INTERVAL_HOURS * 3600)
+
+
+def start_stats_snapshot_worker():
+    threading.Thread(target=stats_snapshot_worker, daemon=True, name="StatsSnapshotWorker").start()
+
+
 # ---------------------------------------------------------------------------
 # Routes — Pages
 # ---------------------------------------------------------------------------
@@ -2259,6 +2330,44 @@ def api_youtube_channel_stats():
     return jsonify(result)
 
 
+@app.route("/api/stats/history", methods=["GET"])
+def api_stats_history():
+    """Zeitreihe aus den dauerhaft gespeicherten stats_snapshots (siehe
+    stats_snapshot_worker) -- Gesamt-Netzwerkwerte pro Tag, unabhaengig von
+    der YouTube Analytics API (kein Extra-Scope, keine Aktivierung noetig).
+    Pro Tag zaehlt jeweils der letzte Snapshot jedes Kontos an diesem Tag."""
+    days = max(1, min(365, int(request.args.get("days", 30))))
+    since = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    with db_session(write=False) as conn:
+        rows = conn.execute(
+            "SELECT youtube_account_id, taken_at, subscriber_count, video_count, view_count "
+            "FROM stats_snapshots WHERE taken_at >= ? ORDER BY taken_at ASC",
+            (since,),
+        ).fetchall()
+
+    latest_per_day_account = {}
+    for r in rows:
+        day = r["taken_at"][:10]
+        latest_per_day_account[(day, r["youtube_account_id"])] = r
+
+    by_day = {}
+    for (day, _acc), r in latest_per_day_account.items():
+        d = by_day.setdefault(day, {"views": 0, "subs": 0, "videos": 0})
+        d["views"] += r["view_count"] or 0
+        d["subs"] += r["subscriber_count"] or 0
+        d["videos"] += r["video_count"] or 0
+
+    series = []
+    for day in sorted(by_day.keys()):
+        d = by_day[day]
+        avg = round(d["views"] / d["videos"], 1) if d["videos"] else 0
+        series.append({
+            "date": day, "views": d["views"], "subs": d["subs"],
+            "videos": d["videos"], "avg_views_per_video": avg,
+        })
+    return jsonify({"series": series, "has_data": len(series) > 0})
+
+
 @app.route("/api/youtube/analytics/views", methods=["GET"])
 def api_youtube_analytics_views():
     """Aufrufe pro Tag der letzten N Tage (Default 7), aufsummiert ueber alle
@@ -2343,6 +2452,7 @@ if __name__ == "__main__":
     init_db()
     start_queue_worker()
     start_youtube_worker()
+    start_stats_snapshot_worker()
 
     port = int(os.environ.get("PORT", 7842))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
