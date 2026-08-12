@@ -449,31 +449,92 @@ function closeChartModal(){
 
 let _chartMode='views'; // 'views' = Gesamtaufrufe, 'avg' = Durchschnitt/Video
 let _chartSeries=[];
+let _chartGranularity='day';
+let _chartRangeDays=30; // aktuell gewaehltes Preset, fuer die aktive Markierung
 
-async function loadViewsChart(){
+const CHART_RANGES=[
+  {key:'today', label:'Heute',     days:1},
+  {key:'week',  label:'7 Tage',    days:7},
+  {key:'month', label:'Monat',     days:30},
+  {key:'year',  label:'Jahr',      days:365},
+];
+
+async function loadViewsChart(days=30){
+  _chartRangeDays=days;
   const body=document.getElementById('chart-modal-body');
   body.innerHTML='<div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>';
   try{
-    const d=await fetch('/api/stats/history?days=30').then(r=>r.json());
+    const d=await fetch('/api/stats/history?days='+days).then(r=>r.json());
     const series=d.series||[];
+    _chartGranularity=d.granularity||'day';
+    const rangeButtons=`
+      <div class="row" style="gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        ${CHART_RANGES.map(r=>`<button class="btn ${r.days===days?'btn--tonal':'btn--outlined'} btn--sm" onclick="loadViewsChart(${r.days})">${r.label}</button>`).join('')}
+        <button class="btn ${!CHART_RANGES.some(r=>r.days===days)?'btn--tonal':'btn--outlined'} btn--sm" onclick="_promptCustomRange()">
+          <span class="mi" style="font-size:15px">date_range</span> Zeitraum
+        </button>
+      </div>`;
     if(series.length<2){
-      body.innerHTML=`
-        <div class="empty" style="padding:20px 0">
+      body.innerHTML=rangeButtons+`
+        <div class="empty" style="padding:16px 0">
           <span class="mi">insights</span>
           <span class="empty__ttl">Noch nicht genug Verlaufsdaten</span>
-          <span class="empty__sub">SARA speichert alle 6 Stunden einen Schnappschuss deiner Kanalzahlen. Der Graph füllt sich automatisch — schau in ein paar Tagen wieder vorbei.</span>
+          <span class="empty__sub">SARA speichert alle 6 Stunden einen Schnappschuss deiner Kanalzahlen. Der Graph füllt sich automatisch.</span>
         </div>`;
       return;
     }
     _chartSeries=series;
-    body.innerHTML=`
+    body.innerHTML=rangeButtons+`
       <div class="row" style="gap:6px;margin-bottom:12px">
         <button class="btn btn--tonal btn--sm" id="chart-btn-views" onclick="_setChartMode('views')" style="flex:1">Gesamtaufrufe</button>
         <button class="btn btn--outlined btn--sm" id="chart-btn-avg" onclick="_setChartMode('avg')" style="flex:1">⌀ pro Video</button>
       </div>
       <div style="position:relative"><canvas id="views-chart-canvas" style="width:100%;display:block"></canvas></div>
       <div id="chart-labels" style="display:flex;justify-content:space-between;margin-top:10px"></div>
-      <div style="font-size:11px;color:var(--cosv);margin-top:12px">Letzte ${series.length} Tage mit gespeicherten Daten · alle 6h aktualisiert</div>
+      <div style="font-size:11px;color:var(--cosv);margin-top:12px">${series.length} Datenpunkt(e) · alle 6h aktualisiert</div>
+    `;
+    _renderChartLabels(series);
+    drawViewsChart(series,'views');
+  }catch(e){
+    body.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`;
+  }
+}
+
+function _promptCustomRange(){
+  const start=prompt('Startdatum (JJJJ-MM-TT):');
+  if(!start) return;
+  const end=prompt('Enddatum (JJJJ-MM-TT):', new Date().toISOString().slice(0,10));
+  if(!end) return;
+  loadViewsChartRange(start,end);
+}
+
+async function loadViewsChartRange(start,end){
+  const body=document.getElementById('chart-modal-body');
+  body.innerHTML='<div style="display:flex;justify-content:center;padding:32px"><div class="spinner"></div></div>';
+  try{
+    const d=await fetch(`/api/stats/history?start=${start}&end=${end}`).then(r=>r.json());
+    if(d.error){ body.innerHTML=`<div class="empty"><span class="empty__sub">${d.error}</span></div>`; return; }
+    const series=d.series||[];
+    _chartGranularity=d.granularity||'day';
+    _chartRangeDays=-1; // kein Preset aktiv
+    const rangeButtons=`
+      <div class="row" style="gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        ${CHART_RANGES.map(r=>`<button class="btn btn--outlined btn--sm" onclick="loadViewsChart(${r.days})">${r.label}</button>`).join('')}
+        <button class="btn btn--tonal btn--sm" onclick="_promptCustomRange()"><span class="mi" style="font-size:15px">date_range</span> ${start} – ${end}</button>
+      </div>`;
+    if(series.length<2){
+      body.innerHTML=rangeButtons+`<div class="empty" style="padding:16px 0"><span class="empty__sub">Keine Daten in diesem Zeitraum</span></div>`;
+      return;
+    }
+    _chartSeries=series;
+    body.innerHTML=rangeButtons+`
+      <div class="row" style="gap:6px;margin-bottom:12px">
+        <button class="btn btn--tonal btn--sm" id="chart-btn-views" onclick="_setChartMode('views')" style="flex:1">Gesamtaufrufe</button>
+        <button class="btn btn--outlined btn--sm" id="chart-btn-avg" onclick="_setChartMode('avg')" style="flex:1">⌀ pro Video</button>
+      </div>
+      <div style="position:relative"><canvas id="views-chart-canvas" style="width:100%;display:block"></canvas></div>
+      <div id="chart-labels" style="display:flex;justify-content:space-between;margin-top:10px"></div>
+      <div style="font-size:11px;color:var(--cosv);margin-top:12px">${series.length} Datenpunkt(e) · alle 6h aktualisiert</div>
     `;
     _renderChartLabels(series);
     drawViewsChart(series,'views');
@@ -485,11 +546,12 @@ async function loadViewsChart(){
 function _renderChartLabels(series){
   const el=document.getElementById('chart-labels');
   if(!el) return;
-  // Bei vielen Tagen nicht jeden Tag beschriften, sonst ueberladen -- max. ~6 Labels
+  const fmt=s=>_chartGranularity==='hour' ? s.date.slice(11)+':00' : s.date.slice(5);
+  // Bei vielen Punkten nicht jeden beschriften, sonst ueberladen -- max. ~6 Labels
   const step=Math.max(1,Math.ceil(series.length/6));
   el.innerHTML=series.map((s,i)=>{
     const show=i===series.length-1||i%step===0;
-    return show?`<span style="font-size:10.5px;color:${i===series.length-1?'var(--cg)':'var(--cosv)'};font-weight:${i===series.length-1?700:400}">${s.date.slice(5)}</span>`:'';
+    return show?`<span style="font-size:10.5px;color:${i===series.length-1?'var(--cg)':'var(--cosv)'};font-weight:${i===series.length-1?700:400}">${fmt(s)}</span>`:'';
   }).join('');
 }
 

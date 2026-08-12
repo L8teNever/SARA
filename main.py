@@ -2333,39 +2333,59 @@ def api_youtube_channel_stats():
 @app.route("/api/stats/history", methods=["GET"])
 def api_stats_history():
     """Zeitreihe aus den dauerhaft gespeicherten stats_snapshots (siehe
-    stats_snapshot_worker) -- Gesamt-Netzwerkwerte pro Tag, unabhaengig von
-    der YouTube Analytics API (kein Extra-Scope, keine Aktivierung noetig).
-    Pro Tag zaehlt jeweils der letzte Snapshot jedes Kontos an diesem Tag."""
-    days = max(1, min(365, int(request.args.get("days", 30))))
-    since = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    stats_snapshot_worker) -- Gesamt-Netzwerkwerte, unabhaengig von der
+    YouTube Analytics API (kein Extra-Scope, keine Aktivierung noetig).
+
+    Zeitraum entweder ueber `days` (Presets: 1=heute, 7, 30, 365) oder ueber
+    explizite `start`/`end` (Format YYYY-MM-DD) fuer einen frei gewaehlten
+    Zeitraum. Bei kurzen Zeitraeumen (<=2 Tage) wird stundengenau aufgeloest
+    (jede einzelne Momentaufnahme sichtbar), sonst auf Tagesebene verdichtet
+    -- sonst waere ein Jahres-Graph mit hunderten 6-Stunden-Punkten ueberladen."""
+    start_param = request.args.get("start")
+    end_param = request.args.get("end")
+    if start_param and end_param:
+        try:
+            start_dt = datetime.strptime(start_param, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_param, "%Y-%m-%d") + timedelta(days=1)
+        except ValueError:
+            return jsonify({"error": "start/end muessen im Format YYYY-MM-DD sein."}), 400
+    else:
+        days = max(1, min(365, int(request.args.get("days", 30))))
+        end_dt = datetime.utcnow()
+        start_dt = end_dt - timedelta(days=days)
+
+    span_days = (end_dt - start_dt).total_seconds() / 86400
+    hourly = span_days <= 2
+
     with db_session(write=False) as conn:
         rows = conn.execute(
             "SELECT youtube_account_id, taken_at, subscriber_count, video_count, view_count "
-            "FROM stats_snapshots WHERE taken_at >= ? ORDER BY taken_at ASC",
-            (since,),
+            "FROM stats_snapshots WHERE taken_at >= ? AND taken_at < ? ORDER BY taken_at ASC",
+            (start_dt.strftime("%Y-%m-%d %H:%M:%S"), end_dt.strftime("%Y-%m-%d %H:%M:%S")),
         ).fetchall()
 
-    latest_per_day_account = {}
+    bucket_len = 13 if hourly else 10  # "YYYY-MM-DD HH" bzw. "YYYY-MM-DD"
+    latest_per_bucket_account = {}
     for r in rows:
-        day = r["taken_at"][:10]
-        latest_per_day_account[(day, r["youtube_account_id"])] = r
+        bucket = r["taken_at"][:bucket_len]
+        latest_per_bucket_account[(bucket, r["youtube_account_id"])] = r
 
-    by_day = {}
-    for (day, _acc), r in latest_per_day_account.items():
-        d = by_day.setdefault(day, {"views": 0, "subs": 0, "videos": 0})
+    by_bucket = {}
+    for (bucket, _acc), r in latest_per_bucket_account.items():
+        d = by_bucket.setdefault(bucket, {"views": 0, "subs": 0, "videos": 0})
         d["views"] += r["view_count"] or 0
         d["subs"] += r["subscriber_count"] or 0
         d["videos"] += r["video_count"] or 0
 
     series = []
-    for day in sorted(by_day.keys()):
-        d = by_day[day]
+    for bucket in sorted(by_bucket.keys()):
+        d = by_bucket[bucket]
         avg = round(d["views"] / d["videos"], 1) if d["videos"] else 0
         series.append({
-            "date": day, "views": d["views"], "subs": d["subs"],
+            "date": bucket, "views": d["views"], "subs": d["subs"],
             "videos": d["videos"], "avg_views_per_video": avg,
         })
-    return jsonify({"series": series, "has_data": len(series) > 0})
+    return jsonify({"series": series, "has_data": len(series) > 0, "granularity": "hour" if hourly else "day"})
 
 
 @app.route("/api/youtube/analytics/views", methods=["GET"])
