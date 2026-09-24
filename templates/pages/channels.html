@@ -72,7 +72,15 @@
   </div>
 
   <!-- Warteschlange -->
-  <div class="lbl" style="margin-top:28px"><span class="mi">upload</span> Upload-Warteschlange</div>
+  <div class="lbl" style="margin-top:28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+    <span><span class="mi">upload</span> Upload-Warteschlange</span>
+    <div id="yt-queue-filter" style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="chip chip--filter is-active" data-filter="all" onclick="setYtQueueFilter('all')">Alle</button>
+      <button class="chip chip--filter" data-filter="pending" onclick="setYtQueueFilter('pending')">Geplant</button>
+      <button class="chip chip--filter" data-filter="done" onclick="setYtQueueFilter('done')">Hochgeladen</button>
+      <button class="chip chip--filter" data-filter="error" onclick="setYtQueueFilter('error')">Fehler</button>
+    </div>
+  </div>
   <div id="yt-queue-list">
     <div class="empty" style="padding:28px 0"><span class="mi">cloud_upload</span><span class="empty__ttl">Noch keine Uploads</span></div>
   </div>
@@ -177,12 +185,32 @@ async function saveYtSettings(){
   }catch(e){showSnack('Fehler: '+e.message,'error')}
 }
 
+let ytQueueJobs=[];
+let ytQueueFilter='all';
+
+function setYtQueueFilter(f){
+  ytQueueFilter=f;
+  document.querySelectorAll('#yt-queue-filter .chip--filter').forEach(b=>{
+    b.classList.toggle('is-active', b.dataset.filter===f);
+  });
+  renderYtQueue();
+}
+
 async function loadYtQueue(){
   const c=document.getElementById('yt-queue-list');
   try{
-    const jobs=await fetch('/api/youtube/queue').then(r=>r.json());
+    ytQueueJobs=await fetch('/api/youtube/queue').then(r=>r.json());
+    renderYtQueue();
+  }catch(e){c.innerHTML=`<div class="empty"><span class="empty__sub">Fehler: ${e.message}</span></div>`}
+}
+
+function renderYtQueue(){
+  const c=document.getElementById('yt-queue-list');
+  const jobs=ytQueueFilter==='all'?ytQueueJobs:ytQueueJobs.filter(j=>j.status===ytQueueFilter);
+  try{
     if(!jobs.length){
-      c.innerHTML='<div class="empty" style="padding:28px 0"><span class="mi">cloud_upload</span><span class="empty__ttl">Noch keine Uploads</span></div>';
+      const msg=ytQueueFilter==='all'?'Noch keine Uploads':'Keine Einträge für diesen Filter';
+      c.innerHTML=`<div class="empty" style="padding:28px 0"><span class="mi">cloud_upload</span><span class="empty__ttl">${msg}</span></div>`;
       return;
     }
     c.innerHTML='';
