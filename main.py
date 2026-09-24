@@ -2447,7 +2447,7 @@ def api_youtube_queue():
             JOIN youtube_accounts a ON a.id = q.youtube_account_id
             JOIN story_parts sp     ON sp.id = q.story_part_id
             JOIN stories s          ON s.id = sp.story_id
-            ORDER BY q.id DESC LIMIT 50
+            ORDER BY q.scheduled_at ASC
         """).fetchall()
     return jsonify([dict(r) for r in rows])
 
