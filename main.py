@@ -1136,11 +1136,11 @@ def queue_worker():
                             status         = 'processing',
                             progress_pct   = 0,
                             progress_label = 'Starte…',
-                            started_at     = datetime('now')
+                            started_at     = datetime('now','localtime')
                         WHERE id = (
                             SELECT id FROM queue
                             WHERE  status = 'pending'
-                              AND  (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
+                              AND  (scheduled_at IS NULL OR scheduled_at <= datetime('now','localtime'))
                               AND  NOT EXISTS (SELECT 1 FROM queue WHERE status = 'processing')
                             ORDER BY id ASC LIMIT 1
                         )
@@ -1166,7 +1166,7 @@ def queue_worker():
                 with db_session() as conn:
                     conn.execute(
                         "UPDATE queue SET status='done', progress_pct=100, "
-                        "progress_label='Fertig! ✅', finished_at=datetime('now') WHERE id=?",
+                        "progress_label='Fertig! ✅', finished_at=datetime('now','localtime') WHERE id=?",
                         (job_id,),
                     )
                     conn.execute(
@@ -1191,7 +1191,7 @@ def queue_worker():
                 with db_session() as conn:
                     conn.execute(
                         "UPDATE queue SET status='error', error_msg=?, "
-                        "progress_label='Fehler ❌', finished_at=datetime('now') WHERE id=?",
+                        "progress_label='Fehler ❌', finished_at=datetime('now','localtime') WHERE id=?",
                         (str(e), job_id),
                     )
                     conn.execute(
@@ -1387,11 +1387,11 @@ def youtube_worker():
                 row = conn.execute("""
                     UPDATE youtube_queue SET
                         status     = 'processing',
-                        started_at = datetime('now')
+                        started_at = datetime('now','localtime')
                     WHERE id = (
                         SELECT id FROM youtube_queue
                         WHERE  status = 'pending'
-                          AND  (scheduled_at IS NULL OR scheduled_at <= datetime('now'))
+                          AND  (scheduled_at IS NULL OR scheduled_at <= datetime('now','localtime'))
                           AND  NOT EXISTS (SELECT 1 FROM youtube_queue WHERE status = 'processing')
                         ORDER BY id ASC LIMIT 1
                     )
@@ -1411,7 +1411,7 @@ def youtube_worker():
                 video_id = upload_to_youtube(part_id, account_id)
                 with db_session() as conn:
                     conn.execute(
-                        "UPDATE youtube_queue SET status='done', video_id=?, finished_at=datetime('now') "
+                        "UPDATE youtube_queue SET status='done', video_id=?, finished_at=datetime('now','localtime') "
                         "WHERE id=?",
                         (video_id, job_id),
                     )
@@ -1449,7 +1449,7 @@ def youtube_worker():
                 err_str = str(e)
                 with db_session() as conn:
                     conn.execute(
-                        "UPDATE youtube_queue SET status='error', error_msg=?, finished_at=datetime('now') "
+                        "UPDATE youtube_queue SET status='error', error_msg=?, finished_at=datetime('now','localtime') "
                         "WHERE id=?",
                         (err_str, job_id),
                     )
