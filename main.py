@@ -444,6 +444,11 @@ def _enqueue_parts(conn: sqlite3.Connection, part_ids: list, interval_min: int) 
 YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY = 10  # YouTubes eigenes Anti-Spam-Limit, erfahrungsgemaess ca. 10/Tag/Kanal
 YOUTUBE_DAILY_TIMES = ["08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30", "20:00", "21:30"]
 YOUTUBE_RETRY_BUFFER_TIME = "22:30"  # Abend-Puffer-Slot fuer fehlgeschlagene Uploads, damit das Tagesziel trotzdem erreicht wird
+YOUTUBE_NOT_READY_RETRY_MINUTES = 10  # Video noch nicht da: derselben Job kurz zurueckstellen, keinen neuen Tages-Slot verbrauchen
+
+
+class YoutubeVideoNotReady(Exception):
+    """story_parts.video_path fehlt oder Datei ist noch nicht da — kein echter Upload-Fehler."""
 
 
 def _next_youtube_slot(conn: sqlite3.Connection, account_id: int) -> datetime:
@@ -1293,8 +1298,10 @@ def upload_to_youtube(story_part_id: int, youtube_account_id: int) -> str:
             "SELECT * FROM youtube_accounts WHERE id=?", (youtube_account_id,)
         ).fetchone()
 
-    if not part or not part["video_path"]:
-        raise ValueError("Video nicht gefunden oder noch nicht fertig produziert.")
+    if not part:
+        raise ValueError("Story-Teil nicht gefunden.")
+    if not part["video_path"]:
+        raise YoutubeVideoNotReady("Video nicht gefunden oder noch nicht fertig produziert.")
     if not account:
         raise ValueError("YouTube-Konto nicht gefunden (evtl. entfernt).")
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
@@ -1323,7 +1330,7 @@ def upload_to_youtube(story_part_id: int, youtube_account_id: int) -> str:
 
     video_path = BASE_DIR / part["video_path"]
     if not video_path.exists():
-        raise ValueError(f"Videodatei nicht gefunden: {video_path}")
+        raise YoutubeVideoNotReady(f"Videodatei nicht gefunden: {video_path}")
 
     youtube = yt_build("youtube", "v3", credentials=creds, cache_discovery=False)
     body = {
@@ -1419,6 +1426,24 @@ def youtube_worker():
                             f"youtube:{account_id}",
                             f"{ch_title} · https://youtube.com/watch?v={video_id}",
                         ),
+                    )
+            except YoutubeVideoNotReady as e:
+                # Produktion noch nicht fertig: denselben Job pending lassen und
+                # nur scheduled_at nach hinten schieben. Kein status=error, kein
+                # _retry_youtube_slot() — sonst wird ein zusaetzlicher Tages-Slot
+                # verbraucht und die Queue rutscht in die Zukunft.
+                retry_at = datetime.now() + timedelta(minutes=YOUTUBE_NOT_READY_RETRY_MINUTES)
+                retry_at_str = retry_at.strftime("%Y-%m-%d %H:%M:%S")
+                reason = (
+                    f"Produktion noch nicht fertig — erneuter Versuch {retry_at_str}: {e}"
+                )
+                print(f"[YouTube] Job {job_id} Teil {part_id}: {reason}")
+                with db_session() as conn:
+                    conn.execute(
+                        "UPDATE youtube_queue SET status='pending', error_msg=?, "
+                        "scheduled_at=?, started_at=NULL, finished_at=NULL "
+                        "WHERE id=?",
+                        (reason, retry_at_str, job_id),
                     )
             except Exception as e:
                 err_str = str(e)
