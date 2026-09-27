@@ -444,7 +444,7 @@ def _enqueue_parts(conn: sqlite3.Connection, part_ids: list, interval_min: int) 
 YOUTUBE_MAX_UPLOADS_PER_CHANNEL_PER_DAY = 10  # YouTubes eigenes Anti-Spam-Limit, erfahrungsgemaess ca. 10/Tag/Kanal
 YOUTUBE_DAILY_TIMES = ["08:00", "09:30", "11:00", "12:30", "14:00", "15:30", "17:00", "18:30", "20:00", "21:30"]
 YOUTUBE_RETRY_BUFFER_TIME = "22:30"  # Abend-Puffer-Slot fuer fehlgeschlagene Uploads, damit das Tagesziel trotzdem erreicht wird
-YOUTUBE_NOT_READY_RETRY_MINUTES = 10  # Video noch nicht da: derselben Job kurz zurueckstellen, keinen neuen Tages-Slot verbrauchen
+YOUTUBE_VIDEO_WAIT_MINUTES = 20  # Job bleibt pending, wenn das Video noch nicht fertig ist — kein Error, kein zweiter Job
 
 
 class YoutubeVideoNotReady(Exception):
@@ -518,14 +518,32 @@ def _retry_youtube_slot(conn: sqlite3.Connection, account_id: int):
     return candidate
 
 
+def _story_part_has_finished_video(conn: sqlite3.Connection, story_part_id: int) -> bool:
+    part = conn.execute(
+        "SELECT status, video_path FROM story_parts WHERE id=?", (story_part_id,)
+    ).fetchone()
+    return bool(part and part["status"] == "done" and part["video_path"])
+
+
+def _defer_youtube_job(conn: sqlite3.Connection, job_id: int, note: str = None):
+    later = datetime.now() + timedelta(minutes=YOUTUBE_VIDEO_WAIT_MINUTES)
+    conn.execute(
+        "UPDATE youtube_queue SET status='pending', started_at=NULL, finished_at=NULL, "
+        "error_msg=?, scheduled_at=? WHERE id=?",
+        (note, later.strftime("%Y-%m-%d %H:%M:%S"), job_id),
+    )
+
+
 def _enqueue_youtube(conn: sqlite3.Connection, story_part_id: int, account_ids: list) -> list:
     """
     Reiht ein fertiges Video fuer einen oder mehrere verbundene YouTube-Kanaele
     zum Hochladen ein. Jeder Kanal bekommt seine eigene Kette aus festen
     Tageszeiten (siehe YOUTUBE_DAILY_TIMES) und weicht selbstaendig auf den
     naechsten Tag aus, sobald sein Tageslimit erreicht ist -- siehe
-    _next_youtube_slot().
+    _next_youtube_slot(). Nur Teile mit fertigem video_path werden eingereiht.
     """
+    if not _story_part_has_finished_video(conn, story_part_id):
+        return []
     job_ids = []
     for account_id in account_ids:
         existing = conn.execute(
@@ -1407,6 +1425,15 @@ def youtube_worker():
             part_id    = row["story_part_id"]
             account_id = row["youtube_account_id"]
 
+            with db_session(write=False) as conn:
+                video_ready = _story_part_has_finished_video(conn, part_id)
+            if not video_ready:
+                with db_session() as conn:
+                    _defer_youtube_job(
+                        conn, job_id, "Video noch nicht fertig — Upload spaeter erneut."
+                    )
+                continue
+
             try:
                 video_id = upload_to_youtube(part_id, account_id)
                 with db_session() as conn:
@@ -1429,22 +1456,12 @@ def youtube_worker():
                     )
             except YoutubeVideoNotReady as e:
                 # Produktion noch nicht fertig: denselben Job pending lassen und
-                # nur scheduled_at nach hinten schieben. Kein status=error, kein
+                # nur scheduled_at +20min schieben. Kein status=error, kein
                 # _retry_youtube_slot() — sonst wird ein zusaetzlicher Tages-Slot
                 # verbraucht und die Queue rutscht in die Zukunft.
-                retry_at = datetime.now() + timedelta(minutes=YOUTUBE_NOT_READY_RETRY_MINUTES)
-                retry_at_str = retry_at.strftime("%Y-%m-%d %H:%M:%S")
-                reason = (
-                    f"Produktion noch nicht fertig — erneuter Versuch {retry_at_str}: {e}"
-                )
-                print(f"[YouTube] Job {job_id} Teil {part_id}: {reason}")
+                print(f"[YouTube] Job {job_id} Teil {part_id}: {e}")
                 with db_session() as conn:
-                    conn.execute(
-                        "UPDATE youtube_queue SET status='pending', error_msg=?, "
-                        "scheduled_at=?, started_at=NULL, finished_at=NULL "
-                        "WHERE id=?",
-                        (reason, retry_at_str, job_id),
-                    )
+                    _defer_youtube_job(conn, job_id, str(e))
             except Exception as e:
                 err_str = str(e)
                 with db_session() as conn:
@@ -1453,9 +1470,8 @@ def youtube_worker():
                         "WHERE id=?",
                         (err_str, job_id),
                     )
-                    # Echtes YouTube-Tageslimit (uploadLimitExceeded) macht einen Retry
-                    # am selben Tag sinnlos -- alles andere (transiente Fehler) wird noch
-                    # am Abend im Puffer-Slot erneut versucht, siehe _retry_youtube_slot().
+                    # Nur transiente YouTube-API-Fehler noch am selben Tag nachlegen.
+                    # uploadLimitExceeded und fehlendes Video nicht.
                     if "uploadLimitExceeded" not in err_str:
                         retry_slot = _retry_youtube_slot(conn, account_id)
                         if retry_slot:
@@ -2281,6 +2297,8 @@ def api_youtube_upload():
             ]
         if not account_ids:
             return jsonify({"error": "Kein aktiver YouTube-Kanal verbunden."}), 400
+        if not _story_part_has_finished_video(conn, story_part_id):
+            return jsonify({"error": "Video noch nicht fertig produziert."}), 400
         job_ids = _enqueue_youtube(conn, story_part_id, account_ids)
     return jsonify({"success": True, "job_ids": job_ids})
 
