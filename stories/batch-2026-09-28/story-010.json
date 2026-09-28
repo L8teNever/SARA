@@ -1,0 +1,38 @@
+{
+  "title": "I Took the Office Thermostat Log to Facilities After the Sticky-Note War",
+  "total_parts": 2,
+  "keywords": [
+    "thermostat",
+    "office",
+    "facilities",
+    "sticky",
+    "hvac",
+    "manager",
+    "log",
+    "openplan",
+    "petty",
+    "temperature"
+  ],
+  "parts": [
+    {
+      "part_number": 1,
+      "text": "I found my seventh sticky note on the thermostat at 8:55 a.m.: STOP MOVING THIS — GREG. The office was fifty-eight degrees and my fingers were the color of printer paper. I was twenty-seven, QA, wearing a hoodie that still smelled like last night's rain. Greg sat in direct sun and ran hot. He had the only override code. I started a log: time, temperature, who touched it, screenshot of the building app. By Thursday the log had nineteen Greg overrides and three of me putting it back to the posted 70. Then Greg changed the code. The app still showed every override under his username. I printed the log on the color printer he also controlled. The pages came out ice blue because he had set the printer to economy. I taped them under the thermostat anyway.",
+      "cliffhanger_hint": "He changed the code; the app still logs his name on every override.",
+      "social": {
+        "video_title": "He ran the office at fifty-eight and left sticky notes — Part 1/2",
+        "description": "QA hoodie, a sun-baked manager, and a thermostat that snitched in the building app. Would you have taped the log up?",
+        "hashtags": "#storytime #reddit #fyp #office #antiwork #pettyrevenge #openoffice"
+      }
+    },
+    {
+      "part_number": 2,
+      "text": "Facilities emailed the whole floor: override codes are for after-hours emergencies, not climates. Greg said he had a medical need. Facilities asked for the form. He did not have the form. The office returned to seventy. I took off the hoodie at 10:12 for the first time in a month. Greg brought a desk fan that rattled like a toy. The sticky notes came down. I kept the log in a folder labeled HVAC in case the sun told him a different story in July. The printer went back to normal color. My fingers went back to looking like fingers.",
+      "cliffhanger_hint": "",
+      "social": {
+        "video_title": "Facilities asked for a form he did not have — Part 2/2",
+        "description": "Nineteen overrides, one missing medical form, and seventy degrees like the sign always said. Was a sticky note a code?",
+        "hashtags": "#storytime #reddit #fyp #maliciouscompliance #office #revenge #antiwork"
+      }
+    }
+  ]
+}
