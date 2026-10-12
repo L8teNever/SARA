@@ -1,0 +1,38 @@
+{
+  "title": "I Let the Hackerspace Resin-Printer Queue Catch the Founder",
+  "total_parts": 2,
+  "keywords": [
+    "hackerspace",
+    "resin",
+    "printer",
+    "queue",
+    "founder",
+    "policy",
+    "sla",
+    "petty",
+    "lab",
+    "revenge"
+  ],
+  "parts": [
+    {
+      "part_number": 1,
+      "text": "I queued a four-hour print at 10:02 p.m. and the founder started a twelve-hour chess set on my vat. The queue board he built said: FIFO. FOUNDERS BOOK LIKE MEMBERS. I was twenty-eight, night member, holding a confirmed slot. Founder Max said, \"Calibrations don't queue.\" The slicer file was a chess set. I photographed the board, the file name, and my confirmation. Then I let the queue bot cancel any job not matching the slot owner. At 10:08 the bot posted why Max's name was on a queue-jump ticket.",
+      "cliffhanger_hint": "The bot can see a chess set on a vat locked to my four-hour slot.",
+      "social": {
+        "video_title": "The founder called a chess set a calibration \u2014 Part 1/2",
+        "description": "Night vat, a twelve-hour jump, and a FIFO board he built. The bot cancelled him. Would you have waited until morning?",
+        "hashtags": "#storytime #reddit #fyp #hackerspace #pettyrevenge #3dprint #maliciouscompliance"
+      }
+    },
+    {
+      "part_number": 2,
+      "text": "Max called it a joke until Slack filled with the bot. I printed the ticket, the board, and the photo. My print started. Max booked noon like a member and told the space the board was always about optics. Optics is a word founders use when a bot exists. Printer policy now has a second line: CHESS IS NOT CALIBRATION. I pull a clean plate. Max FIFOs. The vat finally smells like my resin.",
+      "cliffhanger_hint": "",
+      "social": {
+        "video_title": "Chess is not a calibration \u2014 Part 2/2",
+        "description": "Queue-jump ticket, a real four-hour print, and a second line on the board. Was founding ever a chess set?",
+        "hashtags": "#storytime #reddit #fyp #maliciouscompliance #hackerspace #revenge #3dprint"
+      }
+    }
+  ]
+}

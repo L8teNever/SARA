@@ -1,0 +1,38 @@
+{
+  "title": "I Enforced the Maker-Space Soldering-Iron Checkout on the Mentor",
+  "total_parts": 2,
+  "keywords": [
+    "makerspace",
+    "soldering",
+    "checkout",
+    "mentor",
+    "iron",
+    "policy",
+    "tool",
+    "petty",
+    "electronics",
+    "revenge"
+  ],
+  "parts": [
+    {
+      "part_number": 1,
+      "text": "I checked out iron 4 at 6:18 p.m. and the mentor already had it unlabeled on his bench. The checkout board he built said: TAG OUT. TAG IN. MENTORS INCLUDED. I was twenty-four, night class, holding a board that needed heat now. Mentor Sid said, \"Mentors don't tag heat.\" I pointed at the board. He tinned a tip. \"Heat is teaching.\" I photographed the missing tag, the board, and my checkout slip. Then I asked the tool bot to mark iron 4 overdue on Sid's account. At 6:22 the shop lead asked why Sid's name was on an untagged-iron ticket.",
+      "cliffhanger_hint": "The shop lead can see iron 4 on Sid's bench against the tag-out board he built.",
+      "social": {
+        "video_title": "The mentor skipped the soldering-iron tag \u2014 Part 1/2",
+        "description": "Night class, an unlabeled tip, and a board he built. The bot marked him overdue. Would you have waited on a cold pad?",
+        "hashtags": "#storytime #reddit #fyp #makerspace #pettyrevenge #electronics #maliciouscompliance"
+      }
+    },
+    {
+      "part_number": 2,
+      "text": "Sid called it a demo until the bot emailed the lead. I printed the ticket, the board, and the photo. I got iron 4. Sid tagged a demo iron and told the benches the board was always about optics. Optics is a word mentors use when a bot exists. Checkout policy now has a second line: HEAT TAGS OUT. I solder. Sid beeps. The tip finally has a name.",
+      "cliffhanger_hint": "",
+      "social": {
+        "video_title": "Heat tags out like every iron \u2014 Part 2/2",
+        "description": "Untagged-iron ticket, a demo with a tag, and a second line on the board. Was teaching ever a missing slip?",
+        "hashtags": "#storytime #reddit #fyp #maliciouscompliance #makerspace #revenge #electronics"
+      }
+    }
+  ]
+}
