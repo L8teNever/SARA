@@ -1,0 +1,38 @@
+{
+  "title": "I Used the Laser-Cutter Reservation on the Maker Who Hijacked Mine",
+  "total_parts": 2,
+  "keywords": [
+    "lasercutter",
+    "makerspace",
+    "reservation",
+    "queue",
+    "acrylic",
+    "policy",
+    "petty",
+    "lab",
+    "hijack",
+    "revenge"
+  ],
+  "parts": [
+    {
+      "part_number": 1,
+      "text": "I badged into the shop at 6:31 p.m. and the cutter already smelled like someone else's acrylic. The reservation screen I paid for said: 6:30\u20137:30 SLOT LOCKED TO MEMBER. I was thirty, night member, holding a file named DOOR_SIGN_V3. Maker Theo waved. \"I had five minutes of kerf.\" The log showed twenty-two. I pointed at the lock. He grinned. \"Makers share kerf.\" I photographed the screen, the log, and my unpaid wait. Then I used the shop bot to end his job at the lock time and start mine. At 6:36 the shop lead asked why Theo's name was on a slot-hijack ticket.",
+      "cliffhanger_hint": "The shop lead can see twenty-two minutes of kerf on a slot locked to me.",
+      "social": {
+        "video_title": "He called twenty-two minutes five of kerf \u2014 Part 1/2",
+        "description": "Paid slot, someone else's acrylic, and a lock screen. I ended his job. Would you have watched the kerf?",
+        "hashtags": "#storytime #reddit #fyp #makerspace #pettyrevenge #laser #maliciouscompliance"
+      }
+    },
+    {
+      "part_number": 2,
+      "text": "Theo called it a warmup until billing asked for the minutes. I printed the ticket, the lock, and the photo. My sign cut. Theo paid hijack time and told the Slack the lock was always about optics. Optics is a word makers use when a bot exists. Cutter policy now has a second line: KERF IS NOT A WARMUP. I keep the slot. Theo books his own. The bed finally smells like my file.",
+      "cliffhanger_hint": "",
+      "social": {
+        "video_title": "Kerf is not a warmup \u2014 Part 2/2",
+        "description": "Hijack ticket, billing minutes, and a second line on the lock. Was five minutes ever twenty-two?",
+        "hashtags": "#storytime #reddit #fyp #maliciouscompliance #makerspace #revenge #laser"
+      }
+    }
+  ]
+}
