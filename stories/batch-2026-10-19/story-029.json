@@ -1,0 +1,38 @@
+{
+  "title": "I Took the CNC-Mill Reservation to the Mentor Who Left a Toolpath Running",
+  "total_parts": 2,
+  "keywords": [
+    "cnc",
+    "mill",
+    "reservation",
+    "mentor",
+    "toolpath",
+    "policy",
+    "petty",
+    "shop",
+    "queue",
+    "revenge"
+  ],
+  "parts": [
+    {
+      "part_number": 1,
+      "text": "I loaded stock at 3:02 p.m. and mentor Jax's toolpath was still cutting on my reserved mill. The screen said: END JOB ON THE BEEP. NINETY MINUTES. UNLOAD. I was thirty-one, night student, holding a reservation. Jax did not unload. \"Mentors are the spindle.\" I photographed the screen, the reservation, and his still-green cycle. Then I logged a leftover job. At 3:10 the shop lead asked why Jax's cycle was on my ninety. I let them finish the sentence they would regret in writing. Petty is a word people use when their name is on the ticket.",
+      "cliffhanger_hint": "The shop lead can see Jax's green cycle on the mill during my reserved ninety.",
+      "social": {
+        "video_title": "He left a toolpath running into my mill slot — Part 1/2",
+        "description": "CNC mill, a reservation, and a mentor's leftover cycle. I logged the leftover. Would you have waited for the beep?",
+        "hashtags": "#storytime #reddit #fyp #cnc #makerspace #pettyrevenge #maliciouscompliance"
+      }
+    },
+    {
+      "part_number": 2,
+      "text": "Jax called it a finish until the lead asked for the log. I printed the leftover, the photo, and the screen. The job ended. Jax reserved finish time and told students finishes were always about optics. Optics is a word mentors use when a cycle exists. Reservation now has a second line: MENTORS UNLOAD. I keep my ninety. Jax books. The mill finally cuts a file, not a leftover. Nobody thanked me, which is how you know a policy finally works. A paper policy is only paper until someone treats it like a clock.",
+      "cliffhanger_hint": "",
+      "social": {
+        "video_title": "Mentors unload — Part 2/2",
+        "description": "Leftover log, ended cycle, and a second line. Was a finish ever my stock?",
+        "hashtags": "#storytime #reddit #fyp #cnc #maliciouscompliance #revenge #makerspace"
+      }
+    }
+  ]
+}
